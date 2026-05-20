@@ -1,0 +1,134 @@
+/* Relish Design Tokens */
+:root {
+  --paper: #FFF8EA;
+  --paper-2: #F7EBD2;
+  --ink: #2A1E1E;
+  --ink-soft: #5b4a44;
+  --maroon: #8B1024;
+  --red: #D71920;
+  --gold: #D9A03A;
+  --olive: #4F7A3C;
+  --mute: #a89a8a;
+
+  --font-playfair: 'Playfair Display', Georgia, serif;
+  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-caveat: 'Caveat', cursive;
+  --font-cormorant: 'Cormorant Garamond', Georgia, serif;
+
+  --shadow-booklet: 0 8px 40px rgba(42,30,30,0.12), 0 2px 8px rgba(42,30,30,0.08);
+  --shadow-card: 0 2px 12px rgba(42,30,30,0.08);
+  --shadow-sheet: 0 -4px 32px rgba(42,30,30,0.16);
+}
+
+/* Paper texture background */
+.paper-bg {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at 22px 22px, rgba(217,160,58,0.04) 2px, transparent 0),
+    radial-gradient(circle at 11px 11px, rgba(139,16,36,0.03) 1px, transparent 0);
+  background-size: 44px 44px, 22px 22px;
+}
+
+/* Gold divider line */
+.gold-divider {
+  border: none;
+  height: 1.5px;
+  background: linear-gradient(to right, transparent, var(--gold), transparent);
+  margin: 12px 0;
+}
+
+/* Scrollbar hide */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ---- KEYFRAME ANIMATIONS ---- */
+
+/* Bubbles rising (Beverages) */
+@keyframes bubble-rise {
+  0%   { transform: translateY(0) scale(1);   opacity: 0.6; }
+  50%  { opacity: 0.4; }
+  100% { transform: translateY(-120px) scale(0.5); opacity: 0; }
+}
+@keyframes bubble-sway {
+  0%, 100% { transform: translateX(0); }
+  50%       { transform: translateX(8px); }
+}
+
+/* Steam curl (Soups) */
+@keyframes steam-rise {
+  0%   { transform: translateY(0) scaleX(1); opacity: 0.7; }
+  100% { transform: translateY(-60px) scaleX(1.4); opacity: 0; }
+}
+@keyframes steam-sway {
+  0%, 100% { transform: translateX(-4px) rotate(-3deg); }
+  50%       { transform: translateX(4px)  rotate(3deg); }
+}
+
+/* Drizzle draw (Desserts) */
+@keyframes drizzle-draw {
+  from { stroke-dashoffset: 400; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* Sauce swirl draw (Italian) */
+@keyframes swirl-draw {
+  from { stroke-dashoffset: 500; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* Bell ring (Waiter) */
+@keyframes bell-ring {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(10deg); }
+  30%  { transform: rotate(-10deg); }
+  45%  { transform: rotate(6deg); }
+  60%  { transform: rotate(-6deg); }
+  75%  { transform: rotate(3deg); }
+  90%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Ripple outward (Waiter) */
+@keyframes ripple-out {
+  0%   { transform: scale(0); opacity: 0.8; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* Checkmark scale-in */
+@keyframes check-in {
+  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60%  { transform: scale(1.2) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* Plate reveal border */
+@keyframes plate-reveal {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; }
+  100% { clip-path: inset(0 0% 0 0);   opacity: 1; }
+}
+
+/* Gold shimmer */
+@keyframes gold-shimmer {
+  0%, 100% { background-position: -200% center; }
+  50%       { background-position: 200% center; }
+}
+
+/* Subtle float (cover particles) */
+@keyframes float-drift {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  33%       { transform: translateY(-8px) translateX(4px); }
+  66%       { transform: translateY(4px) translateX(-6px); }
+}
+
+/* Slide underline for active category pill */
+@keyframes underline-slide {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* Order slip appear */
+@keyframes slip-in {
+  0%   { transform: translateY(100%); opacity: 0; }
+  60%  { transform: translateY(-6px);  opacity: 1; }
+  100% { transform: translateY(0);     opacity: 1; }
+}
