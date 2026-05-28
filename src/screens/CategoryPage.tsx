@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { type Category, type MenuItem } from '../data/menu'
 import { MenuCard } from '../components/molecules/MenuCard'
@@ -16,6 +17,15 @@ interface CategoryPageProps {
   onRecommend: () => void
 }
 
+// Maps category ID to the actual banner filename (note: desserts file is singular)
+const BANNER_FILE: Record<string, string> = {
+  beverages:  'beverages-banner.webp',
+  soups:      'soups-banner.webp',
+  quickbites: 'quickbites-banner.webp',
+  italian:    'italian-banner.webp',
+  desserts:   'dessert-banner.webp',
+}
+
 function AnimationForCategory({ type }: { type: Category['backgroundAnimation'] }) {
   if (type === 'bubbles') return <BubblesAnim />
   if (type === 'steam')   return <SteamAnim />
@@ -26,6 +36,9 @@ function AnimationForCategory({ type }: { type: Category['backgroundAnimation'] 
 }
 
 export function CategoryPage({ category, onItemTap, onRecommend }: CategoryPageProps) {
+  const [bannerErr, setBannerErr] = useState(false)
+  const bannerSrc = `/assets/covers/${BANNER_FILE[category.id] ?? `${category.id}-banner.webp`}`
+
   return (
     <div className="flex flex-col paper-bg min-h-0 flex-1">
       {/* Hero section */}
@@ -71,18 +84,28 @@ export function CategoryPage({ category, onItemTap, onRecommend }: CategoryPageP
           </motion.div>
         </div>
 
-        {/* Featured image placeholder */}
+        {/* Category banner — real photo with SVG illustration fallback */}
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
-          className="mt-3 relative"
+          className="mt-3 relative overflow-hidden rounded-2xl"
           style={{ zIndex: 1 }}
         >
-          <CategoryIllustration
-            categoryId={category.id}
-            className="aspect-[16/7]"
-          />
+          {!bannerErr ? (
+            <img
+              key={category.id}
+              src={bannerSrc}
+              alt={category.name}
+              className="w-full aspect-[21/9] object-cover"
+              onError={() => setBannerErr(true)}
+            />
+          ) : (
+            <CategoryIllustration
+              categoryId={category.id}
+              className="aspect-[16/7]"
+            />
+          )}
         </motion.div>
       </div>
 

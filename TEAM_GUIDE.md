@@ -6,6 +6,15 @@
 
 ---
 
+## Session Log
+
+| Date | What was done |
+|------|--------------|
+| 2026-05-20 | Initial build — all 8 screens, HyperFrames composition, 4 landing variants, WaiterPanel |
+| 2026-05-28 | Media assets (WebP), ServicePanel, video prompts — see § 18 |
+
+---
+
 ## Table of Contents
 
 1. [Project Vision](#1-project-vision)
@@ -25,6 +34,7 @@
 15. [Media Production (Nano Banana + Kling AI)](#15-media-production-nano-banana--kling-ai)
 16. [Key Technical Gotchas](#16-key-technical-gotchas)
 17. [Contributing](#17-contributing)
+18. [Session 2 — 2026-05-28 Changes](#18-session-2--2026-05-28-changes)
 
 ---
 
@@ -919,5 +929,88 @@ Edit `src/data/menu.ts`. Add to the appropriate category's `items` array:
 
 ---
 
-_This guide was written at the end of the initial build session (2026-05-20)._
+_This guide was written at the end of the initial build session (2026-05-20) and updated 2026-05-28._
 _The project is actively in development. When in doubt, read the source — it's well-commented._
+
+---
+
+## 18. Session 2 — 2026-05-28 Changes
+
+### What was done
+
+**Media assets wired (WebP)**
+
+All dish images, category banners, and cover images are now live WebP files with graceful fallbacks:
+
+| Component | Asset path | Fallback |
+|-----------|-----------|---------|
+| `MenuCard` thumbnail | `public/assets/dishes/{id}.webp` | Category emoji |
+| `ItemDetail` hero | `public/assets/dishes/{id}-hero.webp` | `CategoryIllustration` SVG |
+| `CategoryPage` banner | `public/assets/covers/{id}-banner.webp` | `CategoryIllustration` SVG |
+| `LandingBotanica` plate | `public/assets/covers/cover-botanica-plate.webp` | — |
+| `LandingGastronomique` portrait | `public/assets/covers/cover-deco-portrait.webp` | — |
+| `LandingEditorial` spread | `public/assets/covers/cover-editorial-spread.webp` | — |
+
+Pattern used everywhere — `key={item.id}` on `<img>` forces React to remount the element when a different item is opened, resetting the cached `onError` state so the right image is attempted fresh.
+
+Banner filename quirk: category ID `desserts` → file `dessert-banner.webp` (singular, not plural). All others follow `{id}-banner.webp`. This is handled by the `BANNER_FILE` map in `CategoryPage.tsx`.
+
+**PNG → WebP conversion (one-time, already run)**
+
+`scripts/convert-to-webp.mjs` converted 68 PNG files to WebP at 85% quality using `sharp`. All originals deleted. Every `.png` reference in source code updated to `.webp`.
+
+**ServicePanel (replaces WaiterPanel)**
+
+`src/screens/ServicePanel.tsx` is a full tableside service hub:
+- **Home view**: drag handle, table tag (Table · 2 guests · time), animated amber status dot, greeting, hero "Call our waiter" card (maroon gradient + `pulse-glow` animation), 3×2 action grid, live request feed
+- **Waiter view**: full-screen overlay, SVG waiter silhouette with `waiterApproach` + `waiter-sway` animations, ETA countdown from 42s, Hide/Cancel buttons
+- **Water sub-sheet**: 4 option cards (Still / Sparkling / +Ice / +Lemon) with water pour animation
+- **Bill sub-sheet**: 4 options (One bill / Split evenly / Itemise / Add gratuity)
+- **More sub-sheet**: 6 options including Jain info → Q&A sub-view
+- **Toast**: AnimatePresence pill, 2.4s auto-dismiss
+- **Feed**: FeedItem state, seed data with done/pending, new requests prepend, pending→done after 4.5s
+
+New animation variants added to `src/animations/variants.ts`: `fullPanel`, `slideInRight`.
+
+New CSS keyframes added to `src/tokens.css`: `pulse-glow`, `waiterApproach`, `waiter-sway`, `water-pour`, `feed-enter`.
+
+`App.tsx` updated: imports `ServicePanel` (not `WaiterPanel`), passes `onOpenMenu`, `onViewOrder`, `orderCount`, `total` props.
+
+**Image prompt library complete**
+
+`public/assets/prompts/` now has 9 files covering every asset the app needs:
+- `00-style-guide.md` — master palette + negative prompts (referenced by all others)
+- `01-covers.md`, `02-category-banners.md`
+- `03-beverages.md` through `07-desserts.md` — 30 dishes × 2 = 60 prompts
+- `08-video-reels.md` — 6 Veo video prompts (see below)
+
+**Video prompts (`08-video-reels.md`)**
+
+6 Google Veo 3.1 prompts — no reference images required, all self-contained:
+
+| ID | File | Where wired | Model | Duration |
+|----|------|------------|-------|----------|
+| vid-001 | `hero-reel.mp4` | `LandingCover.tsx` HERO_VIDEO_SRC | `veo-3.1-generate-preview` | 8s |
+| vid-002 | `cat-beverages.mp4` | CategoryPage Beverages → replaces BubblesAnim | `veo-3.1-fast-generate-preview` | 6s |
+| vid-003 | `cat-soups.mp4` | CategoryPage Soups → replaces SteamAnim | `veo-3.1-fast-generate-preview` | 6s |
+| vid-004 | `cat-quickbites.mp4` | CategoryPage QuickBites → replaces PlateAnim | `veo-3.1-fast-generate-preview` | 6s |
+| vid-005 | `cat-italian.mp4` | CategoryPage Italian → replaces SwirlAnim | `veo-3.1-fast-generate-preview` | 6s |
+| vid-006 | `cat-desserts.mp4` | CategoryPage Desserts → replaces DrizzleAnim | `veo-3.1-fast-generate-preview` | 6s |
+
+All 9:16 vertical portrait, 4K.
+
+### Veo generation tips (learned this session)
+
+- Valid durations: **4, 6, or 8 seconds only** — not 5, not 7
+- Correct model IDs: `veo-3.1-generate-preview` and `veo-3.1-fast-generate-preview`
+- Landscape images as first/last frame for 9:16 output → bad composition. Only use images as **style references**, never first/last frame for portrait video
+- `SILENT SCENE` directive must lead the prompt or Veo adds unwanted speech/music
+- Always add a `Negative:` line excluding wrong food items per category (e.g. `pasta` in the soups video)
+
+### Remaining after this session
+
+1. Generate 6 videos using `08-video-reels.md` prompts
+2. Wire `HERO_VIDEO_SRC` in `LandingCover.tsx` once `hero-reel.mp4` is ready
+3. Wire `<video>` tags in `CategoryPage.tsx` to replace SVG category animations
+4. ServicePanel QA — test all views, ETA countdown, feed transitions
+5. `npm run build` verification

@@ -244,32 +244,20 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
             transition={{ duration: 7, delay: 1.2, repeat: Infinity, ease: 'easeInOut' }}
           />
 
-          {/* SVG elevated fine-dining plate */}
-          <svg
-            className="absolute"
-            style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
-            width="148"
-            height="148"
-            viewBox="0 0 148 148"
-          >
-            <ellipse cx="74" cy="134" rx="54" ry="6" fill="rgba(0,0,0,0.35)" />
-            {/* Elevated plate on stand */}
-            <ellipse cx="74" cy="90" rx="56" ry="10" fill="#D8C890" opacity="0.5" />
-            <rect x="70" y="90" width="8" height="12" rx="2" fill="#C8B870" />
-            <ellipse cx="74" cy="102" rx="18" ry="4" fill="#C8B870" />
-            {/* Plate */}
-            <circle cx="74" cy="72" r="58" fill="#F8F0E0" stroke="#C8A830" strokeWidth="2.2" />
-            <circle cx="74" cy="72" r="47" fill="#FFFBF0" />
-            {/* Dish content */}
-            <path d="M 36 74 Q 56 62 76 74 Q 96 86 110 70" stroke="#B04808" strokeWidth="11" strokeLinecap="round" fill="none" opacity="0.8" />
-            <rect x="58" y="55" width="32" height="22" rx="5" fill="#7A3218" />
-            <rect x="61" y="51" width="26" height="8" rx="3.5" fill="#9A4A28" />
-            <circle cx="42" cy="86" r="3" fill="#C8A030" />
-            <circle cx="48" cy="93" r="2.2" fill="#C8A030" />
-            <circle cx="36" cy="89" r="1.8" fill="#C8A030" />
-            <path d="M 76 47 Q 72 39 66 43 Q 72 47 72 54" fill="#3A6A18" />
-            <path d="M 78 46 Q 84 38 88 43 Q 82 46 79 53" fill="#3A6A18" />
-          </svg>
+          {/* Deco portrait food photo — centred over bokeh */}
+          <img
+            src="/assets/covers/cover-deco-portrait.webp"
+            alt="Relish fine dining"
+            className="absolute object-cover"
+            style={{
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '100%',
+              height: '100%',
+              opacity: 0.92,
+            }}
+          />
 
           {/* Art Deco ornament overlay */}
           <div className="absolute bottom-0 inset-x-0 px-4 py-2 flex items-center justify-center gap-3"

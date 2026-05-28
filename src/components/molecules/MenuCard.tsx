@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { type MenuItem } from '../../data/menu'
 import { Badge } from '../atoms/Badge'
@@ -27,6 +28,7 @@ interface MenuCardProps {
 
 export function MenuCard({ item, onTap }: MenuCardProps) {
   const cat = CATEGORY_THUMB[categoryFromItemId(item.id)] ?? CATEGORY_THUMB.quickbites
+  const [imgErr, setImgErr] = useState(false)
 
   return (
     <motion.div
@@ -40,7 +42,7 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
         boxShadow: 'var(--shadow-card)',
       }}
     >
-      {/* Category-coloured emoji thumbnail */}
+      {/* Dish thumbnail — real photo with emoji fallback */}
       <div
         className="w-16 h-16 rounded-xl flex-shrink-0 relative overflow-hidden flex items-center justify-center"
         style={{
@@ -48,7 +50,16 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
           border: '1px solid rgba(217,160,58,0.28)',
         }}
       >
-        <span style={{ fontSize: 28, lineHeight: 1, userSelect: 'none' }}>{cat.emoji}</span>
+        {!imgErr ? (
+          <img
+            src={`/assets/dishes/${item.id}.webp`}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            onError={() => setImgErr(true)}
+          />
+        ) : (
+          <span style={{ fontSize: 28, lineHeight: 1, userSelect: 'none' }}>{cat.emoji}</span>
+        )}
       </div>
 
       <div className="flex-1 min-w-0">

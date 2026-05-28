@@ -27,7 +27,7 @@ Open Chrome DevTools → Device toolbar → iPhone 14 Pro (393 × 852) for the i
 | **AI Recommendations** | 3-question mood / party size / budget → client-side scored top 3 dishes |
 | **Item Detail** | Bottom sheet, drag-to-dismiss, customizations, pairings |
 | **Add to Order** | Animated order slip with spring-bounce item placement |
-| **Waiter Panel** | Bell ring, gold ripple, 5 quick-tap service options |
+| **Service Panel** | Full tableside hub — call waiter (animated approach), water, bill split, Jain info, live request feed |
 | **Order Panel** | Full cart — quantities, notes, total |
 
 ---
@@ -64,9 +64,16 @@ Deploy by dragging `dist/` into [Netlify](https://netlify.com), running `vercel 
 
 ---
 
-## Media (future)
+## Media
 
-The landing background is currently an animated GSAP/HyperFrames composition.
-When the Kling AI video is ready, drop it in `public/assets/hero-reel.mp4` and set
-`HERO_VIDEO_SRC` in `src/screens/LandingCover.tsx` — the priority logic swaps it in automatically.
-See `TEAM_GUIDE.md § 15` for the full Nano Banana + Kling AI workflow and prompts.
+All dish, cover, and banner images are **WebP** assets in `public/assets/`.
+The landing background currently uses an animated GSAP/HyperFrames HTML composition (`hero-reel.html`).
+Category pages have CSS/SVG ambient animations per section.
+
+**Upgrading to Veo-generated videos (next step):**
+1. Generate 6 videos using prompts in `public/assets/prompts/08-video-reels.md`
+2. Drop `.mp4` files into `public/assets/`
+3. Hero: set `HERO_VIDEO_SRC = '/assets/hero-reel.mp4'` in `LandingCover.tsx`
+4. Category ambients: wire `<video>` tags in `CategoryPage.tsx` to replace SVG animations
+
+See `HANDOFF.md` for exact CLI commands and wiring instructions.

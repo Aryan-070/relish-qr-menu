@@ -124,6 +124,24 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
         </svg>
       </motion.div>
 
+      {/* Editorial food spread — full-width hero strip */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.85, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden"
+      >
+        <img
+          src="/assets/covers/cover-editorial-spread.webp"
+          alt="Relish editorial food spread"
+          className="w-full aspect-[21/9] object-cover"
+          style={{
+            borderTop: '1px solid rgba(42,30,30,0.15)',
+            borderBottom: '1px solid rgba(42,30,30,0.15)',
+          }}
+        />
+      </motion.div>
+
       <Rule />
 
       {/* Feature section — two columns */}

@@ -8,7 +8,7 @@ import { MenuBooklet } from './screens/MenuBooklet'
 import { RecommendationFlow } from './screens/RecommendationFlow'
 import { ItemDetail } from './screens/ItemDetail'
 import { AddToOrder } from './screens/AddToOrder'
-import { WaiterPanel } from './screens/WaiterPanel'
+import { ServicePanel } from './screens/ServicePanel'
 import { OrderPanel } from './screens/OrderPanel'
 import { useOrder } from './hooks/useOrder'
 import { type MenuItem } from './data/menu'
@@ -173,11 +173,15 @@ export default function App() {
         onWaiter={() => { setOrderOpen(false); setTimeout(openWaiter, 80) }}
       />
 
-      {/* Waiter panel */}
-      <WaiterPanel
+      {/* Service panel — replaces WaiterPanel */}
+      <ServicePanel
         open={waiterOpen}
         onClose={() => setWaiterOpen(false)}
         onRecommend={() => { setWaiterOpen(false); setTimeout(goToRecommend, 80) }}
+        onOpenMenu={() => { setWaiterOpen(false); setTimeout(goToMenu, 80) }}
+        onViewOrder={() => { setWaiterOpen(false); setTimeout(() => setOrderOpen(true), 80) }}
+        orderCount={count}
+        total={total}
       />
     </div>
   )

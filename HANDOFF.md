@@ -1,40 +1,19 @@
 # Relish QR Menu — Session Handoff
 
-_Last updated: 2026-05-20 · Classic variant landing page + HyperFrames full-screen background_
+_Last updated: 2026-05-28 · Media assets wired, ServicePanel built, video prompts finalised_
 
 ---
 
 ## Goal
 
-Build **Relish — International Veg Cuisine**, a premium digital QR menu as a mobile-first SPA.
-The landing page should feel like opening a luxury booklet — a cinematic full-screen animation
-plays as the background (candlelight → plate reveal → RELISH reveal with floating spices),
-then the user taps through to the full menu, AI recommendation flow, or waiter call.
+Build **Relish — International Veg Cuisine** — a premium cinematic QR menu SPA.
 
-The full 8-screen spec is in the archived plan file:
-`~/.claude/plans/fetch-this-design-file-warm-nygaard.md`
+**Milestone this session:** Wire all dish/cover/banner images into the app as WebP files with graceful fallbacks, replace WaiterPanel with the full ServicePanel tableside hub, and produce the complete set of Google Veo video prompts for the animated backgrounds.
 
----
-
-## Tech Stack
-
-| Layer | Choice | Notes |
-|-------|--------|-------|
-| Build | Vite 5 + React 18 + TypeScript 5 | `npm run dev` → localhost:5173 |
-| Routing | React state machine (no React Router) | `Screen = 'cover' \| 'menu' \| 'recommend'` |
-| Animations | Framer Motion v11 | `AnimatePresence` + `motion.*` |
-| Background composition | HyperFrames (GSAP 3.14.2 HTML) | `public/assets/hero-reel.html` |
-| Styling | Tailwind CSS v3 + CSS custom properties | `src/tokens.css`, `src/index.css` |
-| Fonts | Playfair Display, Inter, Cormorant Garamond, Caveat | Loaded via `<link>` in `index.html` |
-
-**Design tokens** (in `src/tokens.css`):
-```
---paper: #FFF8EA    --paper-2: #F7EBD2
---ink: #2A1E1E      --ink-soft: #5b4a44
---maroon: #8B1024   --red: #D71920
---gold: #D9A03A     --olive: #4F7A3C
---mute: #a89a8a
-```
+**End-state target:**
+- All 6 Veo-generated videos dropped in → app has no static fallback screens left
+- ServicePanel fully QA'd across all 4 landing themes
+- Build verified green, deployed to Netlify/Vercel
 
 ---
 
@@ -42,55 +21,68 @@ The full 8-screen spec is in the archived plan file:
 
 ### What is COMPLETE and working ✅
 
-**App shell (`src/App.tsx`)**
-- State machine: `cover → menu → recommend`
-- 4 landing variants switchable in-app: Classic, Deco (Gastronomique), Editorial, Botanica
-- `ItemDetail`, `AddToOrder`, `WaiterPanel`, `OrderPanel` all rendered outside `AnimatePresence` (correct)
-- `useOrder` hook wires cart state throughout
+**All dish images wired (WebP)**
+- `MenuCard.tsx` — thumbnail `public/assets/dishes/{id}.webp` with emoji fallback
+- `ItemDetail.tsx` — hero `public/assets/dishes/{id}-hero.webp` with `CategoryIllustration` SVG fallback
+- Key pattern: `key={item.id}` on `<img>` forces React remount so `onError` state resets when a new item opens
 
-**All 4 landing variants**
-- `LandingCover.tsx` (Classic) — HyperFrames cinematic full-screen background
-- `LandingGastronomique.tsx` (Deco)
-- `LandingEditorial.tsx` (Editorial)
-- `LandingBotanica.tsx` (Botanica)
-- All 3 non-classic variants use the original paper-background layout (unaffected by this session's changes)
+**All category banners wired (WebP)**
+- `CategoryPage.tsx` — `BANNER_FILE` map resolves the `desserts` → `dessert-banner.webp` singular quirk
+- `aspect-[21/9]` photo banner + `CategoryIllustration` SVG fallback on load error
 
-**HyperFrames composition (`public/assets/hero-reel.html`)**
-- 3 scenes, 7.5s total, loops via `onComplete: () => tl.restart()`
-- Scene 1: Candlelight — dark field, amber + maroon bokeh, ghost "R", dust particles, corner marks
-- Scene 2: The Plate — warm ember BG, plate SVG springs in, sauce stroke draws, herb garnish, steam wisps, sauce dots
-- Scene 3: RELISH Reveal — dark velvet, 3D letter tumble, gold underline draw, subtitle, then 8 ingredient silhouettes float upward (star anise, chili, oil bottle, bay leaf, garlic, cardamom, cinnamon, peppercorn trio)
-- Loop resets: all `tl.set()` calls at `t=0` restore every element to initial state
-- Auto-play fallback: `if (typeof window.__hyperframes === 'undefined') { tl.play(); }` — works in plain `<iframe>` without the HyperFrames player
-- Verified working: timeline plays, loops, ingredients animate (opacity 0.20, drift transform confirmed at `t=5.2s`)
+**All landing cover images wired (WebP)**
+- `LandingBotanica.tsx` — circular `cover-botanica-plate.webp` (178×178, border-radius 50%)
+- `LandingGastronomique.tsx` — full-bleed `cover-deco-portrait.webp` inside the art-deco frame
+- `LandingEditorial.tsx` — full-width `cover-editorial-spread.webp` hero strip between headline and first rule
 
-**LandingCover.tsx — full-screen layout (THIS SESSION'S MAIN CHANGE)**
-- `iframe` is `position: absolute; inset: 0; z-index: 0` — fills the entire viewport
-- Dark gradient vignette `height: 64%; z-index: 10` covers bottom portion for text legibility
-- `flex-1` spacer (minHeight: 36vh) pushes React content to the bottom
-- React overlay `z-index: 20`: tagline + trust badges + 3 animated buttons
-- `CoverBackground` Three.js canvas **removed** (composition owns the background)
-- React RELISH letter-by-letter heading **removed** (composition reveals it cinematically)
-- GhostBtn: color `rgba(255,248,234,0.52)`, border `rgba(255,248,234,0.18)` — adapted for dark bg
-- GoldBtn: color `#D9A03A` — adapted for dark bg
-- Media priority: `HERO_VIDEO_SRC` (Kling AI .mp4) → `HERO_HTML_SRC` (HyperFrames) → CSS fallback
+**PNG → WebP batch conversion (done)**
+- `scripts/convert-to-webp.mjs` — converted 68 files, deleted all originals
+- `public/assets/covers/` — 10 WebP files; `public/assets/dishes/` — 60+ WebP files
+- Every `.png` reference in source code updated to `.webp`
 
-**Menu screens (all complete)**
-- `MenuBooklet.tsx` — tab shell with TopBar, CategoryNav, BottomNav
-- `CategoryPage.tsx` — per-category items with ambient animations
-- `RecommendationFlow.tsx` — 3-step mood/size/budget chips, `useRecommendation` scoring
-- `ItemDetail.tsx` — bottom sheet, drag-to-dismiss
-- `AddToOrder.tsx` — order slip animation with checkmark
-- `WaiterPanel.tsx` — bell SVG, ripple, 5 quick-tap options
-- `OrderPanel.tsx` — full cart view
+**TypeScript build errors fixed**
+- `LandingBotanica.tsx` — removed unused `GOLD` and `CREAM` constants (TS6133)
 
-**Data & hooks**
-- `src/data/menu.ts` — 5 categories × 6–8 items (Beverages, Soups, Quick Bites, Italian Fiesta, Desserts)
-- `src/hooks/useRecommendation.ts` — client-side scoring by mood/partySize/budget
-- `src/hooks/useOrder.ts` — cart state (add/remove/qty/note)
+**ServicePanel built (`src/screens/ServicePanel.tsx`)**
+- Replaces `WaiterPanel.tsx` entirely
+- Views: `home | waiter | water | bill | more | jain | sent`
+- Home: drag handle + table tag + greeting + hero "Call our waiter" card + 3×2 action grid + live request feed
+- Waiter view: animated approach silhouette, ETA countdown (42s), Hide/Cancel
+- Water, Bill, More sub-sheets with option grids
+- Jain sub-view carries over Q&A from old WaiterPanel
+- Toast notification (2.4s auto-dismiss, AnimatePresence)
+- Live feed: FeedItem state, pending→done auto-transition after 4.5s
+- Theme: cream/warm (paper-bg), maroon gradient hero button, gold accents — soothing for Classic
 
-**Animation components**
-- `BubblesAnim`, `SteamAnim`, `DrizzleAnim`, `BellRipple`, `PlateAnim`, `SwirlAnim` — CSS/SVG keyframe animations
+**New animation variants (`src/animations/variants.ts`)**
+- `fullPanel` — full-screen overlay fade (used by waiter view)
+- `slideInRight` — spring slide for sub-sheets (water/bill/more)
+
+**New CSS keyframes (`src/tokens.css`)**
+- `pulse-glow` — soft maroon/gold shadow pulse on hero call button
+- `waiterApproach` — blur rack to sharp, scale 0.4→1, with translateY
+- `waiter-sway` — body oscillation ±3%
+- `water-pour` — stream animation for water sub-sheet
+- `feed-enter` — feed row slide-in from left
+
+**`App.tsx` wired**
+- Imports `ServicePanel` (no more `WaiterPanel`)
+- Passes `onOpenMenu`, `onViewOrder`, `orderCount`, `total` props
+
+**Image prompt library complete (`public/assets/prompts/`)**
+- `00-style-guide.md` — master palette + negative prompts
+- `01-covers.md` — 3 cover images
+- `02-category-banners.md` — 5 banners
+- `03-beverages.md` through `07-desserts.md` — 30 dishes × 2 (thumbnail + hero) = 60 prompts
+- `08-video-reels.md` — 6 Veo video prompts (see below)
+
+**Video prompt file (`public/assets/prompts/08-video-reels.md`)**
+- 6 videos, correct scope (only LandingCover gets a hero video — other landings stay static)
+- vid-001: Classic hero, `veo-3.1-generate-preview`, 8s, 4K, 9:16, dark cinematic
+- vid-002 to vid-006: Category ambient loops, `veo-3.1-fast-generate-preview`, 6s, 4K, 9:16
+- Mapping: vid-002 Beverages (BubblesAnim), vid-003 Soups (SteamAnim), vid-004 QuickBites (PlateAnim), vid-005 Italian (SwirlAnim), vid-006 Desserts (DrizzleAnim)
+- Each prompt is self-contained, no reference images required
+- SILENT SCENE directive + SFX line + per-category food exclusions in Negative
 
 ---
 
@@ -98,107 +90,133 @@ The full 8-screen spec is in the archived plan file:
 
 | File | Change |
 |------|--------|
-| `public/assets/hero-reel.html` | Full rewrite — v1 was 375×210px, 4s, 3 scenes. v2 is 100% responsive, 7.5s, full-frame, + 8 ingredient SVGs in Scene 3 |
-| `src/screens/LandingCover.tsx` | Full restructure — removed height-constrained hero box, added full-screen iframe background, dark gradient overlay, flex spacer, adapted button colors for dark bg, removed CoverBackground + React RELISH heading |
+| `src/screens/ServicePanel.tsx` | **NEW** — full tableside service hub replacing WaiterPanel |
+| `src/App.tsx` | Import ServicePanel, add onOpenMenu/onViewOrder/orderCount/total props |
+| `src/animations/variants.ts` | Added `fullPanel`, `slideInRight` variants |
+| `src/tokens.css` | Added 5 `@keyframes`: pulse-glow, waiterApproach, waiter-sway, water-pour, feed-enter |
+| `src/screens/LandingBotanica.tsx` | Build fix (removed unused GOLD/CREAM), wired circular cover image |
+| `src/screens/LandingGastronomique.tsx` | Replaced SVG plate with deco portrait WebP |
+| `src/screens/LandingEditorial.tsx` | Added editorial food spread hero strip |
+| `src/screens/CategoryPage.tsx` | Wired .webp banners, updated BANNER_FILE map |
+| `src/components/molecules/MenuCard.tsx` | Wired .webp dish thumbnails + emoji fallback |
+| `src/screens/ItemDetail.tsx` | Wired .webp dish heroes + CategoryIllustration fallback |
+| `public/assets/covers/` | 10 WebP cover + banner images (untracked → staged) |
+| `public/assets/dishes/` | 60+ WebP dish thumbnails + heroes (untracked → staged) |
+| `public/assets/prompts/` | 9 prompt MD files (untracked → staged) |
+| `scripts/convert-to-webp.mjs` | One-time PNG→WebP batch conversion (already run) |
 
 ---
 
 ## What Was Tried and Failed
 
-### `repeat: -1` for ingredient loop
-Tried using GSAP `repeat: -1` on ingredient drift tweens. **Banned by HyperFrames** — infinite-repeat timelines break the capture engine. Fixed by using finite `repeat: 0` (single drift) + calculating the exact motion to cover the available window (4.35s → 6.80s).
+**Landscape images as first/last frame for 9:16 video**
+All source dish photos are 4:3 or 21:9 landscape. An early attempt used them as Veo `first_frame_image` for 9:16 portrait video — the generated video was badly composed (black bars, wrong crop). Fixed by removing first/last frame fields entirely and using only text prompts. Prompts are now detailed enough that reference images are supplementary, not required.
 
-### `tl.from()` for Scene 3 RELISH letters
-Tried `tl.from('#s3-l0', { opacity: 0, rotateX: -52, y: 18 })`. Works in standalone but breaks on loop restart — the `from()` records the animated-to state as the new base, so on loop restart the letters jump to wrong positions. **Fixed** by using `tl.set()` at `t=0` to force initial state, then `tl.to()` to animate to the final state. This pattern is loop-safe.
+**Wrong Veo model IDs (`veo-3.1-pro`, `veo-3.1-fast`)**
+These are not valid API identifiers. After installing the `veo-video-generation` skill, confirmed correct IDs: `veo-3.1-generate-preview` (Pro) and `veo-3.1-fast-generate-preview` (Fast).
 
-### Stroke-dashoffset losing state on loop
-SVG sauce path and gold rules weren't resetting their dashoffset on loop restart. **Fixed** by adding explicit `tl.set('#s2-sauce', { attr: { 'stroke-dashoffset': 138, 'stroke-dasharray': 138 } }, 0)` and similar for all `#s3-*-line` elements.
+**Invalid 5-second duration for ambient loops**
+Veo only accepts 4, 6, or 8 seconds. The first version of prompts used 5s. Fixed to 6s across all ambient loops.
 
-### Three.js canvas as landing background
-Original plan used a `CoverBackground.tsx` Three.js canvas with 30 floating gold/maroon particles. This was replaced by the HyperFrames composition because:
-1. The composition provides far richer cinematics (3 actual scenes vs floating dots)
-2. One less WebGL context
-3. HyperFrames composition is also the path to Kling AI video swap — same `<iframe>/<video>` slot
+**9 videos instead of 6**
+Initial plan had 4 landing hero videos + 5 category ambients. Code audit showed only `LandingCover.tsx` has video infrastructure (`HERO_VIDEO_SRC`). The other 3 landing screens (Gastronomique, Editorial, Botanica) use static images and would need a full wiring pass to support video. Scope reduced to 1 hero + 5 category ambients = 6 videos total.
 
-### Constrained 210px hero box
-The original `LandingCover.tsx` rendered the composition inside a `height: 210` `<div>` with rounded corners at the top — user wanted full page coverage. Removed entirely in this session.
+**QuickBites/Desserts animation labels swapped**
+The first prompt draft described DrizzleAnim for QuickBites and PlateAnim for Desserts. In the code, QuickBites uses `backgroundAnimation: 'plate'` (PlateAnim → concentric circles) and Desserts uses `backgroundAnimation: 'drizzle'` (DrizzleAnim → falling gold line). Fixed in the final `08-video-reels.md`.
 
-### iframe with `min-h-dvh` on html/body
-Early attempt at full-screen had `min-h-dvh` on the iframe's internal HTML — this caused the iframe document to be taller than its container, showing a scrollbar in some browsers. **Fixed** by setting `html, body { width: 100%; height: 100%; overflow: hidden; }` inside the composition — the iframe container clips it.
+**Pasta in the soups ambient prompt**
+An early draft of vid-003 (Soups) ended with a camera pull revealing a pasta plate. Fixed — the soups video now shows broth only, with pasta explicitly in the `Negative:` line.
 
 ---
 
 ## Next Steps
 
-### Immediate — visual polish
+### 1. Generate videos using `08-video-reels.md`
 
-1. **Ingredient visibility** — The React dark gradient (bottom 64%) fully occludes ingredients at `y > 500px` (oil bottle, bay leaf escape partially; others are hidden). Consider:
-   - Reduce gradient height to 55% (`height: '55%'`) and shift spacer to `minHeight: '42vh'` — more composition visible, buttons still have dark backing
-   - OR increase ingredient drift distance so more reach the semi-transparent zone: anise `y: -200`, chili `y: -220`, etc.
+Run each prompt through the Veo CLI:
+```bash
+# Hero (8s, 4K)
+~/.claude/skills/veo-video-generation/generate-video.sh \
+  --prompt "[vid-001 prompt text]" \
+  --model veo-3.1-generate-preview \
+  --duration 8 --resolution 1080p --aspect-ratio 9:16 \
+  --output public/assets --filename hero-reel.mp4
 
-2. **Scene 1 timing feels fast on first load** — fonts (Playfair Display) load async; the first loop may show fallback serif on Scene 3 RELISH letters. Add `document.fonts.ready.then(() => tl.play())` in hero-reel.html instead of the current immediate `tl.play()`.
+# Ambient loops (6s, 4K)
+~/.claude/skills/veo-video-generation/generate-video.sh \
+  --prompt "[vid-002 prompt text]" \
+  --model veo-3.1-fast-generate-preview \
+  --duration 6 --resolution 1080p --aspect-ratio 9:16 \
+  --output public/assets --filename cat-beverages.mp4
+```
+Requires `GEMINI_API_KEY` env var. Cost: ~$2.80/hero, ~$2.10/ambient.
 
-3. **"Est. 2018" and composition corner marks overlap React corner ornaments** — both appear in the same screen corners. Either remove the React corner SVGs for the Classic variant (they live in `LandingCover.tsx` at the bottom of the return) or adjust the composition's corner mark positions from `3%` to `2%`.
+### 2. Wire hero video into LandingCover.tsx
 
-### Near-term — Kling AI video integration
+Once `public/assets/hero-reel.mp4` is ready:
+```ts
+// src/screens/LandingCover.tsx
+const HERO_VIDEO_SRC = '/assets/hero-reel.mp4'
+const HERO_POSTER_SRC = '/assets/hero-poster.jpg'
+```
+The existing priority logic (`HERO_VIDEO_SRC ? <video> : HERO_HTML_SRC ? <iframe> : gradient`) handles the swap automatically.
 
-When the Kling AI `.mp4` is ready:
-1. Drop `hero-reel.mp4` into `public/assets/`
-2. Drop `hero-poster.jpg` (Nano Banana end-frame) into `public/assets/`
-3. In `LandingCover.tsx`, set:
-   ```ts
-   const HERO_VIDEO_SRC = '/assets/hero-reel.mp4'
-   const HERO_POSTER_SRC = '/assets/hero-poster.jpg'
-   ```
-4. The existing priority logic `HERO_VIDEO_SRC ? <video> : HERO_HTML_SRC ? <iframe> : <css>` handles the swap automatically — no other code changes needed.
+### 3. Wire category ambient videos into CategoryPage.tsx
 
-**Nano Banana start-frame prompt** (written last session):
-> "A single elegant white ceramic plate on a dark restaurant table, shot from slightly above at 20°, surrounded by scattered spices — star anise, cardamom, a cinnamon stick — on a surface of deep maroon and black. The plate is empty with a faint gold rim. Warm candlelight from the left casts a soft amber glow. Photorealistic, editorial food photography, shallow depth of field, black background."
+Replace `<AnimationForCategory>` with a `<video>` tag for each category. The SVG animations stay as fallback if the video hasn't loaded yet. Suggested approach:
+```tsx
+// In CategoryPage.tsx hero section
+<video
+  key={category.id}
+  src={`/assets/cat-${category.id}.mp4`}
+  autoPlay muted loop playsInline
+  className="absolute inset-0 w-full h-full object-cover"
+  style={{ zIndex: 0, opacity: 0.6 }}
+  onError={() => { /* fall through to SVG animation */ }}
+/>
+<AnimationForCategory type={category.backgroundAnimation} />
+```
 
-**Kling AI video prompt** (written last session):
-> "Slow cinematic push into the plate from above. The candlelight flickers gently. Aromatic spices drift upward — star anise, cardamom, chili. A sauce stroke appears on the plate. Then the spices dissolve into the word RELISH glowing in cream gold, letter by letter, as the camera pulls back to reveal the full scene. Duration 4 seconds, 24fps, film grain, luxury restaurant aesthetic."
+### 4. ServicePanel QA
 
-### Medium-term — screens not yet built / wired
+- Open app → tap waiter button on any landing screen
+- Test all 6 grid actions (Menu / AI / My Order / Water / Bill / More)
+- Confirm Water sheet: pour animation + Still/Sparkling/+Ice/+Lemon cards
+- Confirm Bill sheet: One bill / Split evenly / Itemise / Add gratuity
+- Confirm More → Jain Info sub-view works, back button returns to More
+- Confirm feed updates and pending→done auto-transition
+- Test on iPhone 14 viewport (393×852) — check text doesn't overflow
 
-- `LandingGastronomique`, `LandingEditorial`, `LandingBotanica` — these three variants don't have the HyperFrames composition background. If we want all 4 to have the same cinematic feel, either add the iframe background to each or create variant-specific compositions.
-- `CategoryPage` ambient animations (BubblesAnim for Beverages, SteamAnim for Soups, etc.) are built but need visual QA across all 5 categories.
-- `ItemDetail` bottom sheet: drag-to-dismiss `dragConstraints` may need tuning on tall items.
-- `OrderPanel` — built but needs a "Send Order" confirmation state.
-
-### HyperFrames composition improvements (hero-reel.html)
-
-- **Scene 2 steam animation**: The steam SVG paths are static opacity fade-in. They should animate upward (translateY) using a finite GSAP repeat — currently there's no motion on the steam wisps, just an opacity reveal.
-  ```js
-  // Add after steam opacity tween:
-  tl.to('#s2-steam', { y: -18, duration: 1.2, ease: 'sine.inOut', repeat: 2, yoyo: true }, 2.10);
-  ```
-- **Scene 1 ghost "R"**: It fades in but never animates. A subtle scale oscillation (1.0 → 1.02 → 1.0) over 2s would add breath to the candlelight scene.
-- **More ingredients**: Add turmeric powder (SVG dust cloud), a sprig of thyme/rosemary. Position toward left-center for balance (currently more items on the right half).
+### 5. Build verification
+```bash
+npm run build   # must have zero TypeScript errors
+```
 
 ---
 
 ## Key Technical Gotchas
 
 ```
-HyperFrames loop pattern (NO repeat: -1):
-  tl = gsap.timeline({ paused: true, onComplete: () => tl.restart() })
-  tl.set(everything, { initial state }, 0)   ← MANDATORY loop resets at t=0
-  // ... all animation tweens ...
-  window.__timelines['relish-hero'] = tl
-  if (typeof window.__hyperframes === 'undefined') { tl.play() }
+Veo valid durations: 4, 6, or 8 seconds only (not 5, not 7)
+Veo 4K + duration: 1080p only works with 8s (heroes). 6s ambient loops use 720p max if 4K not supported
+Veo aspect ratio flag: use --aspect-ratio 9:16 (not --aspect 9/16)
+Correct model IDs: veo-3.1-generate-preview | veo-3.1-fast-generate-preview
 
-SVG attr animation (opacity, stroke-dashoffset):
-  tl.to('#el', { attr: { 'stroke-dashoffset': 0 } })   ← use attr:{} wrapper
-  tl.to('#el', { attr: { opacity: 1 } })                ← NOT just opacity: 1
+Image fallback pattern (React):
+  const [err, setErr] = useState(false)
+  key={item.id}          ← forces remount on item change, resets onError state
+  onError={() => setErr(true)}
 
-Letter loop-safe pattern:
-  tl.set('#letter', { opacity: 0, rotateX: -52, y: 18 }, 0)   ← set initial at t=0
-  tl.to('#letter',  { opacity: 1, rotateX:  0, y:  0 }, 3.4)  ← animate to final
-  (NOT tl.from — from() breaks on restart)
+Banner filename quirk:
+  category.id = 'desserts' → file = 'dessert-banner.webp'  (singular, no 's')
+  All others: '{id}-banner.webp'
 
-iframe same-origin timeline access (for debugging):
-  document.querySelector('iframe[title="Relish hero animation"]')
-    ?.contentWindow?.__timelines?.['relish-hero']?.time()
+Category animation → video mapping:
+  beverages  → BubblesAnim  (bubbles)
+  soups      → SteamAnim    (steam)
+  quickbites → PlateAnim    (plate / concentric circles)
+  italian    → SwirlAnim    (swirl)
+  desserts   → DrizzleAnim  (drizzle)
 ```
 
 ---
@@ -207,10 +225,7 @@ iframe same-origin timeline access (for debugging):
 
 ```bash
 cd /Users/aryanshah/Downloads/softwares/Python_Django/Automations/claude_menu
-
-npm run dev          # localhost:5173
-npm run build        # dist/
-npm run preview      # serve dist/
+npm run dev        # localhost:5173 — iPhone 14 Pro (393×852) in DevTools
+npm run build      # dist/ — verify zero TS errors
+npm run preview    # serve dist/ locally
 ```
-
-The preview MCP server ID is `6d172b01-ba0a-45a2-b162-cab4e2dcbda9` (may change between sessions — use `preview_list` to get the current ID).

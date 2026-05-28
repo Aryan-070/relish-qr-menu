@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ShoppingBag } from 'lucide-react'
 import { type MenuItem, getItemById, getCategoryForItem } from '../data/menu'
@@ -17,11 +17,14 @@ interface ItemDetailProps {
 
 export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetailProps) {
   const [selectedCustomization, setSelectedCustomization] = useState('Regular')
+  const [heroErr, setHeroErr] = useState(false)
+  const handleHeroErr = useCallback(() => setHeroErr(true), [])
 
-  // Reset customization whenever a new item opens
+  // Reset customization and image error whenever a new item opens
   useEffect(() => {
     if (item) {
       setSelectedCustomization(item.customizations[0] ?? 'Regular')
+      setHeroErr(false)
     }
   }, [item?.id])
 
@@ -94,14 +97,25 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
             {/* Scrollable content — independent of drag */}
             <div className="flex-1 overflow-y-auto">
               <div className="px-5 pb-8">
-                {/* Image */}
+                {/* Hero image — real photo with SVG illustration fallback */}
                 <motion.div
                   initial={{ scale: 0.97, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 0.4 }}
                   className="mb-4 mt-1"
                 >
-                  <CategoryIllustration categoryId={getCategoryForItem(item.id)} className="aspect-[4/3]" />
+                  {!heroErr ? (
+                    <img
+                      key={item.id}
+                      src={`/assets/dishes/${item.id}-hero.webp`}
+                      alt={item.name}
+                      className="w-full aspect-[4/3] object-cover rounded-2xl"
+                      style={{ border: '1px solid rgba(217,160,58,0.2)' }}
+                      onError={handleHeroErr}
+                    />
+                  ) : (
+                    <CategoryIllustration categoryId={getCategoryForItem(item.id)} className="aspect-[4/3]" />
+                  )}
                 </motion.div>
 
                 {/* Title + price */}

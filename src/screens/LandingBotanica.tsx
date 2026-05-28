@@ -8,9 +8,7 @@ interface Props {
 
 const GREEN = '#2A4820'
 const SAGE = '#6B8F5E'
-const GOLD = '#C8A832'
 const BG = '#F7FAF3'
-const CREAM = '#F0EBD8'
 
 function BotanicaBtn({
   onClick,
@@ -118,7 +116,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center w-full pt-10 pb-8 px-7">
 
-        {/* Organic plate with fresh food SVG art */}
+        {/* Botanica plate — real food photo */}
         <motion.div
           initial={{ opacity: 0, scale: 0.88 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -126,42 +124,17 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           className="relative flex items-center justify-center mb-5"
           style={{ width: 178, height: 178 }}
         >
-          <svg width="178" height="178" viewBox="0 0 178 178">
-            {/* Plate shadow */}
-            <ellipse cx="89" cy="168" rx="66" ry="8" fill="rgba(42,72,32,0.12)" />
-            {/* Outer plate */}
-            <circle cx="89" cy="89" r="78" fill={CREAM} stroke={SAGE} strokeWidth="2.2" />
-            {/* Inner well */}
-            <circle cx="89" cy="89" r="64" fill="#FDFFF9" />
-            {/* Plating ring */}
-            <circle cx="89" cy="89" r="36" fill="none" stroke="rgba(107,143,94,0.2)" strokeWidth="0.8" />
-
-            {/* Fresh food — salad base */}
-            <ellipse cx="89" cy="100" rx="30" ry="14" fill="#5A8A3A" opacity="0.75" />
-            {/* Lettuce leaves */}
-            <path d="M 65 96 Q 60 85 70 80 Q 72 90 78 94" fill="#6EA040" opacity="0.9" />
-            <path d="M 72 88 Q 68 76 78 72 Q 79 83 85 88" fill="#5A9030" opacity="0.85" />
-            <path d="M 95 86 Q 100 74 110 76 Q 106 86 100 90" fill="#6EA040" opacity="0.85" />
-            <path d="M 102 92 Q 112 84 118 88 Q 110 96 105 96" fill="#5A9030" opacity="0.8" />
-            {/* Lemon slice */}
-            <circle cx="72" cy="78" r="13" fill="#F5E040" stroke="#C8A020" strokeWidth="1.2" />
-            <circle cx="72" cy="78" r="9" fill="none" stroke="#C8A020" strokeWidth="0.6" opacity="0.5" />
-            <line x1="72" y1="65" x2="72" y2="91" stroke="#C8A020" strokeWidth="0.7" opacity="0.6" />
-            <line x1="59" y1="78" x2="85" y2="78" stroke="#C8A020" strokeWidth="0.7" opacity="0.6" />
-            <line x1="63" y1="69" x2="81" y2="87" stroke="#C8A020" strokeWidth="0.5" opacity="0.5" />
-            <line x1="81" y1="69" x2="63" y2="87" stroke="#C8A020" strokeWidth="0.5" opacity="0.5" />
-            {/* Cherry tomatoes */}
-            <circle cx="112" cy="75" r="9" fill="#D83028" />
-            <circle cx="112" cy="75" r="9" fill="none" stroke="#A82018" strokeWidth="0.8" />
-            <ellipse cx="110" cy="72" rx="3" ry="2" fill="rgba(255,255,255,0.25)" />
-            <path d="M 112 66 Q 114 62 116 64" stroke="#4A7A20" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-            {/* Herb garnish top */}
-            <path d="M 85 60 Q 80 52 74 56 Q 80 60 80 68" fill="#3A6A18" />
-            <path d="M 88 58 Q 95 50 100 55 Q 93 58 90 65" fill="#3A6A18" />
-            <line x1="87" y1="62" x2="87" y2="55" stroke="#4A8A28" strokeWidth="1.4" strokeLinecap="round" />
-            {/* Gold olive oil drizzle */}
-            <path d="M 58 104 Q 68 100 80 106 Q 94 112 108 106" stroke={GOLD} strokeWidth="1.8" strokeLinecap="round" fill="none" opacity="0.7" />
-          </svg>
+          <img
+            src="/assets/covers/cover-botanica-plate.webp"
+            alt="Relish organic plate"
+            style={{
+              width: 178,
+              height: 178,
+              objectFit: 'cover',
+              borderRadius: '50%',
+              boxShadow: '0 8px 24px rgba(42,72,32,0.18)',
+            }}
+          />
         </motion.div>
 
         {/* Growing leaf ornaments */}
