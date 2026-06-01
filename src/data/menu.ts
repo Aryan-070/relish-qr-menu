@@ -8,6 +8,10 @@ export interface MenuItem {
   tags: string[]
   pairings: { beverage?: string; side?: string; dessert?: string }
   customizations: string[]
+  /** Kitchen's signature pick — surfaces a Chef's Special badge. */
+  chefsSpecial?: boolean
+  /** Heat level 0–3 (0/undefined = not spicy) — surfaces flame indicators. */
+  spiceLevel?: 0 | 1 | 2 | 3
 }
 
 export interface Category {
@@ -144,6 +148,7 @@ export const categories: Category[] = [
         isJain: false,
         canBeJain: false,
         tags: ['spicy', 'tangy', 'indo-chinese'],
+        spiceLevel: 2,
         pairings: { side: 'qb-004', dessert: 'des-003' },
         customizations: ['Regular', 'Less spicy', 'No tofu', 'Extra sour'],
       },
@@ -230,6 +235,8 @@ export const categories: Category[] = [
         isJain: false,
         canBeJain: true,
         tags: ['Indian', 'tandoor', 'popular'],
+        chefsSpecial: true,
+        spiceLevel: 1,
         pairings: { beverage: 'bev-004', dessert: 'des-004' },
         customizations: ['Regular', 'Jain (no onion)', 'Extra chutney', 'Less spicy'],
       },
@@ -261,6 +268,7 @@ export const categories: Category[] = [
         isJain: true,
         canBeJain: false,
         tags: ['spicy', 'Italian', 'classic'],
+        spiceLevel: 3,
         pairings: { beverage: 'bev-001', dessert: 'des-001' },
         customizations: ['Regular', 'Less spicy', 'Extra sauce', 'Gluten-free pasta'],
       },
@@ -294,6 +302,7 @@ export const categories: Category[] = [
         isJain: false,
         canBeJain: false,
         tags: ['pizza', 'classic', 'Italian'],
+        chefsSpecial: true,
         pairings: { beverage: 'bev-001', dessert: 'des-003' },
         customizations: ['Thin crust', 'Thick crust', 'Extra cheese', 'Add jalapeños'],
       },
@@ -336,6 +345,7 @@ export const categories: Category[] = [
         isJain: false,
         canBeJain: false,
         tags: ['Italian', 'coffee', 'creamy'],
+        chefsSpecial: true,
         pairings: { beverage: 'bev-003' },
         customizations: ['Regular', 'Extra espresso', 'Less sweet'],
       },
@@ -418,7 +428,7 @@ export const recommendationPaths: RecommendationPath[] = [
     estimatedPrice: 900,
     reason: 'Dive into wild mushroom soup, a soul-warming Pasta Arrabbiata, and finish with our legendary Choco Lava Cake. The combo table orderes again and again.',
     moodMatch: ['Cheesy & Comforting', 'Italian', 'Mexican'],
-    partySizeMatch: ['Two people', 'Family/group'],
+    partySizeMatch: ['Two people', 'Family / group'],
     budgetMatch: ['₹300–₹500', 'Premium / no limit'],
   },
   {
@@ -429,12 +439,12 @@ export const recommendationPaths: RecommendationPath[] = [
     estimatedPrice: 1160,
     reason: 'The Veg Platter to start, Risotto ai Funghi as the centrepiece, and Tiramisu to end — this is Relish at its very best.',
     moodMatch: ['Spicy', 'Italian', 'Dessert'],
-    partySizeMatch: ['Family/group', 'Two people'],
+    partySizeMatch: ['Family / group', 'Two people'],
     budgetMatch: ['₹300–₹500', 'Premium / no limit'],
   },
 ]
 
-export const allItems: MenuItem[] = categories.flatMap(c => c.items)
+const allItems: MenuItem[] = categories.flatMap(c => c.items)
 
 export function getItemById(id: string): MenuItem | undefined {
   return allItems.find(item => item.id === id)

@@ -1,11 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, CheckCircle2, Bell } from 'lucide-react'
-import { bottomPanel, stagger, fadeUp, slideInRight, fullPanel } from '../animations/variants'
+import {
+  X, ChevronLeft, ChevronRight, CheckCircle2, Bell,
+  BookOpen, Sparkles, ClipboardList, GlassWater, ReceiptText, LayoutGrid,
+  Snowflake, Citrus, Scale, ListChecks, HandHeart,
+  Croissant, Sprout, TriangleAlert, ChefHat, Shirt,
+  type LucideIcon,
+} from 'lucide-react'
+import { stagger, fadeUp, fullPanel, btnPrimary, btnCard, btnIcon } from '../animations/variants'
+import { useMediaMode } from '../theme/MediaModeContext'
+import { WaiterFigure, WaiterVideo, WaterScene, BreadScene } from './service/SceneSkins'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PanelView = 'home' | 'waiter' | 'water' | 'bill' | 'more' | 'jain'
+type PanelView = 'home' | 'waiter' | 'water' | 'bill' | 'split' | 'more' | 'jain' | 'bread'
+
+const TIP_OPTIONS = [0, 5, 10, 15] as const
 
 interface FeedItem {
   id: string
@@ -33,28 +43,28 @@ const JAIN_INFO = [
   { q: 'Cross-contamination?', a: 'Our kitchen takes care with Jain orders, but we use a shared kitchen. Please speak to the waiter for strict requirements.' },
 ]
 
-const WATER_OPTIONS = [
-  { id: 'still',     label: 'Still',      sub: 'spring, room temp', icon: '💧' },
-  { id: 'sparkling', label: 'Sparkling',  sub: 'well chilled',      icon: '✨' },
-  { id: 'ice',       label: '+ Ice',      sub: 'extra cubes',       icon: '🧊' },
-  { id: 'lemon',     label: '+ Lemon',    sub: 'fresh wedge',       icon: '🍋' },
-] as const
+const WATER_OPTIONS: { id: string; label: string; sub: string; icon: LucideIcon }[] = [
+  { id: 'still',     label: 'Still',      sub: 'spring, room temp', icon: GlassWater },
+  { id: 'sparkling', label: 'Sparkling',  sub: 'well chilled',      icon: Sparkles },
+  { id: 'ice',       label: '+ Ice',      sub: 'extra cubes',       icon: Snowflake },
+  { id: 'lemon',     label: '+ Lemon',    sub: 'fresh wedge',       icon: Citrus },
+]
 
-const BILL_OPTIONS = [
-  { id: 'whole',     label: 'One bill',     sub: 'for the table',  icon: '🧾' },
-  { id: 'split',     label: 'Split evenly', sub: '2 ways',         icon: '⚖️' },
-  { id: 'itemize',   label: 'Itemise',      sub: 'per dish',       icon: '📋' },
-  { id: 'gratuity',  label: 'Add gratuity', sub: '10 / 18 / 20%',  icon: '🙏' },
-] as const
+const BILL_OPTIONS: { id: string; label: string; sub: string; icon: LucideIcon }[] = [
+  { id: 'whole',     label: 'One bill',     sub: 'for the table',  icon: ReceiptText },
+  { id: 'split',     label: 'Split evenly', sub: '2 ways',         icon: Scale },
+  { id: 'itemize',   label: 'Itemise',      sub: 'per dish',       icon: ListChecks },
+  { id: 'gratuity',  label: 'Add gratuity', sub: '10 / 18 / 20%',  icon: HandHeart },
+]
 
-const MORE_OPTIONS = [
-  { id: 'bread',      label: 'Refill bread',     sub: 'sourdough',         icon: '🍞', action: 'send' },
-  { id: 'jain',       label: 'Jain info',        sub: 'menu details',      icon: '🌿', action: 'jain' },
-  { id: 'allergy',    label: 'Allergy note',     sub: 'flag the kitchen',  icon: '⚠️', action: 'send' },
-  { id: 'compliment', label: 'Compliments',      sub: 'to the chef',       icon: '👨‍🍳', action: 'send' },
-  { id: 'choose',     label: 'Help choosing',    sub: 'ask our team',      icon: '✦',  action: 'send' },
-  { id: 'coat',       label: 'Coat check',       sub: 'retrieve',          icon: '🧥', action: 'send' },
-] as const
+const MORE_OPTIONS: { id: string; label: string; sub: string; icon: LucideIcon; action: string }[] = [
+  { id: 'bread',      label: 'Bread basket',     sub: 'warm sourdough',    icon: Croissant,     action: 'bread' },
+  { id: 'jain',       label: 'Jain info',        sub: 'menu details',      icon: Sprout,        action: 'jain' },
+  { id: 'allergy',    label: 'Allergy note',     sub: 'flag the kitchen',  icon: TriangleAlert, action: 'send' },
+  { id: 'compliment', label: 'Compliments',      sub: 'to the chef',       icon: ChefHat,       action: 'send' },
+  { id: 'choose',     label: 'Help choosing',    sub: 'ask our team',      icon: Sparkles,      action: 'send' },
+  { id: 'coat',       label: 'Coat check',       sub: 'retrieve',          icon: Shirt,         action: 'send' },
+]
 
 const SEED_FEED: FeedItem[] = [
   { id: 'seed-1', label: 'Table seated',      status: 'done',    eta: '— done' },
@@ -67,7 +77,7 @@ const TOAST_MESSAGES: Record<string, string> = {
   ice:       'Extra ice — coming.',
   lemon:     'A wedge of lemon — coming.',
   whole:     'One bill, on its way.',
-  split:     'Splitting 2 ways.',
+  split:     'Bill split — sent to your waiter.',
   itemize:   'Itemising the bill.',
   gratuity:  'Add gratuity at the till.',
   bread:     'More bread — coming.',
@@ -79,133 +89,26 @@ const TOAST_MESSAGES: Record<string, string> = {
   cancel:    'Cancelled — no waiter on the way.',
 }
 
-// ─── Sub-component: Waiter SVG silhouette ────────────────────────────────────
-
-function WaiterFigure() {
-  return (
-    <svg viewBox="0 0 80 200" preserveAspectRatio="xMidYMax meet" style={{ width: '100%', height: '100%', display: 'block' }}>
-      {/* head */}
-      <circle cx="40" cy="22" r="10" fill="var(--ink)" />
-      {/* neck */}
-      <rect x="36" y="30" width="8" height="6" fill="var(--ink)" />
-      {/* shoulders + body */}
-      <path d="M22 42 Q40 36 58 42 L60 90 Q40 96 20 90 Z" fill="var(--ink)" />
-      {/* apron */}
-      <path d="M26 60 Q40 64 54 60 L56 120 Q40 124 24 120 Z" fill="var(--ink-soft)" />
-      <path d="M26 60 L24 56 L40 50 L56 56 L54 60" fill="var(--ink)" />
-      {/* legs */}
-      <path d="M28 118 L26 196 L36 196 L38 120 Z" fill="var(--ink)" />
-      <path d="M42 120 L44 196 L54 196 L52 118 Z" fill="var(--ink)" />
-      {/* left arm resting */}
-      <path d="M22 42 Q14 60 18 90 L24 90 Q22 60 28 50 Z" fill="var(--ink)" />
-      {/* right arm + tray */}
-      <g style={{ transformOrigin: '54px 44px', animation: 'waiter-arm 0.65s ease-in-out infinite alternate' }}>
-        <path d="M58 42 Q70 38 72 28 L66 24 Q60 32 54 40 Z" fill="var(--ink)" />
-        {/* tray */}
-        <ellipse cx="68" cy="22" rx="16" ry="3.5" fill="var(--ink-soft)" />
-        <ellipse cx="68" cy="20.5" rx="16" ry="3" fill="var(--ink)" opacity="0.7" />
-        {/* plate */}
-        <ellipse cx="68" cy="18" rx="9" ry="2.4" fill="var(--maroon)" />
-        <ellipse cx="68" cy="17.2" rx="6" ry="1.6" fill="var(--gold)" opacity="0.75" />
-      </g>
-    </svg>
-  )
-}
-
-// ─── Sub-component: Water pour scene ─────────────────────────────────────────
-
-function WaterPourScene({ animKey }: { animKey: number }) {
-  const [full, setFull] = useState(false)
-  const [poured, setPoured] = useState(false)
-
-  useEffect(() => {
-    setFull(false)
-    setPoured(false)
-    const t1 = setTimeout(() => setFull(true), 250)
-    const t2 = setTimeout(() => setPoured(true), 1900)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [animKey])
-
-  return (
-    <div
-      className="relative flex items-end justify-center rounded-2xl overflow-hidden mb-4"
-      style={{ height: 160, background: 'rgba(217,160,58,0.05)', border: '1px solid rgba(217,160,58,0.18)' }}
-    >
-      <div className="relative" style={{ width: 72, height: 120, marginBottom: 12 }}>
-        {/* pour stream */}
-        {!poured && (
-          <div
-            className="absolute left-1/2"
-            style={{
-              width: 5,
-              top: -32,
-              background: 'linear-gradient(180deg, rgba(180,215,230,0.95), rgba(120,180,210,0.5))',
-              borderRadius: 3,
-              transformOrigin: 'top center',
-              animation: 'water-pour-stream 1.7s ease-out forwards',
-              animationDelay: '0.15s',
-            }}
-          />
-        )}
-        {/* glass body */}
-        <div
-          className="absolute inset-0 rounded-b-xl overflow-hidden"
-          style={{
-            border: '2px solid rgba(42,30,30,0.35)',
-            borderTop: 'none',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.08), rgba(42,30,30,0.04))',
-          }}
-        >
-          {/* water fill */}
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: full ? '76%' : '0%',
-              transition: 'height 1.5s cubic-bezier(0.4,0.05,0.5,1)',
-              background: 'linear-gradient(180deg, rgba(180,215,230,0.82), rgba(120,180,210,0.95))',
-            }}
-          >
-            {/* meniscus */}
-            <div
-              style={{
-                position: 'absolute',
-                left: -2,
-                right: -2,
-                top: -3,
-                height: 6,
-                borderRadius: '50%',
-                background: 'rgba(220,240,250,0.72)',
-              }}
-            />
-          </div>
-        </div>
-      </div>
-      {/* label */}
-      <p
-        className="absolute bottom-2 left-0 right-0 text-center font-inter text-[10px] uppercase tracking-widest"
-        style={{ color: 'var(--mute)' }}
-      >
-        {poured ? 'Choose your preference' : 'Pouring…'}
-      </p>
-    </div>
-  )
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrder, orderCount }: ServicePanelProps) {
+export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrder, orderCount, total }: ServicePanelProps) {
+  const { posterOnly } = useMediaMode()
   const [view, setView] = useState<PanelView>('home')
   const [feed, setFeed] = useState<FeedItem[]>(SEED_FEED)
   const [toastText, setToastText] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
   const [eta, setEta] = useState(42)
   const [waterAnimKey, setWaterAnimKey] = useState(0)
+  const [waiterArrived, setWaiterArrived] = useState(false)
+  const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([])
+  // Split-bill calculator state
+  const [splitPeople, setSplitPeople] = useState(2)
+  const [splitTipPct, setSplitTipPct] = useState<number>(0)
+  const [splitRoundUp, setSplitRoundUp] = useState(false)
   const etaRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const feedTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
+  const waiterArrivedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const waiterCallIdRef = useRef<string | null>(null)
 
   // Reset on open/close — also resets view on close so next open starts at home
@@ -218,10 +121,22 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
   useEffect(() => {
     return () => {
       if (toastRef.current) clearTimeout(toastRef.current)
+      if (waiterArrivedTimerRef.current) clearTimeout(waiterArrivedTimerRef.current)
       feedTimersRef.current.forEach(clearTimeout)
       feedTimersRef.current.clear()
     }
   }, [])
+
+  // Waiter arrival — legs walk for 5.5s (approach duration) then stop
+  useEffect(() => {
+    if (view === 'waiter') {
+      setWaiterArrived(false)
+      waiterArrivedTimerRef.current = setTimeout(() => setWaiterArrived(true), 5500)
+    }
+    return () => {
+      if (waiterArrivedTimerRef.current) clearTimeout(waiterArrivedTimerRef.current)
+    }
+  }, [view])
 
   // ETA countdown when waiter view is active
   useEffect(() => {
@@ -287,10 +202,18 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
     setView('home')
   }
 
+  const handleRippleTap = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const id = Date.now()
+    setRipples(prev => [...prev, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }])
+    setTimeout(() => setRipples(prev => prev.filter(r => r.id !== id)), 750)
+    handleCallWaiter()
+  }
+
   // Back-header helper — memoised so its reference stays stable across renders
   const backTo = useCallback((dest: PanelView) => (
     <motion.button
-      whileTap={{ scale: 0.88 }}
+      whileTap={btnIcon.tap}
       onClick={() => setView(dest)}
       aria-label="Go back"
       className="w-8 h-8 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
@@ -336,84 +259,135 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
             exit="exit"
             className="fixed top-0 bottom-0 z-[61] flex flex-col overflow-hidden w-full"
             style={{
-              maxWidth: 430,
+              maxWidth: 560,
               left: '50%',
               transform: 'translateX(-50%)',
               right: 'auto',
             }}
           >
+            {/* Full-bleed waiter video behind everything (video mode only), with a
+                scrim: dark at the very top for the label, clear video in the middle,
+                cream at the bottom so the copy + buttons keep their dark-on-cream design. */}
+            {!posterOnly && (
+              <div className="absolute inset-0" style={{ zIndex: 0 }}>
+                <WaiterVideo />
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      'linear-gradient(to bottom, rgba(4,1,3,0.5) 0%, rgba(4,1,3,0) 12%, rgba(4,1,3,0) 32%, rgba(247,235,210,0.5) 44%, var(--paper) 58%, var(--paper) 100%)',
+                  }}
+                />
+              </div>
+            )}
+
             {/* top row */}
-            <div className="flex items-center justify-between px-5 pt-14 pb-4">
-              <p className="font-inter text-[10px] uppercase tracking-[0.28em]" style={{ color: 'var(--mute)' }}>
+            <div className="flex items-center justify-between px-5 pt-14 pb-4" style={{ position: 'relative', zIndex: 1 }}>
+              <p
+                className="font-inter text-[10px] uppercase tracking-[0.28em]"
+                style={{ color: posterOnly ? 'var(--mute)' : 'rgba(255,248,234,0.85)', textShadow: posterOnly ? 'none' : '0 1px 6px rgba(0,0,0,0.5)' }}
+              >
                 — Waiter en route —
               </p>
-              <button
+              <motion.button
+                whileTap={btnIcon.tap}
                 aria-label="Close"
                 onClick={() => setView('home')}
                 className="w-8 h-8 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(139,16,36,0.08)', border: '1px solid rgba(139,16,36,0.15)' }}
               >
                 <X size={14} aria-hidden="true" style={{ color: 'var(--maroon)' }} />
-              </button>
+              </motion.button>
             </div>
 
-            {/* waiter figure area */}
-            <div className="flex-1 relative overflow-hidden flex items-end justify-center">
-              {/* subtle ground glow */}
-              <div
-                className="absolute bottom-0 left-1/2 pointer-events-none"
-                style={{
-                  transform: 'translateX(-50%)',
-                  width: '120%',
-                  height: '45%',
-                  background: 'radial-gradient(60% 80% at 50% 100%, rgba(217,160,58,0.18), transparent 70%)',
-                }}
-              />
-              {/* figure */}
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  bottom: '5%',
-                  width: 100,
-                  height: 240,
-                  animation: 'waiterApproach 5.5s cubic-bezier(0.4,0.05,0.5,1) forwards',
-                }}
-              >
-                <div style={{ width: '100%', height: '100%', animation: 'waiter-sway 0.65s ease-in-out infinite alternate', transformOrigin: '50% 100%' }}>
-                  <WaiterFigure />
-                </div>
-              </div>
+            {/* waiter figure area — animated SVG (image mode) or an empty spacer
+                that lets the full-bleed background video show through (video mode). */}
+            <div className="flex-1 relative overflow-hidden flex items-end justify-center" style={{ zIndex: 1 }}>
+              {posterOnly && (
+                <>
+                  {/* subtle ground glow */}
+                  <div
+                    className="absolute bottom-0 left-1/2 pointer-events-none"
+                    style={{
+                      transform: 'translateX(-50%)',
+                      width: '120%',
+                      height: '45%',
+                      background: 'radial-gradient(60% 80% at 50% 100%, rgba(217,160,58,0.18), transparent 70%)',
+                    }}
+                  />
+                  {/* animated SVG figure — walks in then sways */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '50%',
+                      bottom: '5%',
+                      width: 100,
+                      height: 240,
+                      animation: 'waiterApproach 5.5s cubic-bezier(0.4,0.05,0.5,1) forwards',
+                    }}
+                  >
+                    <div style={{ width: '100%', height: '100%', animation: 'waiter-sway 0.65s ease-in-out infinite alternate', transformOrigin: '50% 100%' }}>
+                      <WaiterFigure walking={!waiterArrived} />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* copy */}
-            <div className="text-center px-5 pt-2 pb-2">
-              <p className="font-inter text-[10px] uppercase tracking-[0.3em] mb-2" style={{ color: 'var(--mute)' }}>
-                Notified just now
-              </p>
+            <div className="text-center px-5 pt-2 pb-2" style={{ position: 'relative', zIndex: 1 }}>
+              <div
+                className="inline-flex items-center gap-2 mb-3 px-3 py-1.5 rounded-full"
+                style={{ background: 'rgba(79,122,60,0.1)', border: '1px solid rgba(79,122,60,0.28)' }}
+              >
+                <CheckCircle2 size={13} style={{ color: 'var(--olive)' }} />
+                <span className="font-inter text-[10px] uppercase tracking-[0.24em]" style={{ color: 'var(--olive)' }}>
+                  Request received · Table 7
+                </span>
+              </div>
               <h2 className="font-playfair font-bold text-[26px] leading-tight" style={{ color: 'var(--ink)' }}>
                 <span style={{ fontStyle: 'italic', fontWeight: 300 }}>Your waiter is </span>on the way
               </h2>
-              {/* ETA pill */}
-              <div
-                className="inline-flex items-center gap-3 mt-4 px-5 py-2.5 rounded-full font-inter text-[11px] uppercase tracking-[0.28em]"
-                style={{
-                  background: 'rgba(217,160,58,0.1)',
-                  border: '1px solid rgba(217,160,58,0.32)',
-                  color: 'var(--ink)',
-                }}
-              >
-                <span>ETA</span>
-                <span className="font-bold" style={{ color: eta === 0 ? 'var(--olive)' : 'var(--maroon)' }}>
-                  {eta === 0 ? 'here now' : formatEta(eta)}
-                </span>
+              {/* ETA countdown ring */}
+              <div className="flex flex-col items-center gap-1.5 mt-4">
+                <div className="relative" style={{ width: 82, height: 82 }}>
+                  <svg width={82} height={82} viewBox="0 0 82 82" style={{ transform: 'rotate(-90deg)' }}>
+                    <circle cx={41} cy={41} r={33} fill="none" stroke="rgba(217,160,58,0.15)" strokeWidth={4} />
+                    <circle
+                      cx={41} cy={41} r={33}
+                      fill="none"
+                      stroke={eta === 0 ? 'var(--olive)' : 'var(--gold)'}
+                      strokeWidth={4}
+                      strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 33}
+                      strokeDashoffset={2 * Math.PI * 33 * (1 - eta / 42)}
+                      style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-inter text-[9px] uppercase tracking-[0.22em]" style={{ color: 'var(--mute)' }}>ETA</span>
+                    <span className="font-playfair font-bold text-[17px] leading-none" style={{ color: eta === 0 ? 'var(--olive)' : 'var(--maroon)' }}>
+                      {eta === 0 ? '✓' : formatEta(eta)}
+                    </span>
+                  </div>
+                </div>
+                {eta === 0 && (
+                  <motion.p
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="font-inter text-[11px] uppercase tracking-[0.24em]"
+                    style={{ color: 'var(--olive)' }}
+                  >
+                    Arrived!
+                  </motion.p>
+                )}
               </div>
             </div>
 
             {/* action buttons */}
-            <div className="flex gap-3 px-5 pb-10 pt-3 justify-center flex-wrap">
+            <div className="flex gap-3 px-5 pb-10 pt-3 justify-center flex-wrap" style={{ position: 'relative', zIndex: 1 }}>
               <motion.button
-                whileTap={{ scale: 0.95 }}
+                whileTap={btnPrimary.tap}
                 onClick={() => setView('home')}
                 className="px-6 py-2.5 rounded-full font-inter text-[11px] uppercase tracking-[0.26em]"
                 style={{ background: 'rgba(42,30,30,0.08)', border: '1px solid rgba(42,30,30,0.2)', color: 'var(--ink)' }}
@@ -421,7 +395,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                 Hide
               </motion.button>
               <motion.button
-                whileTap={{ scale: 0.95 }}
+                whileTap={btnPrimary.tap}
                 onClick={handleCancelWaiter}
                 className="px-6 py-2.5 rounded-full font-inter text-[11px] uppercase tracking-[0.26em]"
                 style={{ background: 'rgba(215,25,32,0.06)', border: '1px solid rgba(215,25,32,0.22)', color: 'var(--red)' }}
@@ -436,39 +410,38 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
   )
 
   // ─── Bottom sheet (all other views) ──────────────────────────────────────
+  // Always mounted; animates on `sheetOpen`. This avoids the StrictMode +
+  // AnimatePresence mount-race that left the sheet stuck off-screen at y:100%.
+  const sheetOpen = open && view !== 'waiter'
 
   return (
     <>
       {waiterFullScreen}
 
-      <AnimatePresence>
-        {open && view !== 'waiter' && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              key="sp-backdrop"
-              className="fixed inset-0 z-40"
-              style={{ background: 'rgba(42,30,30,0.48)' }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleClose}
-            />
+      {/* Backdrop — always mounted; fades on sheetOpen */}
+      <motion.div
+        className="fixed inset-0 z-40"
+        style={{ background: 'rgba(42,30,30,0.48)', pointerEvents: sheetOpen ? 'auto' : 'none' }}
+        initial={false}
+        animate={{ opacity: sheetOpen ? 1 : 0 }}
+        transition={{ duration: 0.25 }}
+        onClick={handleClose}
+        aria-hidden={!sheetOpen}
+      />
 
-            {/* Panel */}
-            <motion.div
-              key="sp-panel"
-              variants={bottomPanel}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50 rounded-t-3xl overflow-hidden flex flex-col"
-              style={{
-                background: 'var(--paper)',
-                boxShadow: 'var(--shadow-sheet)',
-                maxHeight: '88dvh',
-              }}
-            >
+      {/* Panel — always mounted; slides on sheetOpen */}
+      <motion.div
+        initial={false}
+        animate={{ y: sheetOpen ? '0%' : '100%' }}
+        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+        className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] sm:max-w-[560px] z-50 rounded-t-3xl overflow-hidden flex flex-col"
+        style={{
+          background: 'var(--paper)',
+          boxShadow: 'var(--shadow-sheet)',
+          maxHeight: '88dvh',
+          pointerEvents: sheetOpen ? 'auto' : 'none',
+        }}
+      >
               {/* Drag handle */}
               <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
                 <div className="w-10 h-1 rounded-full" style={{ background: 'var(--mute)', opacity: 0.4 }} />
@@ -480,7 +453,8 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                 style={{ borderBottom: '1px solid rgba(217,160,58,0.18)' }}
               >
                 {/* Back button for sub-views */}
-                {(view === 'water' || view === 'bill' || view === 'more' || view === 'jain') && backTo(view === 'jain' ? 'more' : 'home')}
+                {(view === 'water' || view === 'bill' || view === 'split' || view === 'more' || view === 'jain' || view === 'bread') &&
+                  backTo(view === 'jain' ? 'more' : view === 'bread' ? 'more' : view === 'split' ? 'bill' : 'home')}
 
                 {/* Bell icon for home */}
                 {view === 'home' && (
@@ -494,8 +468,10 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                     {view === 'home'  && 'Table Service'}
                     {view === 'water' && 'Request Water'}
                     {view === 'bill'  && 'Bill'}
+                    {view === 'split' && 'Split the Bill'}
                     {view === 'more'  && 'More Options'}
                     {view === 'jain'  && 'Jain Menu Details'}
+                    {view === 'bread' && 'Bread & Sourdough'}
                   </h3>
                   {view === 'home' && (
                     <p className="font-inter text-[11px]" style={{ color: 'var(--mute)' }}>
@@ -504,19 +480,22 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                   )}
                 </div>
 
-                <button
+                <motion.button
+                  whileTap={btnIcon.tap}
                   aria-label="Close"
                   onClick={handleClose}
                   className="w-8 h-8 rounded-full flex items-center justify-center ml-2 flex-shrink-0"
                   style={{ background: 'rgba(139,16,36,0.08)' }}
                 >
                   <X size={15} aria-hidden="true" style={{ color: 'var(--maroon)' }} />
-                </button>
+                </motion.button>
               </div>
 
-              {/* Scrollable body */}
+              {/* Scrollable body — keyed crossfade; the active view is keyed so
+                  switching unmounts the old instantly (no mode="wait" stall) and
+                  fades the new one in. */}
               <div className="flex-1 overflow-y-auto no-scrollbar">
-                <AnimatePresence mode="wait">
+                <AnimatePresence>
 
                   {/* ── HOME ─────────────────────────────────────────────────── */}
                   {view === 'home' && (
@@ -552,8 +531,8 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
 
                       {/* Hero "Call Waiter" button */}
                       <motion.button
-                        whileTap={{ scale: 0.97 }}
-                        onClick={handleCallWaiter}
+                        whileTap={btnPrimary.tap}
+                        onClick={handleRippleTap}
                         className="w-full rounded-2xl p-4 mb-5 text-left overflow-hidden relative"
                         style={{
                           background: 'linear-gradient(160deg, #A52030 0%, #7A0E1E 55%, #5c0a15 100%)',
@@ -578,6 +557,20 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                             background: 'radial-gradient(circle, rgba(217,160,58,0.35), transparent 65%)',
                           }}
                         />
+                        {/* tap ripples */}
+                        {ripples.map(r => (
+                          <span
+                            key={r.id}
+                            className="absolute pointer-events-none rounded-full"
+                            style={{
+                              left: r.x,
+                              top: r.y,
+                              transform: 'translate(-50%, -50%)',
+                              background: 'rgba(255,248,234,0.28)',
+                              animation: 'ripple-wave 0.75s ease-out forwards',
+                            }}
+                          />
+                        ))}
                         <div className="flex items-center gap-3 relative">
                           <div
                             className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -593,7 +586,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                               Call our waiter
                             </p>
                           </div>
-                          <span className="font-playfair text-[24px]" style={{ color: 'rgba(255,248,234,0.55)' }}>›</span>
+                          <ChevronRight size={22} strokeWidth={2} style={{ color: 'rgba(255,248,234,0.55)' }} />
                         </div>
                       </motion.button>
 
@@ -614,33 +607,33 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                       >
                         {/* Menu */}
                         <ActionCard
-                          icon="📖" label="Menu" sub="browse"
+                          icon={BookOpen} label="Menu" sub="browse"
                           onClick={() => { onOpenMenu?.(); handleClose() }}
                         />
                         {/* Ask AI */}
                         <ActionCard
-                          icon="✦" label="Ask AI" sub="Relish guide"
+                          icon={Sparkles} label="Ask AI" sub="Relish guide"
                           badge="AI"
                           onClick={() => { onRecommend?.(); handleClose() }}
                         />
                         {/* My Order */}
                         <ActionCard
-                          icon="📋" label="My Order" sub={orderCount > 0 ? `${orderCount} item${orderCount !== 1 ? 's' : ''}` : 'empty'}
+                          icon={ClipboardList} label="My Order" sub={orderCount > 0 ? `${orderCount} item${orderCount !== 1 ? 's' : ''} · ₹${total.toLocaleString('en-IN')}` : 'empty'}
                           onClick={() => { onViewOrder?.(); handleClose() }}
                         />
                         {/* Water */}
                         <ActionCard
-                          icon="💧" label="Water" sub="still · sparkling"
+                          icon={GlassWater} label="Water" sub="still · sparkling"
                           onClick={() => { setWaterAnimKey(k => k + 1); setView('water') }}
                         />
                         {/* Bill */}
                         <ActionCard
-                          icon="🧾" label="Bill" sub="split · pay"
+                          icon={ReceiptText} label="Bill" sub="split · pay"
                           onClick={() => setView('bill')}
                         />
                         {/* More */}
                         <ActionCard
-                          icon="···" label="More" sub="jain · etc"
+                          icon={LayoutGrid} label="More" sub="jain · etc"
                           onClick={() => setView('more')}
                         />
                       </motion.div>
@@ -674,13 +667,13 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                   {view === 'water' && (
                     <motion.div
                       key="water"
-                      variants={slideInRight}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
                       className="px-5 pt-4 pb-8"
                     >
-                      <WaterPourScene animKey={waterAnimKey} />
+                      <WaterScene animKey={waterAnimKey} posterOnly={posterOnly} />
                       <div className="grid grid-cols-2 gap-2.5">
                         {WATER_OPTIONS.map(opt => (
                           <OptionCard
@@ -695,14 +688,42 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                     </motion.div>
                   )}
 
+                  {/* ── BREAD / SOURDOUGH ────────────────────────────────────── */}
+                  {view === 'bread' && (
+                    <motion.div
+                      key="bread"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="px-5 pt-4 pb-8"
+                    >
+                      <BreadScene posterOnly={posterOnly} />
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <OptionCard
+                          icon={Croissant}
+                          label="Sourdough"
+                          sub="warm basket"
+                          onClick={() => handleSend('bread', 'Bread — sourdough', '~2 min')}
+                        />
+                        <OptionCard
+                          icon={Croissant}
+                          label="More bread"
+                          sub="refill please"
+                          onClick={() => handleSend('bread', 'Bread — refill', '~2 min')}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* ── BILL ─────────────────────────────────────────────────── */}
                   {view === 'bill' && (
                     <motion.div
                       key="bill"
-                      variants={slideInRight}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
                       className="px-5 pt-4 pb-8"
                     >
                       <p
@@ -717,11 +738,168 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                             key={opt.id}
                             icon={opt.icon}
                             label={opt.label}
-                            sub={opt.sub}
-                            onClick={() => handleSend(opt.id, `Bill — ${opt.label}`, '~3 min')}
+                            sub={opt.id === 'split' ? 'calculate shares' : opt.sub}
+                            onClick={() =>
+                              opt.id === 'split'
+                                ? setView('split')
+                                : handleSend(opt.id, `Bill — ${opt.label}`, '~3 min')
+                            }
                           />
                         ))}
                       </div>
+                    </motion.div>
+                  )}
+
+                  {/* ── SPLIT BILL (share calculator) ────────────────────────── */}
+                  {view === 'split' && (
+                    <motion.div
+                      key="split"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="px-5 pt-4 pb-8"
+                    >
+                      {total <= 0 ? (
+                        /* Empty-order guard */
+                        <div className="flex flex-col items-center text-center py-8 gap-3">
+                          <span className="text-3xl">🧮</span>
+                          <p className="font-playfair font-bold text-[17px]" style={{ color: 'var(--ink)' }}>
+                            Nothing to split yet
+                          </p>
+                          <p className="font-inter text-[12px] leading-relaxed max-w-[230px]" style={{ color: 'var(--ink-soft)' }}>
+                            Add a few dishes to your order and we'll work out everyone's share.
+                          </p>
+                          <motion.button
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() => { onOpenMenu?.(); handleClose() }}
+                            className="mt-1 px-5 py-2.5 rounded-full font-inter font-semibold text-[12px]"
+                            style={{ background: 'rgba(139,16,36,0.1)', color: 'var(--maroon)', border: '1px solid rgba(139,16,36,0.25)' }}
+                          >
+                            Browse the menu
+                          </motion.button>
+                        </div>
+                      ) : (
+                        (() => {
+                          // ── Share math (defined rounding → no floating-point garbage) ──
+                          const subtotal = total
+                          const baseTip = Math.round((subtotal * splitTipPct) / 100)
+                          const grand = subtotal + baseTip
+                          const rawPer = grand / splitPeople
+                          const perPerson = splitRoundUp ? Math.ceil(rawPer / 10) * 10 : Math.ceil(rawPer)
+                          const collected = perPerson * splitPeople
+                          const tipTotal = collected - subtotal // baseTip + rounding overage
+                          const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
+
+                          return (
+                            <>
+                              {/* Per-person hero */}
+                              <div
+                                className="rounded-2xl px-4 py-5 mb-4 text-center relative overflow-hidden"
+                                style={{ background: 'rgba(139,16,36,0.06)', border: '1px solid rgba(139,16,36,0.18)' }}
+                              >
+                                <p className="font-inter text-[10px] uppercase tracking-[0.28em] mb-1" style={{ color: 'var(--mute)' }}>
+                                  Each person pays
+                                </p>
+                                <p className="font-playfair font-bold leading-none" style={{ fontSize: 40, color: 'var(--maroon)' }}>
+                                  {inr(perPerson)}
+                                </p>
+                                <p className="font-inter text-[11px] mt-1.5" style={{ color: 'var(--ink-soft)' }}>
+                                  {splitPeople} {splitPeople === 1 ? 'person' : 'people'} · {inr(collected)} total
+                                </p>
+                              </div>
+
+                              {/* People stepper */}
+                              <div className="flex items-center justify-between mb-4">
+                                <span className="font-inter text-[12px] uppercase tracking-[0.16em]" style={{ color: 'var(--ink-soft)' }}>
+                                  Split between
+                                </span>
+                                <div className="flex items-center gap-3">
+                                  <StepBtn label="Decrease" disabled={splitPeople <= 1} onClick={() => setSplitPeople(p => Math.max(1, p - 1))}>−</StepBtn>
+                                  <span className="font-playfair font-bold text-[20px] w-7 text-center" style={{ color: 'var(--ink)' }}>
+                                    {splitPeople}
+                                  </span>
+                                  <StepBtn label="Increase" disabled={splitPeople >= 20} onClick={() => setSplitPeople(p => Math.min(20, p + 1))}>+</StepBtn>
+                                </div>
+                              </div>
+
+                              {/* Gratuity chips */}
+                              <p className="font-inter text-[12px] uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--ink-soft)' }}>
+                                Add a tip
+                              </p>
+                              <div className="grid grid-cols-4 gap-2 mb-4">
+                                {TIP_OPTIONS.map(pct => {
+                                  const active = splitTipPct === pct
+                                  return (
+                                    <motion.button
+                                      key={pct}
+                                      whileTap={{ scale: 0.94 }}
+                                      onClick={() => setSplitTipPct(pct)}
+                                      aria-pressed={active}
+                                      className="py-2.5 rounded-xl font-inter font-semibold text-[13px]"
+                                      style={{
+                                        background: active ? 'var(--maroon)' : 'rgba(42,30,30,0.04)',
+                                        border: active ? '1px solid var(--maroon)' : '1px solid rgba(42,30,30,0.12)',
+                                        color: active ? '#FFF8EA' : 'var(--ink-soft)',
+                                      }}
+                                    >
+                                      {pct === 0 ? 'None' : `${pct}%`}
+                                    </motion.button>
+                                  )
+                                })}
+                              </div>
+
+                              {/* Round-up toggle */}
+                              <button
+                                onClick={() => setSplitRoundUp(r => !r)}
+                                aria-pressed={splitRoundUp}
+                                className="w-full flex items-center justify-between px-3.5 py-3 rounded-xl mb-4"
+                                style={{ background: 'rgba(217,160,58,0.07)', border: '1px solid rgba(217,160,58,0.22)' }}
+                              >
+                                <span className="flex flex-col text-left">
+                                  <span className="font-inter font-semibold text-[12.5px]" style={{ color: 'var(--ink)' }}>
+                                    Round up for the staff
+                                  </span>
+                                  <span className="font-inter text-[10px]" style={{ color: 'var(--mute)' }}>
+                                    nearest ₹10 each · extra goes to tip
+                                  </span>
+                                </span>
+                                <span
+                                  className="relative flex-shrink-0 rounded-full transition-colors"
+                                  style={{ width: 40, height: 24, background: splitRoundUp ? 'var(--olive)' : 'rgba(42,30,30,0.18)' }}
+                                >
+                                  <motion.span
+                                    layout
+                                    transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                                    className="absolute top-0.5 rounded-full bg-white"
+                                    style={{ width: 20, height: 20, left: splitRoundUp ? 18 : 2 }}
+                                  />
+                                </span>
+                              </button>
+
+                              {/* Breakdown */}
+                              <div
+                                className="rounded-2xl overflow-hidden mb-5"
+                                style={{ border: '1px solid rgba(42,30,30,0.1)' }}
+                              >
+                                <BreakRow label="Order subtotal" value={inr(subtotal)} />
+                                <BreakRow label={`Tip${splitTipPct > 0 ? ` · ${splitTipPct}%` : ''}`} value={inr(tipTotal)} />
+                                <BreakRow label="Table total" value={inr(collected)} strong />
+                              </div>
+
+                              {/* CTA */}
+                              <motion.button
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => handleSend('split', `Bill — split ${splitPeople} ways · ${inr(perPerson)}/person`, '~3 min')}
+                                className="w-full py-3.5 rounded-full font-inter font-semibold text-[13.5px]"
+                                style={{ background: 'linear-gradient(135deg, #A52030, #7A0E1E)', color: '#FFF8EA', boxShadow: '0 4px 16px rgba(139,16,36,0.28)' }}
+                              >
+                                Ask for the bill — split {splitPeople} ways
+                              </motion.button>
+                            </>
+                          )
+                        })()
+                      )}
                     </motion.div>
                   )}
 
@@ -729,10 +907,10 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                   {view === 'more' && (
                     <motion.div
                       key="more"
-                      variants={slideInRight}
-                      initial="hidden"
-                      animate="visible"
-                      exit="exit"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
                       className="px-5 pt-4 pb-8"
                     >
                       <div className="grid grid-cols-2 gap-2.5">
@@ -745,6 +923,8 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                             onClick={() => {
                               if (opt.action === 'jain') {
                                 setView('jain')
+                              } else if (opt.action === 'bread') {
+                                setView('bread')
                               } else {
                                 handleSend(opt.id, opt.label, '~2 min')
                               }
@@ -836,18 +1016,15 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                 )}
               </AnimatePresence>
 
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      </motion.div>
     </>
   )
 }
 
 // ─── Helper sub-components ────────────────────────────────────────────────────
 
-function ActionCard({ icon, label, sub, badge, onClick }: {
-  icon: string
+function ActionCard({ icon: Icon, label, sub, badge, onClick }: {
+  icon: LucideIcon
   label: string
   sub: string
   badge?: string
@@ -856,15 +1033,21 @@ function ActionCard({ icon, label, sub, badge, onClick }: {
   return (
     <motion.button
       variants={fadeUp}
-      whileTap={{ scale: 0.95 }}
+      whileTap={btnCard.tap}
+      whileHover={btnCard.hover}
       onClick={onClick}
-      className="relative flex flex-col gap-2 p-3 rounded-2xl text-left min-h-[90px] overflow-hidden"
+      className="relative flex flex-col gap-2 p-3 rounded-2xl text-left min-h-[96px] overflow-hidden cursor-pointer transition-colors duration-200"
       style={{
         background: 'rgba(217,160,58,0.07)',
         border: '1px solid rgba(217,160,58,0.22)',
       }}
     >
-      <span className="text-lg leading-none">{icon}</span>
+      <span
+        className="inline-flex items-center justify-center rounded-xl"
+        style={{ width: 36, height: 36, background: 'rgba(217,160,58,0.12)', border: '1px solid rgba(217,160,58,0.22)' }}
+      >
+        <Icon size={19} strokeWidth={1.75} style={{ color: 'var(--gold)' }} />
+      </span>
       <span className="font-playfair font-semibold text-[14px] leading-tight" style={{ color: 'var(--ink)' }}>
         {label}
       </span>
@@ -883,23 +1066,29 @@ function ActionCard({ icon, label, sub, badge, onClick }: {
   )
 }
 
-function OptionCard({ icon, label, sub, onClick }: {
-  icon: string
+function OptionCard({ icon: Icon, label, sub, onClick }: {
+  icon: LucideIcon
   label: string
   sub: string
   onClick: () => void
 }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.96 }}
+      whileTap={btnCard.tap}
+      whileHover={btnCard.hover}
       onClick={onClick}
-      className="flex flex-col gap-2 p-3.5 rounded-2xl text-left min-h-[100px]"
+      className="flex flex-col gap-2 p-3.5 rounded-2xl text-left min-h-[104px] cursor-pointer transition-colors duration-200"
       style={{
         background: 'rgba(42,30,30,0.04)',
         border: '1px solid rgba(42,30,30,0.12)',
       }}
     >
-      <span className="text-xl leading-none">{icon}</span>
+      <span
+        className="inline-flex items-center justify-center rounded-xl"
+        style={{ width: 40, height: 40, background: 'rgba(139,16,36,0.07)', border: '1px solid rgba(139,16,36,0.16)' }}
+      >
+        <Icon size={21} strokeWidth={1.75} style={{ color: 'var(--maroon)' }} />
+      </span>
       <span className="font-playfair font-semibold text-[15px] leading-tight" style={{ color: 'var(--ink)' }}>
         {label}
       </span>
@@ -907,6 +1096,56 @@ function OptionCard({ icon, label, sub, onClick }: {
         {sub}
       </span>
     </motion.button>
+  )
+}
+
+function StepBtn({ children, onClick, disabled, label }: {
+  children: React.ReactNode
+  onClick: () => void
+  disabled?: boolean
+  label: string
+}) {
+  return (
+    <motion.button
+      whileTap={disabled ? undefined : { scale: 0.88 }}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="w-9 h-9 rounded-full flex items-center justify-center font-playfair text-[20px] leading-none flex-shrink-0"
+      style={{
+        background: disabled ? 'rgba(42,30,30,0.04)' : 'rgba(139,16,36,0.08)',
+        border: `1px solid ${disabled ? 'rgba(42,30,30,0.1)' : 'rgba(139,16,36,0.22)'}`,
+        color: disabled ? 'var(--mute)' : 'var(--maroon)',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {children}
+    </motion.button>
+  )
+}
+
+function BreakRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div
+      className="flex items-center justify-between px-4 py-2.5"
+      style={{
+        background: strong ? 'rgba(139,16,36,0.05)' : 'transparent',
+        borderTop: strong ? '1px solid rgba(42,30,30,0.1)' : 'none',
+      }}
+    >
+      <span
+        className="font-inter text-[12px]"
+        style={{ color: strong ? 'var(--ink)' : 'var(--ink-soft)', fontWeight: strong ? 600 : 400 }}
+      >
+        {label}
+      </span>
+      <span
+        className="font-inter"
+        style={{ fontSize: strong ? 15 : 12.5, fontWeight: strong ? 700 : 500, color: strong ? 'var(--maroon)' : 'var(--ink)' }}
+      >
+        {value}
+      </span>
+    </div>
   )
 }
 

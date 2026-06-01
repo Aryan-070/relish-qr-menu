@@ -1,3 +1,11 @@
+# Raw ingredient chroma renders (source for scripts/key-ingredients.mjs;
+# keyed outputs live in public/assets/ingredients/ and ARE committed)
+raw-ingredients/
+
+# Original full-res dish/cover renders (source for scripts/optimize-images.mjs;
+# optimized outputs live in public/assets/ and ARE committed)
+raw-assets/
+
 # Logs
 logs
 *.log
@@ -22,3 +30,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Raw category chroma renders (keyed outputs in public/assets/categories/ ARE committed)
+raw-categories/
+
+# Downloaded video renditions (regenerate with `npm run fetch:videos`).
+# Large (~120MB across resolutions) — kept out of git; app falls back to posters.
+public/assets/video/

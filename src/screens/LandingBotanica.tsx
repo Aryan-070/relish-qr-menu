@@ -61,15 +61,16 @@ function BotanicaBtn({
 }
 
 export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const PLATE = 'min(clamp(178px, 26vw, 360px), 24vh)'
   return (
     <div
-      className="relative flex flex-col items-center min-h-dvh overflow-hidden"
+      className="relative flex flex-col items-center min-h-full overflow-hidden"
       style={{ background: BG }}
     >
       {/* Botanical watermark — large herb illustration */}
       <svg
         className="absolute pointer-events-none"
-        style={{ right: -30, top: '8%', width: 260, height: 380, opacity: 0.065, color: SAGE }}
+        style={{ right: -30, top: '8%', width: 'clamp(260px, 34vw, 560px)', height: 'clamp(380px, 50vw, 820px)', opacity: 0.065, color: SAGE }}
         viewBox="0 0 260 380"
         fill="none"
       >
@@ -97,7 +98,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
       {/* Left botanical accent */}
       <svg
         className="absolute pointer-events-none"
-        style={{ left: -20, bottom: '15%', width: 160, height: 260, opacity: 0.055, color: GREEN }}
+        style={{ left: -20, bottom: '15%', width: 'clamp(160px, 24vw, 420px)', height: 'clamp(260px, 38vw, 640px)', opacity: 0.055, color: GREEN }}
         viewBox="0 0 160 260"
         fill="none"
       >
@@ -114,7 +115,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
         style={{ background: `linear-gradient(to right, transparent, ${SAGE}, transparent)` }} />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center w-full pt-10 pb-8 px-7">
+      <div className="relative z-10 flex flex-col items-center justify-between flex-1 w-full pt-10 pb-8 px-7 gap-[clamp(3px,1vh,16px)]" style={{ maxWidth: 'min(94vw, 840px)' }}>
 
         {/* Botanica plate — real food photo */}
         <motion.div
@@ -122,14 +123,14 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1] }}
           className="relative flex items-center justify-center mb-5"
-          style={{ width: 178, height: 178 }}
+          style={{ width: PLATE, height: PLATE }}
         >
           <img
             src="/assets/covers/cover-botanica-plate.webp"
             alt="Relish organic plate"
             style={{
-              width: 178,
-              height: 178,
+              width: PLATE,
+              height: PLATE,
               objectFit: 'cover',
               borderRadius: '50%',
               boxShadow: '0 8px 24px rgba(42,72,32,0.18)',
@@ -156,7 +157,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
         {/* RELISH wordmark */}
         <motion.h1
           className="font-playfair font-bold text-center mb-1"
-          style={{ fontSize: 68, color: GREEN, letterSpacing: '0.06em', lineHeight: 0.95 }}
+          style={{ fontSize: 'clamp(68px, 9vw, 120px)', color: GREEN, letterSpacing: '0.06em', lineHeight: 0.95 }}
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
@@ -196,7 +197,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           animate={{ opacity: 1 }}
           transition={{ delay: 1.05, duration: 0.6 }}
           className="font-caveat text-center mb-6"
-          style={{ fontSize: 20, color: `rgba(42,72,32,0.7)`, lineHeight: 1.4 }}
+          style={{ fontSize: 'clamp(20px, 2.2vw, 30px)', color: `rgba(42,72,32,0.7)`, lineHeight: 1.4 }}
         >
           Farm fresh · seasonal · crafted with love
         </motion.p>
@@ -248,7 +249,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5, duration: 0.5 }}
-          className="mt-auto pt-8 flex flex-col items-center gap-2"
+          className="mt-10 flex flex-col items-center gap-2"
         >
           <div className="flex items-center gap-3">
             <div style={{ width: 40, height: 1, background: `rgba(107,143,94,0.4)` }} />
