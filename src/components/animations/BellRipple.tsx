@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Bell } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -10,10 +10,14 @@ interface BellRippleProps {
 
 export function BellRipple({ size = 20, color = '#D9A03A', onClick }: BellRippleProps) {
   const [ringing, setRinging] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
   const handleClick = () => {
     setRinging(true)
-    setTimeout(() => setRinging(false), 1400)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => setRinging(false), 1400)
     onClick?.()
   }
 

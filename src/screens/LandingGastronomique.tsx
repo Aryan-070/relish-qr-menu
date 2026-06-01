@@ -51,7 +51,7 @@ function DecoBtn({
         color: primary ? DECO_BG : DECO_GOLD,
       }}
       whileTap={{ scale: 0.97 }}
-      className={`${fullWidth ? 'w-full' : 'flex-1'} py-3.5 font-inter font-semibold uppercase text-[11px] tracking-[0.18em]`}
+      className={`${fullWidth ? 'w-full' : 'flex-1'} py-3.5 font-inter font-semibold uppercase text-[11px] lg:text-[13px] tracking-[0.18em]`}
       style={{
         background: primary ? DECO_GOLD : 'transparent',
         color: primary ? DECO_BG : DECO_GOLD,
@@ -68,7 +68,7 @@ function DecoBtn({
 export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Props) {
   return (
     <div
-      className="relative flex flex-col min-h-dvh overflow-hidden"
+      className="relative flex flex-col min-h-full overflow-hidden"
       style={{ background: DECO_BG }}
     >
       {/* Background oversized "R" monogram */}
@@ -167,14 +167,17 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
         />
       </motion.svg>
 
-      <div className="relative z-10 flex flex-col flex-1 px-6">
+      <div
+        className="relative z-10 flex flex-col flex-1 justify-between gap-[clamp(4px,1.2vh,18px)] px-6 mx-auto w-full"
+        style={{ width: '100%', maxWidth: 'min(94vw, 940px)' }}
+      >
         {/* Top thick-thin rule */}
         <motion.div
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           style={{ transformOrigin: 'left' }}
-          className="mt-5"
+          className="mt-5 lg:mt-8"
         >
           <ThickThinRule />
         </motion.div>
@@ -214,7 +217,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.5, duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
           className="relative overflow-hidden mt-4"
-          style={{ height: 178, borderRadius: 0, border: `1px solid rgba(184,146,10,0.35)` }}
+          style={{ height: 'min(clamp(178px, 26vw, 340px), 25vh)', borderRadius: 0, border: `1px solid rgba(184,146,10,0.35)` }}
         >
           {/* Sepia-amber gradient background */}
           <div
@@ -294,7 +297,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
           <h1
             className="font-playfair font-bold text-center w-full"
             style={{
-              fontSize: 'clamp(58px, 19.5vw, 84px)',
+              fontSize: 'clamp(58px, 12.5vw, 150px)',
               color: DECO_MAROON,
               letterSpacing: '0.08em',
               lineHeight: 0.9,
@@ -347,7 +350,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.5, duration: 0.5 }}
-          className="flex flex-col gap-2.5 py-4"
+          className="flex flex-col gap-2.5 py-3"
         >
           <div className="flex gap-2.5">
             <DecoBtn onClick={onOpenMenu} primary>
@@ -363,7 +366,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
         </motion.div>
 
         {/* Bottom masthead */}
-        <div className="mt-auto pb-6">
+        <div className="mt-6">
           <ThickThinRule />
           <div className="flex justify-center pt-2">
             <span

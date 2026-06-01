@@ -1,11 +1,7 @@
-import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { LandingCover } from './screens/LandingCover'
-import { LandingGastronomique } from './screens/LandingGastronomique'
-import { LandingEditorial } from './screens/LandingEditorial'
-import { LandingBotanica } from './screens/LandingBotanica'
-import { MenuBooklet } from './screens/MenuBooklet'
-import { RecommendationFlow } from './screens/RecommendationFlow'
+import { useState, lazy, Suspense } from 'react'
+import { motion } from 'framer-motion'
+import { LayoutGrid } from 'lucide-react'
+import { LandingSignatureDish } from './screens/LandingSignatureDish'
 import { ItemDetail } from './screens/ItemDetail'
 import { AddToOrder } from './screens/AddToOrder'
 import { ServicePanel } from './screens/ServicePanel'
@@ -13,20 +9,43 @@ import { OrderPanel } from './screens/OrderPanel'
 import { useOrder } from './hooks/useOrder'
 import { type MenuItem } from './data/menu'
 import { fadeIn } from './animations/variants'
+import { ThemeProvider, useTheme } from './theme/ThemeContext'
+import { MediaModeProvider } from './theme/MediaModeContext'
+import { ThemeSwitcher } from './components/molecules/ThemeSwitcher'
+import { MediaModeSwitcher } from './components/molecules/MediaModeSwitcher'
+import { ErrorBoundary } from './components/ErrorBoundary'
+
+// Code-split: non-default landings + secondary screens load on demand
+const LandingCover = lazy(() => import('./screens/LandingCover').then(m => ({ default: m.LandingCover })))
+const LandingGastronomique = lazy(() => import('./screens/LandingGastronomique').then(m => ({ default: m.LandingGastronomique })))
+const LandingEditorial = lazy(() => import('./screens/LandingEditorial').then(m => ({ default: m.LandingEditorial })))
+const LandingBotanica = lazy(() => import('./screens/LandingBotanica').then(m => ({ default: m.LandingBotanica })))
+const LandingCinematic = lazy(() => import('./screens/LandingCinematic').then(m => ({ default: m.LandingCinematic })))
+const LandingReel = lazy(() => import('./screens/LandingReel').then(m => ({ default: m.LandingReel })))
+const MenuBooklet = lazy(() => import('./screens/MenuBooklet').then(m => ({ default: m.MenuBooklet })))
+const RecommendationFlow = lazy(() => import('./screens/RecommendationFlow').then(m => ({ default: m.RecommendationFlow })))
+const ConsoleApp = lazy(() => import('./console/ConsoleApp').then(m => ({ default: m.ConsoleApp })))
 
 type Screen = 'cover' | 'menu' | 'recommend'
-type LandingVariant = 'classic' | 'gastronomique' | 'editorial' | 'botanica'
+type LandingVariant = 'classic' | 'gastronomique' | 'editorial' | 'botanica' | 'signature' | 'cinematic' | 'reel'
 
 const VARIANTS: Array<{ id: LandingVariant; label: string }> = [
+  { id: 'signature',      label: 'Signature'},
   { id: 'classic',        label: 'Classic'  },
   { id: 'gastronomique',  label: 'Deco'     },
   { id: 'editorial',      label: 'Editorial'},
   { id: 'botanica',       label: 'Botanica' },
+  { id: 'cinematic',      label: 'Cinema'   },
+  { id: 'reel',           label: 'Reel'     },
 ]
 
-export default function App() {
+function AppInner() {
+  const { theme } = useTheme()
+  const [appMode, setAppMode] = useState<'guest' | 'staff'>(() =>
+    typeof window !== 'undefined' && window.location.hash === '#staff' ? 'staff' : 'guest',
+  )
   const [screen, setScreen] = useState<Screen>('cover')
-  const [landingVariant, setLandingVariant] = useState<LandingVariant>('classic')
+  const [landingVariant, setLandingVariant] = useState<LandingVariant>('reel')
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [addingItem, setAddingItem] = useState<{ item: MenuItem; customization: string } | null>(null)
@@ -34,6 +53,29 @@ export default function App() {
   const [orderOpen, setOrderOpen] = useState(false)
 
   const { orderItems, addItem, removeItem, updateQuantity, updateNote, total, count } = useOrder()
+
+  const enterStaff = () => {
+    setAppMode('staff')
+    if (typeof window !== 'undefined') window.location.hash = 'staff'
+  }
+  const exitStaff = () => {
+    setAppMode('guest')
+    if (typeof window !== 'undefined') {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }
+
+  // All hooks are declared above this point — keep the early return below them
+  // so hook order stays stable across guest/staff toggles (Rules of Hooks).
+  if (appMode === 'staff') {
+    return (
+      <div className="app-shell" data-ui-theme={theme}>
+        <Suspense fallback={null}>
+          <ConsoleApp onExit={exitStaff} />
+        </Suspense>
+      </div>
+    )
+  }
 
   const goToMenu = () => setScreen('menu')
 
@@ -55,15 +97,14 @@ export default function App() {
   const handleAddConfirmDone = () => setAddingItem(null)
 
   return (
-    <div className="app-shell">
-      <AnimatePresence mode="wait">
+    <div className="app-shell" data-ui-theme={theme}>
+      <Suspense fallback={null}>
         {screen === 'cover' && (
           <motion.div
             key="cover"
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            exit="exit"
             className="absolute inset-0"
           >
             {landingVariant === 'classic' && (
@@ -78,6 +119,15 @@ export default function App() {
             {landingVariant === 'botanica' && (
               <LandingBotanica onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
             )}
+            {landingVariant === 'signature' && (
+              <LandingSignatureDish onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
+            )}
+            {landingVariant === 'cinematic' && (
+              <LandingCinematic onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
+            )}
+            {landingVariant === 'reel' && (
+              <LandingReel onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
+            )}
           </motion.div>
         )}
 
@@ -87,7 +137,6 @@ export default function App() {
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            exit="exit"
             className="absolute inset-0"
           >
             <MenuBooklet
@@ -106,7 +155,6 @@ export default function App() {
             variants={fadeIn}
             initial="hidden"
             animate="visible"
-            exit="exit"
             className="absolute inset-0"
           >
             <RecommendationFlow
@@ -116,7 +164,7 @@ export default function App() {
             />
           </motion.div>
         )}
-      </AnimatePresence>
+      </Suspense>
 
       {/* Variant switcher — only on cover screen */}
       {screen === 'cover' && (
@@ -183,6 +231,42 @@ export default function App() {
         orderCount={count}
         total={total}
       />
+
+      {/* Global UI-theme switcher — collapsed gear, anchored per-screen so it never overlaps nav */}
+      <ThemeSwitcher screen={screen} />
+
+      {/* Media-mode switcher — Video/Photo toggle, opposite corner from the theme gear */}
+      <MediaModeSwitcher screen={screen} />
+
+      {/* Discreet staff-console entry — bottom-left, all guest screens */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={enterStaff}
+        aria-label="Open staff console"
+        title="Staff console"
+        className="fixed bottom-3 left-3 z-50 w-9 h-9 inline-flex items-center justify-center rounded-full"
+        style={{
+          background: 'rgba(42,30,30,0.42)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: 'rgba(255,248,234,0.78)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+        }}
+      >
+        <LayoutGrid size={16} />
+      </motion.button>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <ThemeProvider>
+        <MediaModeProvider>
+          <AppInner />
+        </MediaModeProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   )
 }

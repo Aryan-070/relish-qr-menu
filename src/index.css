@@ -18,6 +18,34 @@
   --shadow-booklet: 0 8px 40px rgba(42,30,30,0.12), 0 2px 8px rgba(42,30,30,0.08);
   --shadow-card: 0 2px 12px rgba(42,30,30,0.08);
   --shadow-sheet: 0 -4px 32px rgba(42,30,30,0.16);
+
+  /* ── Design-system scales (8pt spacing / radius / type / elevation) ─────── */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-2xl: 24px;
+
+  --text-display: 26px; --text-title: 20px; --text-heading: 18px; --text-body: 14px;
+  --text-secondary: 13px; --text-caption: 11px; --text-label: 10px; --text-micro: 8px;
+
+  --elevation-1: 0 1px 4px rgba(42,30,30,0.06);
+  --elevation-2: 0 2px 12px rgba(42,30,30,0.08);
+  --elevation-3: 0 4px 20px rgba(42,30,30,0.10);
+  --elevation-4: 0 8px 40px rgba(42,30,30,0.12), 0 2px 8px rgba(42,30,30,0.08);
+  --elevation-5: 0 -4px 32px rgba(42,30,30,0.16);
+}
+
+/* Blur-up shimmer placeholder */
+@keyframes lqip-sheen {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.lqip-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.35) 50%, transparent 80%);
+  animation: lqip-sheen 1.3s ease-in-out infinite;
 }
 
 @tailwind base;
@@ -32,7 +60,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: #2A1E1E;
+  background: var(--paper);
   overscroll-behavior: none;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -40,23 +68,50 @@ html, body {
 }
 
 #root {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  min-height: 100dvh;
-  background: #2A1E1E;
   width: 100%;
+  height: 100dvh;
 }
 
+/* ── Full-screen responsive app shell (no phone bezel) ──────── */
 .app-shell {
   width: 100%;
-  max-width: 430px;
-  min-height: 100dvh;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
   background: var(--paper);
-  box-shadow: var(--shadow-booklet);
 }
+
+/* ── UI theme palette overrides (warm = default, no override needed) ─────── */
+/* Brutalist shifts the whole surface cooler & higher-contrast; hybrid keeps
+   the warm palette and expresses its difference at the component level. */
+[data-ui-theme="brutalist"] {
+  --paper: #F4F4F0;
+  --paper-2: #E9E9E4;
+  --ink: #111111;
+  --ink-soft: #444444;
+}
+[data-ui-theme="brutalist"].app-shell {
+  background: #F4F4F0;
+}
+[data-ui-theme="brutalist"] .paper-bg {
+  background-color: #F4F4F0;
+  background-image: none;
+}
+[data-ui-theme="brutalist"] .gold-divider {
+  background: #111111;
+  height: 1px;
+}
+
+/* Re-skin the serif display/accent utilities per theme so all panel titles
+   (Order / Service / Recommendation / ItemDetail) follow the theme's type.
+   Higher specificity than the base .font-* class, so it wins. */
+[data-ui-theme="warm"]      .font-playfair { font-family: 'Fraunces', Georgia, serif; }
+[data-ui-theme="hybrid"]    .font-playfair { font-family: 'DM Serif Display', Georgia, serif; }
+[data-ui-theme="brutalist"] .font-playfair { font-family: 'Syne', 'Arial Black', sans-serif; letter-spacing: -0.01em; }
+
+[data-ui-theme="warm"]      .font-cormorant { font-family: 'Instrument Serif', Georgia, serif; }
+[data-ui-theme="hybrid"]    .font-cormorant { font-family: 'Martian Mono', monospace; font-style: normal; }
+[data-ui-theme="brutalist"] .font-cormorant { font-family: 'JetBrains Mono', monospace; font-style: normal; }
 
 /* Paper texture background */
 .paper-bg {
@@ -105,51 +160,6 @@ html, body {
   to   { stroke-dashoffset: 0; }
 }
 
-@keyframes swirl-draw {
-  from { stroke-dashoffset: 500; }
-  to   { stroke-dashoffset: 0; }
-}
-
-@keyframes bell-ring {
-  0%   { transform: rotate(0deg); }
-  15%  { transform: rotate(10deg); }
-  30%  { transform: rotate(-10deg); }
-  45%  { transform: rotate(6deg); }
-  60%  { transform: rotate(-6deg); }
-  75%  { transform: rotate(3deg); }
-  90%  { transform: rotate(-3deg); }
-  100% { transform: rotate(0deg); }
-}
-
-@keyframes ripple-out {
-  0%   { transform: scale(0); opacity: 0.8; }
-  100% { transform: scale(3); opacity: 0; }
-}
-
-@keyframes check-in {
-  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
-  60%  { transform: scale(1.2) rotate(5deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
-}
-
-@keyframes plate-reveal {
-  0%   { transform: scale(0.45); opacity: 0; }
-  60%  { transform: scale(1.2);  opacity: 0.07; }
-  100% { transform: scale(1.5);  opacity: 0; }
-}
-
-@keyframes float-drift {
-  0%, 100% { transform: translateY(0px) translateX(0px); }
-  33%       { transform: translateY(-8px) translateX(4px); }
-  66%       { transform: translateY(4px) translateX(-6px); }
-}
-
-@keyframes slip-in {
-  0%   { transform: translateY(100%); opacity: 0; }
-  60%  { transform: translateY(-6px);  opacity: 1; }
-  100% { transform: translateY(0);     opacity: 1; }
-}
-
 /* Primary button shimmer sweep */
 @keyframes shine-sweep {
   0%       { transform: translateX(-200%) skewX(-15deg); }
@@ -168,16 +178,148 @@ html, body {
   50%       { box-shadow: 0 0 0 5px rgba(139,16,36,0.1); }
 }
 
-/* Botanica leaf sway */
-@keyframes leaf-sway {
-  0%, 100% { transform: rotate(-4deg) scale(1); }
-  50%       { transform: rotate(4deg) scale(1.04); }
+/* Rotating conic border for ElectricOpenMenuBtn */
+@property --conic-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes conic-spin    { to { --conic-angle: 360deg; } }
+
+/* Badge micro-animations */
+@keyframes badge-bob     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes badge-pulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+@keyframes badge-twinkle { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+/* Relish heading gold-red shimmer — continuous sweep matching conic-spin rhythm */
+@keyframes relish-shimmer {
+  from { background-position: 0% 50%; }
+  to   { background-position: 200% 50%; }
 }
 
-/* Deco rule grow */
-@keyframes deco-grow {
-  from { transform: scaleX(0); transform-origin: center; }
-  to   { transform: scaleX(1); transform-origin: center; }
+/* Bubble free-roam float + gentle scale-breathe — 3 variants for organic variety */
+@keyframes bubble-float-a {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  33%       { transform: translate(6px, -12px) rotate(2deg) scale(1.05); }
+  66%       { transform: translate(-5px, -5px) rotate(-2deg) scale(0.97); }
+}
+@keyframes bubble-float-b {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  40%       { transform: translate(-7px, -9px) rotate(-3deg) scale(1.06); }
+  75%       { transform: translate(5px, -4px) rotate(2deg) scale(0.96); }
+}
+@keyframes bubble-float-c {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  30%       { transform: translate(8px, -10px) rotate(1deg) scale(1.04); }
+  60%       { transform: translate(-4px, -14px) rotate(-1deg) scale(0.98); }
+}
+
+/* Ambient ingredient bubbles — free roam + dramatic size breathing */
+@keyframes ambient-roam-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%       { transform: translate(14px, -20px) scale(1.18); }
+  50%       { transform: translate(-8px, -32px) scale(0.88); }
+  75%       { transform: translate(11px, -14px) scale(1.1); }
+}
+@keyframes ambient-roam-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30%       { transform: translate(-16px, -16px) scale(1.2); }
+  55%       { transform: translate(6px, -28px) scale(0.9); }
+  80%       { transform: translate(-9px, -8px) scale(1.08); }
+}
+@keyframes ambient-roam-c {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  20%       { transform: translate(10px, -14px) scale(1.12); }
+  50%       { transform: translate(-12px, -24px) scale(0.85); }
+  70%       { transform: translate(14px, -18px) scale(1.16); }
+}
+
+/* ── MISSING SERVICE PANEL KEYFRAMES (referenced but previously undefined) ── */
+
+/* Waiter walks in from screen-left, overshoots centre, settles */
+@keyframes waiterApproach {
+  0%   { transform: translateX(-50%) translateX(-320px) scale(0.78); opacity: 0; }
+  12%  { opacity: 1; }
+  70%  { transform: translateX(-50%) translateX(10px)  scale(1.02); }
+  82%  { transform: translateX(-50%) translateX(-5px)  scale(0.99); }
+  100% { transform: translateX(-50%) translateX(0px)   scale(1); }
+}
+
+/* Gentle standing sway (after approach) */
+@keyframes waiter-sway {
+  0%, 100% { transform: rotate(-1.2deg); }
+  50%       { transform: rotate(1.2deg); }
+}
+
+/* Tray arm lifts and lowers */
+@keyframes waiter-arm {
+  0%   { transform: rotate(-6deg); }
+  100% { transform: rotate(4deg); }
+}
+
+/* Walking legs — left and right legs swing in opposite phase */
+@keyframes waiter-leg-l {
+  0%, 100% { transform: rotate(0deg); }
+  25%       { transform: rotate(22deg); }
+  75%       { transform: rotate(-22deg); }
+}
+@keyframes waiter-leg-r {
+  0%, 100% { transform: rotate(0deg); }
+  25%       { transform: rotate(-22deg); }
+  75%       { transform: rotate(22deg); }
+}
+
+/* Water stream grows downward into glass then fades */
+@keyframes water-pour-stream {
+  0%   { height: 0px; opacity: 0; }
+  12%  { opacity: 1; }
+  100% { height: 36px; opacity: 0.85; }
+}
+
+/* Gold status indicator blink */
+@keyframes status-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* Hero CTA ring pulse — Call Waiter */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 6px 28px rgba(139,16,36,0.28), 0 0 0 0px rgba(139,16,36,0); }
+  50%       { box-shadow: 0 6px 28px rgba(139,16,36,0.32), 0 0 0 9px rgba(139,16,36,0.07); }
+}
+
+/* Feed row slides up on entry */
+@keyframes feed-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── NEW PREMIUM BUTTON & SCENE KEYFRAMES ──────────────────────────────────── */
+
+/* Ripple expands from tap point */
+@keyframes ripple-wave {
+  0%   { width: 4px; height: 4px; opacity: 0.55; }
+  100% { width: 260px; height: 260px; opacity: 0; }
+}
+
+/* Water surface ring pop when glass fills */
+@keyframes water-surface-pop {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.9; }
+  60%  { opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
+}
+
+/* Condensation drop drips down glass exterior */
+@keyframes condense-drip {
+  0%   { transform: translateY(0); opacity: 0.7; }
+  80%  { opacity: 0.5; }
+  100% { transform: translateY(24px); opacity: 0; }
+}
+
+/* Checkmark SVG path draw-in */
+@keyframes check-draw {
+  from { stroke-dashoffset: 28; }
+  to   { stroke-dashoffset: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -186,4 +328,21 @@ html, body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── Staff Console print support (Reports / Billing receipts) ─────────────── */
+/* Wrap printable content in .print-area and mark controls/chrome .no-print. */
+@media print {
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    padding: 24px !important;
+    background: #fff !important;
+    color: #111 !important;
+    box-shadow: none !important;
+  }
+  .no-print { display: none !important; }
 }
