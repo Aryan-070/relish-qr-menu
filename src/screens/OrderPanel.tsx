@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Trash2, Plus, Minus, MessageSquare, CheckCircle2 } from 'lucide-react'
 import { type OrderItem } from '../hooks/useOrder'
 import { Price } from '../components/atoms/Price'
+import { formatMoney } from '../lib/money'
+import { useT } from '../i18n'
 import { btnPrimary, btnIcon, btnStep } from '../animations/variants'
 
 interface OrderPanelProps {
@@ -10,9 +12,11 @@ interface OrderPanelProps {
   items: OrderItem[]
   total: number
   onClose: () => void
-  onRemove: (itemId: string, customization: string) => void
-  onUpdateQty: (itemId: string, customization: string, delta: number) => void
-  onUpdateNote: (itemId: string, customization: string, note: string) => void
+  onRemove: (lineId: string) => void
+  onUpdateQty: (lineId: string, delta: number) => void
+  onUpdateNote: (lineId: string, note: string) => void
+  /** Commit the cart to the kitchen (scan-to-order). */
+  onPlaceOrder?: () => void
   onWaiter: () => void
 }
 
@@ -24,13 +28,16 @@ export function OrderPanel({
   onRemove,
   onUpdateQty,
   onUpdateNote,
+  onPlaceOrder,
   onWaiter,
 }: OrderPanelProps) {
   const [noteOpen, setNoteOpen] = useState<string | null>(null)
   const [orderSent, setOrderSent] = useState(false)
+  const tr = useT()
 
   const handlePlaceOrder = () => {
     setOrderSent(true)
+    onPlaceOrder?.()
     setTimeout(() => {
       setOrderSent(false)
       onWaiter()
@@ -81,10 +88,12 @@ export function OrderPanel({
             <div className="flex items-center px-5 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(217,160,58,0.2)' }}>
               <div className="flex-1">
                 <h3 className="font-playfair font-bold text-[18px]" style={{ color: 'var(--maroon)' }}>
-                  Your Order
+                  {tr('order.title')}
                 </h3>
                 <p className="font-inter text-[11px]" style={{ color: 'var(--mute)' }}>
-                  {items.length === 0 ? 'Nothing added yet' : `${items.reduce((s, i) => s + i.quantity, 0)} item${items.reduce((s, i) => s + i.quantity, 0) !== 1 ? 's' : ''}`}
+                  {items.length === 0
+                    ? tr('order.nothingAdded')
+                    : `${items.reduce((s, i) => s + i.quantity, 0)} ${items.reduce((s, i) => s + i.quantity, 0) !== 1 ? tr('order.itemPlural') : tr('order.itemSingular')}`}
                 </p>
               </div>
               <motion.button
@@ -104,16 +113,16 @@ export function OrderPanel({
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <span className="text-4xl opacity-30">🛍️</span>
                   <p className="font-playfair italic text-[15px]" style={{ color: 'var(--ink-soft)' }}>
-                    Your order is empty
+                    {tr('order.empty')}
                   </p>
                   <p className="font-inter text-[12px]" style={{ color: 'var(--mute)' }}>
-                    Tap any dish to add it here
+                    {tr('action.tapDishToAdd')}
                   </p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
                   {items.map(orderItem => {
-                    const key = `${orderItem.item.id}-${orderItem.customization}`
+                    const key = orderItem.lineId
                     return (
                       <motion.div
                         key={key}
@@ -134,7 +143,7 @@ export function OrderPanel({
                             <div className="flex flex-col items-center gap-1.5 pt-0.5">
                               <motion.button
                                 whileTap={btnStep.tap}
-                                onClick={() => onUpdateQty(orderItem.item.id, orderItem.customization, 1)}
+                                onClick={() => onUpdateQty(key, 1)}
                                 className="w-7 h-7 rounded-full flex items-center justify-center"
                                 style={{ background: 'rgba(139,16,36,0.1)' }}
                               >
@@ -146,8 +155,8 @@ export function OrderPanel({
                               <motion.button
                                 whileTap={btnStep.tap}
                                 onClick={() => {
-                                  if (orderItem.quantity <= 1) onRemove(orderItem.item.id, orderItem.customization)
-                                  else onUpdateQty(orderItem.item.id, orderItem.customization, -1)
+                                  if (orderItem.quantity <= 1) onRemove(key)
+                                  else onUpdateQty(key, -1)
                                 }}
                                 className="w-7 h-7 rounded-full flex items-center justify-center"
                                 style={{ background: 'rgba(139,16,36,0.1)' }}
@@ -161,9 +170,9 @@ export function OrderPanel({
                               <p className="font-playfair font-semibold text-[14px] leading-snug" style={{ color: 'var(--ink)' }}>
                                 {orderItem.item.name}
                               </p>
-                              {orderItem.customization !== 'Regular' && (
+                              {orderItem.label && (
                                 <p className="font-inter text-[11px] mt-0.5" style={{ color: 'var(--mute)' }}>
-                                  {orderItem.customization}
+                                  {orderItem.label}
                                 </p>
                               )}
                               {/* Special note */}
@@ -176,10 +185,10 @@ export function OrderPanel({
 
                             {/* Price + remove */}
                             <div className="flex flex-col items-end gap-1.5">
-                              <Price amount={orderItem.item.price * orderItem.quantity} size="sm" />
+                              <Price amount={orderItem.unitPrice * orderItem.quantity} size="sm" />
                               <motion.button
                                 whileTap={{ scale: 0.82, rotate: -10, transition: { type: 'spring', stiffness: 500, damping: 24 } }}
-                                onClick={() => onRemove(orderItem.item.id, orderItem.customization)}
+                                onClick={() => onRemove(key)}
                               >
                                 <Trash2 size={13} style={{ color: 'var(--mute)' }} />
                               </motion.button>
@@ -196,9 +205,9 @@ export function OrderPanel({
                               >
                                 <textarea
                                   autoFocus
-                                  placeholder="e.g. Less spicy, no onion, extra sauce..."
+                                  placeholder={tr('order.notePlaceholder')}
                                   value={orderItem.note ?? ''}
-                                  onChange={e => onUpdateNote(orderItem.item.id, orderItem.customization, e.target.value)}
+                                  onChange={e => onUpdateNote(key, e.target.value)}
                                   rows={2}
                                   className="w-full font-inter text-[12px] resize-none rounded-lg px-3 py-2 outline-none"
                                   style={{
@@ -212,7 +221,7 @@ export function OrderPanel({
                                   className="self-end font-inter text-[11px] font-medium"
                                   style={{ color: 'var(--maroon)' }}
                                 >
-                                  Done
+                                  {tr('action.done')}
                                 </button>
                               </motion.div>
                             ) : (
@@ -222,7 +231,7 @@ export function OrderPanel({
                                 style={{ color: orderItem.note ? 'var(--gold)' : 'var(--mute)' }}
                               >
                                 <MessageSquare size={12} />
-                                {orderItem.note ? 'Edit special instructions' : 'Add special instructions'}
+                                {orderItem.note ? tr('order.editNote') : tr('order.addNote')}
                               </button>
                             )}
                           </div>
@@ -244,14 +253,14 @@ export function OrderPanel({
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <p className="font-inter text-[11px] uppercase tracking-widest" style={{ color: 'var(--mute)' }}>
-                      Total
+                      {tr('order.total')}
                     </p>
                     <p className="font-playfair font-bold text-[22px]" style={{ color: 'var(--maroon)' }}>
-                      ₹{total.toLocaleString('en-IN')}
+                      {formatMoney(total)}
                     </p>
                   </div>
                   <p className="font-inter text-[11px]" style={{ color: 'var(--mute)' }}>
-                    Taxes & service charges extra
+                    {tr('order.taxesExtra')}
                   </p>
                 </div>
 
@@ -288,7 +297,7 @@ export function OrderPanel({
                           className="flex items-center gap-2 relative z-10"
                         >
                           <CheckCircle2 size={18} />
-                          <span>Calling waiter…</span>
+                          <span>{tr('order.callingWaiter')}</span>
                         </motion.span>
                       ) : (
                         <motion.span
@@ -298,14 +307,14 @@ export function OrderPanel({
                           exit={{ opacity: 0 }}
                           className="relative z-10"
                         >
-                          Place Order with Waiter
+                          {tr('action.placeOrder')}
                         </motion.span>
                       )}
                     </AnimatePresence>
                   </motion.button>
                 </div>
                 <p className="font-inter text-center text-[10px] mt-2" style={{ color: 'var(--mute)' }}>
-                  Hand this to your waiter or tap to call them
+                  {tr('order.handToWaiter')}
                 </p>
               </div>
             )}

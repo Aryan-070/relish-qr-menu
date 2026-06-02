@@ -1,8 +1,20 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ShoppingBag } from 'lucide-react'
 import { type MenuItem, getItemById, getCategoryForItem } from '../data/menu'
+import { dietaryProfile, ALLERGEN_LABELS, type DietaryTag } from '../data/dietary'
+import {
+  resolveModifierGroups,
+  defaultSelection,
+  selectionUnitPrice,
+  isSelectionValid,
+  type SelectedModifier,
+  type ModifierGroup,
+  type ModifierOption,
+} from '../data/modifiers'
 import { ChefSpecial, SpiceLevel, DietBadge, TagLabel } from '../components/atoms/DietaryBadges'
+import { formatMoney } from '../lib/money'
+import { useT } from '../i18n'
 import { Price } from '../components/atoms/Price'
 import { Button } from '../components/atoms/Button'
 import { CategoryIllustration } from '../components/atoms/CategoryIllustration'
@@ -15,34 +27,63 @@ import { resolveDishHeroVideo } from '../data/videoManifest'
 interface ItemDetailProps {
   item: MenuItem | null
   onClose: () => void
-  onAddToOrder: (item: MenuItem, customization: string) => void
+  onAddToOrder: (item: MenuItem, modifiers: SelectedModifier[]) => void
   onWaiter: () => void
 }
 
 export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetailProps) {
   const { tokens: t } = useTheme()
+  const tr = useT()
   const { posterOnly } = useMediaMode()
-  const [selectedCustomization, setSelectedCustomization] = useState('Regular')
+  const [selection, setSelection] = useState<SelectedModifier[]>([])
   const [heroErr, setHeroErr] = useState(false)
   const handleHeroErr = useCallback(() => setHeroErr(true), [])
 
-  // Reset customization and image error whenever a new item opens
+  const groups = useMemo(() => (item ? resolveModifierGroups(item) : []), [item])
+
+  // Reset selection + image error whenever a new item opens
   const itemId = item?.id
-  const firstCustomization = item?.customizations[0]
   useEffect(() => {
-    if (itemId) {
-      setSelectedCustomization(firstCustomization ?? 'Regular')
+    if (item) {
+      setSelection(defaultSelection(resolveModifierGroups(item)))
       setHeroErr(false)
     }
-  }, [itemId, firstCustomization])
+  }, [itemId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const unitPrice = item ? selectionUnitPrice(item.price, selection) : 0
+  const valid = isSelectionValid(groups, selection)
+
+  const toggleOption = (group: ModifierGroup, option: ModifierOption) => {
+    setSelection(prev => {
+      const others = prev.filter(s => s.groupId !== group.id)
+      const inGroup = prev.filter(s => s.groupId === group.id)
+      const isSelected = inGroup.some(s => s.optionId === option.id)
+      const sel: SelectedModifier = {
+        groupId: group.id,
+        optionId: option.id,
+        label: option.label,
+        priceDelta: option.priceDelta,
+      }
+      // Single-select (radio): replace whatever was chosen in the group
+      if (group.max === 1) return [...others, sel]
+      // Multi-select toggle, respecting min/max
+      if (isSelected) {
+        const next = inGroup.filter(s => s.optionId !== option.id)
+        if (next.length < group.min) return prev
+        return [...others, ...next]
+      }
+      if (inGroup.length >= group.max) return prev
+      return [...others, ...inGroup, sel]
+    })
+  }
 
   const handleAdd = () => {
-    if (!item) return
-    onAddToOrder(item, selectedCustomization)
+    if (!item || !valid) return
+    onAddToOrder(item, selection)
   }
 
   const handleAddPairing = (paired: MenuItem) => {
-    onAddToOrder(paired, paired.customizations[0] ?? 'Regular')
+    onAddToOrder(paired, defaultSelection(resolveModifierGroups(paired)))
   }
 
   return (
@@ -168,33 +209,66 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
                   {item.description}
                 </p>
 
+                {/* Dietary + allergen disclosure */}
+                <DietaryDisclosure item={item} />
+
                 <div className="gold-divider" />
 
-                {/* Customisations */}
-                <div className="mb-4">
-                  <p
-                    className="font-inter text-[11px] uppercase tracking-widest mb-2"
-                    style={{ color: 'var(--gold)' }}
-                  >
-                    Customise
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {item.customizations.map(c => (
-                      <button
-                        key={c}
-                        onClick={() => setSelectedCustomization(c)}
-                        className="px-3 py-1.5 rounded-full font-inter text-[12px] border transition-all"
-                        style={{
-                          background: selectedCustomization === c ? 'var(--maroon)' : 'transparent',
-                          color: selectedCustomization === c ? 'white' : 'var(--ink-soft)',
-                          borderColor: selectedCustomization === c ? 'var(--maroon)' : 'rgba(139,16,36,0.25)',
-                        }}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Modifier groups (priced, with min/max rules) */}
+                {groups.map(group => {
+                  const inGroup = selection.filter(s => s.groupId === group.id)
+                  const rule =
+                    group.max === 1
+                      ? tr('item.pickOne')
+                      : group.min > 0
+                        ? `Choose ${group.min}–${group.max}`
+                        : `Up to ${group.max}`
+                  return (
+                    <div className="mb-4" key={group.id}>
+                      <div className="flex items-baseline justify-between mb-2">
+                        <p
+                          className="font-inter text-[11px] uppercase tracking-widest"
+                          style={{ color: 'var(--gold)' }}
+                        >
+                          {group.name}
+                        </p>
+                        <span className="font-inter text-[10px]" style={{ color: 'var(--mute)' }}>
+                          {rule}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {group.options.map(option => {
+                          const isSelected = inGroup.some(s => s.optionId === option.id)
+                          return (
+                            <button
+                              key={option.id}
+                              onClick={() => toggleOption(group, option)}
+                              className="px-3 py-1.5 rounded-full font-inter text-[12px] border transition-all flex items-center gap-1.5"
+                              style={{
+                                background: isSelected ? 'var(--maroon)' : 'transparent',
+                                color: isSelected ? 'white' : 'var(--ink-soft)',
+                                borderColor: isSelected ? 'var(--maroon)' : 'rgba(139,16,36,0.25)',
+                              }}
+                            >
+                              {option.label}
+                              {option.priceDelta > 0 && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    opacity: isSelected ? 0.85 : 0.7,
+                                    color: isSelected ? 'white' : 'var(--gold)',
+                                  }}
+                                >
+                                  +{formatMoney(option.priceDelta)}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
 
                 {/* Goes well with */}
                 {Object.values(item.pairings).some(Boolean) && (
@@ -205,13 +279,13 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
                         className="font-inter text-[11px] uppercase tracking-widest mb-2"
                         style={{ color: 'var(--gold)' }}
                       >
-                        Goes well with
+                        {tr('item.goesWellWith')}
                       </p>
                       <p
                         className="font-inter text-[11px] mb-3"
                         style={{ color: 'var(--mute)' }}
                       >
-                        Tap to add to your order
+                        {tr('action.tapToAdd')}
                       </p>
                       <motion.div
                         variants={stagger}
@@ -269,11 +343,11 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
 
                 {/* CTAs */}
                 <div className="flex gap-3 mt-4">
-                  <Button variant="primary" fullWidth onClick={handleAdd}>
-                    <ShoppingBag size={14} /> Add to Order
+                  <Button variant="primary" fullWidth onClick={handleAdd} disabled={!valid}>
+                    <ShoppingBag size={14} /> {tr('action.addToOrder')} · {formatMoney(unitPrice)}
                   </Button>
                   <Button variant="ghost" onClick={() => { onClose(); setTimeout(onWaiter, 80) }}>
-                    Ask Waiter
+                    {tr('action.askWaiter')}
                   </Button>
                 </div>
               </div>
@@ -282,5 +356,50 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
         </>
       )}
     </AnimatePresence>
+  )
+}
+
+// Positive dietary claims worth surfacing to the guest (vegetarian is implicit
+// on this menu, so it's omitted to reduce noise).
+const DIETARY_DISPLAY: ReadonlyArray<[DietaryTag, string]> = [
+  ['vegan', 'Vegan'],
+  ['jain', 'Jain'],
+  ['gluten-free', 'Gluten-free'],
+  ['nut-free', 'Nut-free'],
+  ['dairy-free', 'Dairy-free'],
+]
+
+function DietaryDisclosure({ item }: { item: MenuItem }) {
+  const tr = useT()
+  const { dietary, allergens } = dietaryProfile(item)
+  const claims = DIETARY_DISPLAY.filter(([tag]) => dietary.includes(tag))
+  if (claims.length === 0 && allergens.length === 0) return null
+
+  return (
+    <div className="mb-4 flex flex-col gap-2">
+      {claims.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-inter text-[10px] uppercase tracking-widest" style={{ color: 'var(--gold)' }}>
+            {tr('item.suitableFor')}
+          </span>
+          {claims.map(([tag, label]) => (
+            <span
+              key={tag}
+              className="font-inter text-[11px] px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(79,122,60,0.12)', color: '#4F7A3C', border: '1px solid rgba(79,122,60,0.4)' }}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+      {allergens.length > 0 && (
+        <p className="font-inter text-[11px]" style={{ color: 'var(--mute)' }}>
+          <span style={{ fontWeight: 600, color: 'var(--maroon)' }}>{tr('item.contains')}:</span>{' '}
+          {allergens.map(a => ALLERGEN_LABELS[a]).join(' · ')}
+          <span style={{ opacity: 0.7 }}> — {tr('item.allergyNote')}</span>
+        </p>
+      )}
+    </div>
   )
 }

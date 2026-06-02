@@ -4,16 +4,21 @@ import {
   X, ChevronLeft, ChevronRight, CheckCircle2, Bell,
   BookOpen, Sparkles, ClipboardList, GlassWater, ReceiptText, LayoutGrid,
   Snowflake, Citrus, Scale, ListChecks, HandHeart,
-  Croissant, Sprout, TriangleAlert, ChefHat, Shirt,
+  Croissant, Sprout, TriangleAlert, ChefHat, Shirt, Star, Gift,
   type LucideIcon,
 } from 'lucide-react'
 import { stagger, fadeUp, fullPanel, btnPrimary, btnCard, btnIcon } from '../animations/variants'
+import { formatMoney } from '../lib/money'
 import { useMediaMode } from '../theme/MediaModeContext'
 import { WaiterFigure, WaiterVideo, WaterScene, BreadScene } from './service/SceneSkins'
+import { FeedbackView } from './service/FeedbackView'
+import { LoyaltyView } from './service/LoyaltyView'
+import { useT } from '../i18n'
+import type { TranslationKey } from '../i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PanelView = 'home' | 'waiter' | 'water' | 'bill' | 'split' | 'more' | 'jain' | 'bread'
+type PanelView = 'home' | 'waiter' | 'water' | 'bill' | 'split' | 'more' | 'jain' | 'bread' | 'feedback' | 'loyalty'
 
 const TIP_OPTIONS = [0, 5, 10, 15] as const
 
@@ -32,69 +37,74 @@ interface ServicePanelProps {
   onViewOrder?: () => void
   orderCount: number
   total: number
+  /** Loyalty customer linked to this session (drives the Rewards card). */
+  activeCustomerId?: string | null
+  onLinkCustomer?: (customerId: string) => void
 }
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 
-const JAIN_INFO = [
-  { q: 'What is Jain food?', a: 'Jain cuisine avoids root vegetables (onion, garlic, potato, carrot, radish) and any ingredient that harms living organisms.' },
-  { q: 'Which items are fully Jain?', a: 'Items marked with the Jain badge are prepared without any root vegetables. Look for the green "Jain" badge on the menu.' },
-  { q: 'Can dishes be made Jain?', a: 'Many dishes show "Can be Jain" — these can be prepared Jain-friendly on request. Please inform your waiter before ordering.' },
-  { q: 'Cross-contamination?', a: 'Our kitchen takes care with Jain orders, but we use a shared kitchen. Please speak to the waiter for strict requirements.' },
+const JAIN_INFO: { qKey: TranslationKey; aKey: TranslationKey }[] = [
+  { qKey: 'service.jainQ1', aKey: 'service.jainA1' },
+  { qKey: 'service.jainQ2', aKey: 'service.jainA2' },
+  { qKey: 'service.jainQ3', aKey: 'service.jainA3' },
+  { qKey: 'service.jainQ4', aKey: 'service.jainA4' },
 ]
 
-const WATER_OPTIONS: { id: string; label: string; sub: string; icon: LucideIcon }[] = [
-  { id: 'still',     label: 'Still',      sub: 'spring, room temp', icon: GlassWater },
-  { id: 'sparkling', label: 'Sparkling',  sub: 'well chilled',      icon: Sparkles },
-  { id: 'ice',       label: '+ Ice',      sub: 'extra cubes',       icon: Snowflake },
-  { id: 'lemon',     label: '+ Lemon',    sub: 'fresh wedge',       icon: Citrus },
+const WATER_OPTIONS: { id: string; labelKey: TranslationKey; subKey: TranslationKey; icon: LucideIcon }[] = [
+  { id: 'still',     labelKey: 'service.waterStill',     subKey: 'service.waterStillSub',     icon: GlassWater },
+  { id: 'sparkling', labelKey: 'service.waterSparkling', subKey: 'service.waterSparklingSub', icon: Sparkles },
+  { id: 'ice',       labelKey: 'service.waterIce',       subKey: 'service.waterIceSub',       icon: Snowflake },
+  { id: 'lemon',     labelKey: 'service.waterLemon',     subKey: 'service.waterLemonSub',      icon: Citrus },
 ]
 
-const BILL_OPTIONS: { id: string; label: string; sub: string; icon: LucideIcon }[] = [
-  { id: 'whole',     label: 'One bill',     sub: 'for the table',  icon: ReceiptText },
-  { id: 'split',     label: 'Split evenly', sub: '2 ways',         icon: Scale },
-  { id: 'itemize',   label: 'Itemise',      sub: 'per dish',       icon: ListChecks },
-  { id: 'gratuity',  label: 'Add gratuity', sub: '10 / 18 / 20%',  icon: HandHeart },
+const BILL_OPTIONS: { id: string; labelKey: TranslationKey; subKey: TranslationKey; icon: LucideIcon }[] = [
+  { id: 'whole',     labelKey: 'service.billOneBill',     subKey: 'service.billOneBillSub',     icon: ReceiptText },
+  { id: 'split',     labelKey: 'service.billSplitEvenly', subKey: 'service.billSplitEvenlySub', icon: Scale },
+  { id: 'itemize',   labelKey: 'service.billItemise',     subKey: 'service.billItemiseSub',     icon: ListChecks },
+  { id: 'gratuity',  labelKey: 'service.billGratuity',    subKey: 'service.billGratuitySub',    icon: HandHeart },
 ]
 
-const MORE_OPTIONS: { id: string; label: string; sub: string; icon: LucideIcon; action: string }[] = [
-  { id: 'bread',      label: 'Bread basket',     sub: 'warm sourdough',    icon: Croissant,     action: 'bread' },
-  { id: 'jain',       label: 'Jain info',        sub: 'menu details',      icon: Sprout,        action: 'jain' },
-  { id: 'allergy',    label: 'Allergy note',     sub: 'flag the kitchen',  icon: TriangleAlert, action: 'send' },
-  { id: 'compliment', label: 'Compliments',      sub: 'to the chef',       icon: ChefHat,       action: 'send' },
-  { id: 'choose',     label: 'Help choosing',    sub: 'ask our team',      icon: Sparkles,      action: 'send' },
-  { id: 'coat',       label: 'Coat check',       sub: 'retrieve',          icon: Shirt,         action: 'send' },
+const MORE_OPTIONS: { id: string; labelKey: TranslationKey; subKey: TranslationKey; icon: LucideIcon; action: string }[] = [
+  { id: 'rewards',    labelKey: 'service.rewards',      subKey: 'service.rewardsSub',      icon: Gift,          action: 'loyalty' },
+  { id: 'rate',       labelKey: 'service.rateUs',       subKey: 'service.rateUsSub',       icon: Star,          action: 'feedback' },
+  { id: 'bread',      labelKey: 'service.bread',        subKey: 'service.breadSub',        icon: Croissant,     action: 'bread' },
+  { id: 'jain',       labelKey: 'service.jainInfo',     subKey: 'service.jainInfoSub',     icon: Sprout,        action: 'jain' },
+  { id: 'allergy',    labelKey: 'service.allergyNote',  subKey: 'service.allergyNoteSub',  icon: TriangleAlert, action: 'send' },
+  { id: 'compliment', labelKey: 'service.compliments',  subKey: 'service.complimentsSub',  icon: ChefHat,       action: 'send' },
+  { id: 'choose',     labelKey: 'service.helpChoosing', subKey: 'service.helpChoosingSub', icon: Sparkles,      action: 'send' },
+  { id: 'coat',       labelKey: 'service.coatCheck',    subKey: 'service.coatCheckSub',    icon: Shirt,         action: 'send' },
 ]
 
-const SEED_FEED: FeedItem[] = [
-  { id: 'seed-1', label: 'Table seated',      status: 'done',    eta: '— done' },
-  { id: 'seed-2', label: 'Menus delivered',   status: 'done',    eta: '— done' },
-]
-
-const TOAST_MESSAGES: Record<string, string> = {
-  still:     'Still water, on its way.',
-  sparkling: 'Sparkling, well chilled.',
-  ice:       'Extra ice — coming.',
-  lemon:     'A wedge of lemon — coming.',
-  whole:     'One bill, on its way.',
-  split:     'Bill split — sent to your waiter.',
-  itemize:   'Itemising the bill.',
-  gratuity:  'Add gratuity at the till.',
-  bread:     'More bread — coming.',
-  allergy:   'Kitchen flagged. Waiter will confirm.',
-  compliment:'Compliments passed to the kitchen.',
-  choose:    'Waiter will be with you shortly.',
-  coat:      'Retrieving your coats.',
-  waiter:    'Waiter has been called!',
-  cancel:    'Cancelled — no waiter on the way.',
+// Toast message key per action id
+const TOAST_MESSAGE_KEYS: Record<string, TranslationKey> = {
+  still:     'service.toastStill',
+  sparkling: 'service.toastSparkling',
+  ice:       'service.toastIce',
+  lemon:     'service.toastLemon',
+  whole:     'service.toastWhole',
+  split:     'service.toastSplit',
+  itemize:   'service.toastItemize',
+  gratuity:  'service.toastGratuity',
+  bread:     'service.toastBread',
+  allergy:   'service.toastAllergy',
+  compliment:'service.toastCompliment',
+  choose:    'service.toastChoose',
+  coat:      'service.toastCoat',
+  waiter:    'service.toastWaiter',
+  cancel:    'service.toastCancel',
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrder, orderCount, total }: ServicePanelProps) {
+export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrder, orderCount, total, activeCustomerId = null, onLinkCustomer }: ServicePanelProps) {
+  const tr = useT()
   const { posterOnly } = useMediaMode()
   const [view, setView] = useState<PanelView>('home')
-  const [feed, setFeed] = useState<FeedItem[]>(SEED_FEED)
+  const [feed, setFeed] = useState<FeedItem[]>(() => [
+    { id: 'seed-1', label: tr('service.feedTableSeated'),    status: 'done', eta: tr('service.feedDone') },
+    { id: 'seed-2', label: tr('service.feedMenusDelivered'), status: 'done', eta: tr('service.feedDone') },
+  ])
   const [toastText, setToastText] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
   const [eta, setEta] = useState(42)
@@ -163,12 +173,12 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
     const item: FeedItem = { id, label, status: 'pending', eta: feedEta }
     setFeed(prev => [item, ...prev])
     const t = setTimeout(() => {
-      setFeed(prev => prev.map(f => f.id === id ? { ...f, status: 'done', eta: '— done' } : f))
+      setFeed(prev => prev.map(f => f.id === id ? { ...f, status: 'done', eta: tr('service.feedDone') } : f))
       feedTimersRef.current.delete(t)
     }, 4500)
     feedTimersRef.current.add(t)
     return id
-  }, [])
+  }, [tr])
 
   const showToast = useCallback((msg: string) => {
     setToastText(msg)
@@ -177,11 +187,12 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
     toastRef.current = setTimeout(() => setToastVisible(false), 2400)
   }, [])
 
-  const handleSend = useCallback((actionId: string, feedLabel: string, feedEta = '2 min') => {
+  const handleSend = useCallback((actionId: string, feedLabel: string, feedEta = tr('service.feedEta2min')) => {
     addFeed(feedLabel, feedEta)
-    showToast(TOAST_MESSAGES[actionId] ?? 'Noted — on its way.')
+    const toastKey = TOAST_MESSAGE_KEYS[actionId]
+    showToast(toastKey ? tr(toastKey) : tr('service.toastNoted'))
     setView('home')
-  }, [addFeed, showToast])
+  }, [addFeed, showToast, tr])
 
   const handleClose = () => {
     setView('home')
@@ -190,14 +201,14 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
 
   const handleCallWaiter = () => {
     setView('waiter')
-    waiterCallIdRef.current = addFeed('Waiter called', '~45 sec')
+    waiterCallIdRef.current = addFeed(tr('service.feedWaiterCalled'), tr('service.feedWaiterEta'))
   }
 
   const handleCancelWaiter = () => {
-    showToast(TOAST_MESSAGES.cancel)
+    showToast(tr('service.toastCancel'))
     const targetId = waiterCallIdRef.current
     setFeed(prev => prev.map(f => f.id === targetId && f.status === 'pending'
-      ? { ...f, status: 'done', eta: '— cancelled' } : f))
+      ? { ...f, status: 'done', eta: tr('service.feedCancelled') } : f))
     waiterCallIdRef.current = null
     setView('home')
   }
@@ -215,17 +226,17 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
     <motion.button
       whileTap={btnIcon.tap}
       onClick={() => setView(dest)}
-      aria-label="Go back"
+      aria-label={tr('service.goBack')}
       className="w-8 h-8 rounded-full flex items-center justify-center mr-3 flex-shrink-0"
       style={{ background: 'rgba(139,16,36,0.08)' }}
     >
       <ChevronLeft size={16} aria-hidden="true" style={{ color: 'var(--maroon)' }} />
     </motion.button>
-  ), [])
+  ), [tr])
 
   // Time greeting
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'good morning,' : hour < 17 ? 'good afternoon,' : 'good evening,'
+  const greeting = hour < 12 ? tr('service.goodMorning') : hour < 17 ? tr('service.goodAfternoon') : tr('service.goodEvening')
 
   // ─── Waiter full-screen view ──────────────────────────────────────────────
 
@@ -287,11 +298,11 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                 className="font-inter text-[10px] uppercase tracking-[0.28em]"
                 style={{ color: posterOnly ? 'var(--mute)' : 'rgba(255,248,234,0.85)', textShadow: posterOnly ? 'none' : '0 1px 6px rgba(0,0,0,0.5)' }}
               >
-                — Waiter en route —
+                — {tr('service.waiterEnRoute')} —
               </p>
               <motion.button
                 whileTap={btnIcon.tap}
-                aria-label="Close"
+                aria-label={tr('service.close')}
                 onClick={() => setView('home')}
                 className="w-8 h-8 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(139,16,36,0.08)', border: '1px solid rgba(139,16,36,0.15)' }}
@@ -342,11 +353,11 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
               >
                 <CheckCircle2 size={13} style={{ color: 'var(--olive)' }} />
                 <span className="font-inter text-[10px] uppercase tracking-[0.24em]" style={{ color: 'var(--olive)' }}>
-                  Request received · Table 7
+                  {tr('service.requestReceivedTable')}
                 </span>
               </div>
               <h2 className="font-playfair font-bold text-[26px] leading-tight" style={{ color: 'var(--ink)' }}>
-                <span style={{ fontStyle: 'italic', fontWeight: 300 }}>Your waiter is </span>on the way
+                <span style={{ fontStyle: 'italic', fontWeight: 300 }}>{tr('service.waiterPrefix')}</span>{tr('service.waiterOnWay')}
               </h2>
               {/* ETA countdown ring */}
               <div className="flex flex-col items-center gap-1.5 mt-4">
@@ -365,7 +376,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-inter text-[9px] uppercase tracking-[0.22em]" style={{ color: 'var(--mute)' }}>ETA</span>
+                    <span className="font-inter text-[9px] uppercase tracking-[0.22em]" style={{ color: 'var(--mute)' }}>{tr('service.eta')}</span>
                     <span className="font-playfair font-bold text-[17px] leading-none" style={{ color: eta === 0 ? 'var(--olive)' : 'var(--maroon)' }}>
                       {eta === 0 ? '✓' : formatEta(eta)}
                     </span>
@@ -378,7 +389,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                     className="font-inter text-[11px] uppercase tracking-[0.24em]"
                     style={{ color: 'var(--olive)' }}
                   >
-                    Arrived!
+                    {tr('service.arrived')}
                   </motion.p>
                 )}
               </div>
@@ -392,7 +403,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                 className="px-6 py-2.5 rounded-full font-inter text-[11px] uppercase tracking-[0.26em]"
                 style={{ background: 'rgba(42,30,30,0.08)', border: '1px solid rgba(42,30,30,0.2)', color: 'var(--ink)' }}
               >
-                Hide
+                {tr('service.hide')}
               </motion.button>
               <motion.button
                 whileTap={btnPrimary.tap}
@@ -400,7 +411,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                 className="px-6 py-2.5 rounded-full font-inter text-[11px] uppercase tracking-[0.26em]"
                 style={{ background: 'rgba(215,25,32,0.06)', border: '1px solid rgba(215,25,32,0.22)', color: 'var(--red)' }}
               >
-                Cancel request
+                {tr('service.cancelRequest')}
               </motion.button>
             </div>
           </motion.div>
@@ -453,8 +464,8 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                 style={{ borderBottom: '1px solid rgba(217,160,58,0.18)' }}
               >
                 {/* Back button for sub-views */}
-                {(view === 'water' || view === 'bill' || view === 'split' || view === 'more' || view === 'jain' || view === 'bread') &&
-                  backTo(view === 'jain' ? 'more' : view === 'bread' ? 'more' : view === 'split' ? 'bill' : 'home')}
+                {(view === 'water' || view === 'bill' || view === 'split' || view === 'more' || view === 'jain' || view === 'bread' || view === 'feedback' || view === 'loyalty') &&
+                  backTo(view === 'jain' ? 'more' : view === 'bread' ? 'more' : view === 'split' ? 'bill' : view === 'feedback' ? 'more' : view === 'loyalty' ? 'more' : 'home')}
 
                 {/* Bell icon for home */}
                 {view === 'home' && (
@@ -465,24 +476,26 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
 
                 <div className="flex-1 min-w-0">
                   <h3 className="font-playfair font-bold text-[17px]" style={{ color: 'var(--maroon)' }}>
-                    {view === 'home'  && 'Table Service'}
-                    {view === 'water' && 'Request Water'}
-                    {view === 'bill'  && 'Bill'}
-                    {view === 'split' && 'Split the Bill'}
-                    {view === 'more'  && 'More Options'}
-                    {view === 'jain'  && 'Jain Menu Details'}
-                    {view === 'bread' && 'Bread & Sourdough'}
+                    {view === 'home'  && tr('service.title')}
+                    {view === 'water' && tr('service.requestWater')}
+                    {view === 'bill'  && tr('service.bill')}
+                    {view === 'split' && tr('service.splitTitle')}
+                    {view === 'more'  && tr('service.moreTitle')}
+                    {view === 'jain'  && tr('service.jainTitle')}
+                    {view === 'bread' && tr('service.breadTitle')}
+                    {view === 'feedback' && tr('service.feedbackTitle')}
+                    {view === 'loyalty' && tr('service.rewardsTitle')}
                   </h3>
                   {view === 'home' && (
                     <p className="font-inter text-[11px]" style={{ color: 'var(--mute)' }}>
-                      How can we help you?
+                      {tr('service.howCanWeHelp')}
                     </p>
                   )}
                 </div>
 
                 <motion.button
                   whileTap={btnIcon.tap}
-                  aria-label="Close"
+                  aria-label={tr('service.close')}
                   onClick={handleClose}
                   className="w-8 h-8 rounded-full flex items-center justify-center ml-2 flex-shrink-0"
                   style={{ background: 'rgba(139,16,36,0.08)' }}
@@ -517,7 +530,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                           }}
                         />
                         <span className="font-inter text-[10px] uppercase tracking-[0.28em]" style={{ color: 'var(--mute)' }}>
-                          Table 7 · 2 guests
+                          {tr('service.tableGuests')}
                         </span>
                       </div>
 
@@ -526,7 +539,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                         {greeting}
                       </p>
                       <p className="font-playfair font-bold text-[22px] mb-4 leading-tight" style={{ color: 'var(--ink)' }}>
-                        Welcome to Relish
+                        {tr('service.welcome')}
                       </p>
 
                       {/* Hero "Call Waiter" button */}
@@ -580,10 +593,10 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-inter text-[10px] uppercase tracking-[0.3em] mb-0.5" style={{ color: 'rgba(255,248,234,0.65)' }}>
-                              Anytime
+                              {tr('service.anytime')}
                             </p>
                             <p className="font-playfair font-bold text-[20px] leading-tight" style={{ color: '#FFF8EA' }}>
-                              Call our waiter
+                              {tr('service.callOurWaiter')}
                             </p>
                           </div>
                           <ChevronRight size={22} strokeWidth={2} style={{ color: 'rgba(255,248,234,0.55)' }} />
@@ -593,9 +606,9 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                       {/* Grid label */}
                       <div className="flex items-center justify-between mb-3">
                         <p className="font-inter text-[10px] uppercase tracking-[0.28em]" style={{ color: 'var(--mute)' }}>
-                          At Your Service
+                          {tr('service.atYourService')}
                         </p>
-                        <p className="font-inter text-[10px]" style={{ color: 'var(--mute)', opacity: 0.6 }}>tap any</p>
+                        <p className="font-inter text-[10px]" style={{ color: 'var(--mute)', opacity: 0.6 }}>{tr('service.tapAny')}</p>
                       </div>
 
                       {/* 3×2 action grid */}
@@ -607,33 +620,33 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                       >
                         {/* Menu */}
                         <ActionCard
-                          icon={BookOpen} label="Menu" sub="browse"
+                          icon={BookOpen} label={tr('nav.menu')} sub={tr('service.menuSub')}
                           onClick={() => { onOpenMenu?.(); handleClose() }}
                         />
                         {/* Ask AI */}
                         <ActionCard
-                          icon={Sparkles} label="Ask AI" sub="Relish guide"
+                          icon={Sparkles} label={tr('nav.askAI')} sub={tr('service.askAISub')}
                           badge="AI"
                           onClick={() => { onRecommend?.(); handleClose() }}
                         />
                         {/* My Order */}
                         <ActionCard
-                          icon={ClipboardList} label="My Order" sub={orderCount > 0 ? `${orderCount} item${orderCount !== 1 ? 's' : ''} · ₹${total.toLocaleString('en-IN')}` : 'empty'}
+                          icon={ClipboardList} label={tr('nav.myOrder')} sub={orderCount > 0 ? `${orderCount} ${orderCount !== 1 ? tr('order.itemPlural') : tr('order.itemSingular')} · ${formatMoney(total)}` : tr('service.empty')}
                           onClick={() => { onViewOrder?.(); handleClose() }}
                         />
                         {/* Water */}
                         <ActionCard
-                          icon={GlassWater} label="Water" sub="still · sparkling"
+                          icon={GlassWater} label={tr('service.water')} sub={tr('service.waterSub')}
                           onClick={() => { setWaterAnimKey(k => k + 1); setView('water') }}
                         />
                         {/* Bill */}
                         <ActionCard
-                          icon={ReceiptText} label="Bill" sub="split · pay"
+                          icon={ReceiptText} label={tr('service.bill')} sub={tr('service.billSub')}
                           onClick={() => setView('bill')}
                         />
                         {/* More */}
                         <ActionCard
-                          icon={LayoutGrid} label="More" sub="jain · etc"
+                          icon={LayoutGrid} label={tr('service.more')} sub={tr('service.moreSub')}
                           onClick={() => setView('more')}
                         />
                       </motion.div>
@@ -643,7 +656,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                         <>
                           <div className="flex items-center justify-between mb-2">
                             <p className="font-inter text-[10px] uppercase tracking-[0.28em]" style={{ color: 'var(--mute)' }}>
-                              Tonight's requests
+                              {tr('service.tonightsRequests')}
                             </p>
                             <span
                               className="w-1.5 h-1.5 rounded-full"
@@ -679,9 +692,9 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                           <OptionCard
                             key={opt.id}
                             icon={opt.icon}
-                            label={opt.label}
-                            sub={opt.sub}
-                            onClick={() => handleSend(opt.id, `Water — ${opt.label}`, '~2 min')}
+                            label={tr(opt.labelKey)}
+                            sub={tr(opt.subKey)}
+                            onClick={() => handleSend(opt.id, `${tr('service.water')} — ${tr(opt.labelKey)}`, '~2 min')}
                           />
                         ))}
                       </div>
@@ -702,15 +715,15 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                       <div className="grid grid-cols-2 gap-2.5">
                         <OptionCard
                           icon={Croissant}
-                          label="Sourdough"
-                          sub="warm basket"
-                          onClick={() => handleSend('bread', 'Bread — sourdough', '~2 min')}
+                          label={tr('service.sourdough')}
+                          sub={tr('service.sourdoughSub')}
+                          onClick={() => handleSend('bread', `${tr('service.bread')} — ${tr('service.sourdough')}`, '~2 min')}
                         />
                         <OptionCard
                           icon={Croissant}
-                          label="More bread"
-                          sub="refill please"
-                          onClick={() => handleSend('bread', 'Bread — refill', '~2 min')}
+                          label={tr('service.moreBread')}
+                          sub={tr('service.moreBreadSub')}
+                          onClick={() => handleSend('bread', `${tr('service.bread')} — ${tr('service.moreBread')}`, '~2 min')}
                         />
                       </div>
                     </motion.div>
@@ -730,23 +743,32 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                         className="font-playfair italic text-[15px] mb-4 leading-snug"
                         style={{ color: 'var(--ink-soft)' }}
                       >
-                        We'll print &amp; bring it over. No rush.
+                        {tr('service.billPrintNote')}
                       </p>
                       <div className="grid grid-cols-2 gap-2.5">
                         {BILL_OPTIONS.map(opt => (
                           <OptionCard
                             key={opt.id}
                             icon={opt.icon}
-                            label={opt.label}
-                            sub={opt.id === 'split' ? 'calculate shares' : opt.sub}
+                            label={tr(opt.labelKey)}
+                            sub={opt.id === 'split' ? tr('service.billCalculateShares') : tr(opt.subKey)}
                             onClick={() =>
                               opt.id === 'split'
                                 ? setView('split')
-                                : handleSend(opt.id, `Bill — ${opt.label}`, '~3 min')
+                                : handleSend(opt.id, `${tr('service.bill')} — ${tr(opt.labelKey)}`, '~3 min')
                             }
                           />
                         ))}
                       </div>
+
+                      {/* Post-bill — rate your visit */}
+                      <button
+                        onClick={() => setView('feedback')}
+                        className="mt-4 w-full py-2.5 rounded-full font-inter font-semibold text-[12.5px] flex items-center justify-center gap-1.5"
+                        style={{ background: 'transparent', color: 'var(--maroon)', border: '1px solid rgba(139,16,36,0.3)' }}
+                      >
+                        ★ {tr('feedback.rateVisit')}
+                      </button>
                     </motion.div>
                   )}
 
@@ -765,10 +787,10 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                         <div className="flex flex-col items-center text-center py-8 gap-3">
                           <span className="text-3xl">🧮</span>
                           <p className="font-playfair font-bold text-[17px]" style={{ color: 'var(--ink)' }}>
-                            Nothing to split yet
+                            {tr('service.splitNothingYet')}
                           </p>
                           <p className="font-inter text-[12px] leading-relaxed max-w-[230px]" style={{ color: 'var(--ink-soft)' }}>
-                            Add a few dishes to your order and we'll work out everyone's share.
+                            {tr('service.splitEmptyDesc')}
                           </p>
                           <motion.button
                             whileTap={{ scale: 0.96 }}
@@ -776,7 +798,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                             className="mt-1 px-5 py-2.5 rounded-full font-inter font-semibold text-[12px]"
                             style={{ background: 'rgba(139,16,36,0.1)', color: 'var(--maroon)', border: '1px solid rgba(139,16,36,0.25)' }}
                           >
-                            Browse the menu
+                            {tr('service.splitBrowseMenu')}
                           </motion.button>
                         </div>
                       ) : (
@@ -789,7 +811,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                           const perPerson = splitRoundUp ? Math.ceil(rawPer / 10) * 10 : Math.ceil(rawPer)
                           const collected = perPerson * splitPeople
                           const tipTotal = collected - subtotal // baseTip + rounding overage
-                          const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
+                          const inr = (n: number) => formatMoney(n)
 
                           return (
                             <>
@@ -799,20 +821,20 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                                 style={{ background: 'rgba(139,16,36,0.06)', border: '1px solid rgba(139,16,36,0.18)' }}
                               >
                                 <p className="font-inter text-[10px] uppercase tracking-[0.28em] mb-1" style={{ color: 'var(--mute)' }}>
-                                  Each person pays
+                                  {tr('service.splitEachPays')}
                                 </p>
                                 <p className="font-playfair font-bold leading-none" style={{ fontSize: 40, color: 'var(--maroon)' }}>
                                   {inr(perPerson)}
                                 </p>
                                 <p className="font-inter text-[11px] mt-1.5" style={{ color: 'var(--ink-soft)' }}>
-                                  {splitPeople} {splitPeople === 1 ? 'person' : 'people'} · {inr(collected)} total
+                                  {splitPeople} {splitPeople === 1 ? tr('service.personSingular') : tr('service.personPlural')} · {inr(collected)} {tr('service.splitTotal')}
                                 </p>
                               </div>
 
                               {/* People stepper */}
                               <div className="flex items-center justify-between mb-4">
                                 <span className="font-inter text-[12px] uppercase tracking-[0.16em]" style={{ color: 'var(--ink-soft)' }}>
-                                  Split between
+                                  {tr('service.splitBetween')}
                                 </span>
                                 <div className="flex items-center gap-3">
                                   <StepBtn label="Decrease" disabled={splitPeople <= 1} onClick={() => setSplitPeople(p => Math.max(1, p - 1))}>−</StepBtn>
@@ -825,7 +847,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
 
                               {/* Gratuity chips */}
                               <p className="font-inter text-[12px] uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--ink-soft)' }}>
-                                Add a tip
+                                {tr('service.splitAddTip')}
                               </p>
                               <div className="grid grid-cols-4 gap-2 mb-4">
                                 {TIP_OPTIONS.map(pct => {
@@ -843,7 +865,7 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                                         color: active ? '#FFF8EA' : 'var(--ink-soft)',
                                       }}
                                     >
-                                      {pct === 0 ? 'None' : `${pct}%`}
+                                      {pct === 0 ? tr('service.splitTipNoneShort') : `${pct}%`}
                                     </motion.button>
                                   )
                                 })}
@@ -858,10 +880,10 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                               >
                                 <span className="flex flex-col text-left">
                                   <span className="font-inter font-semibold text-[12.5px]" style={{ color: 'var(--ink)' }}>
-                                    Round up for the staff
+                                    {tr('service.splitRoundUp')}
                                   </span>
                                   <span className="font-inter text-[10px]" style={{ color: 'var(--mute)' }}>
-                                    nearest ₹10 each · extra goes to tip
+                                    {tr('service.splitRoundUpSub')}
                                   </span>
                                 </span>
                                 <span
@@ -882,19 +904,19 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                                 className="rounded-2xl overflow-hidden mb-5"
                                 style={{ border: '1px solid rgba(42,30,30,0.1)' }}
                               >
-                                <BreakRow label="Order subtotal" value={inr(subtotal)} />
-                                <BreakRow label={`Tip${splitTipPct > 0 ? ` · ${splitTipPct}%` : ''}`} value={inr(tipTotal)} />
-                                <BreakRow label="Table total" value={inr(collected)} strong />
+                                <BreakRow label={tr('service.splitSubtotal')} value={inr(subtotal)} />
+                                <BreakRow label={`${tr('service.splitTip')}${splitTipPct > 0 ? ` · ${splitTipPct}%` : ''}`} value={inr(tipTotal)} />
+                                <BreakRow label={tr('service.splitTableTotal')} value={inr(collected)} strong />
                               </div>
 
                               {/* CTA */}
                               <motion.button
                                 whileTap={{ scale: 0.97 }}
-                                onClick={() => handleSend('split', `Bill — split ${splitPeople} ways · ${inr(perPerson)}/person`, '~3 min')}
+                                onClick={() => handleSend('split', `${tr('service.bill')} — ${splitPeople} ${tr('service.splitWays')} · ${inr(perPerson)}${tr('service.splitPerPerson')}`, '~3 min')}
                                 className="w-full py-3.5 rounded-full font-inter font-semibold text-[13.5px]"
                                 style={{ background: 'linear-gradient(135deg, #A52030, #7A0E1E)', color: '#FFF8EA', boxShadow: '0 4px 16px rgba(139,16,36,0.28)' }}
                               >
-                                Ask for the bill — split {splitPeople} ways
+                                {tr('service.splitCtaPrefix')}{splitPeople} {tr('service.splitWays')}
                               </motion.button>
                             </>
                           )
@@ -918,20 +940,52 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                           <OptionCard
                             key={opt.id}
                             icon={opt.icon}
-                            label={opt.label}
-                            sub={opt.sub}
+                            label={tr(opt.labelKey)}
+                            sub={tr(opt.subKey)}
                             onClick={() => {
                               if (opt.action === 'jain') {
                                 setView('jain')
                               } else if (opt.action === 'bread') {
                                 setView('bread')
+                              } else if (opt.action === 'feedback') {
+                                setView('feedback')
+                              } else if (opt.action === 'loyalty') {
+                                setView('loyalty')
                               } else {
-                                handleSend(opt.id, opt.label, '~2 min')
+                                handleSend(opt.id, tr(opt.labelKey), '~2 min')
                               }
                             }}
                           />
                         ))}
                       </div>
+                    </motion.div>
+                  )}
+
+                  {/* ── FEEDBACK / REVIEW ────────────────────────────────────── */}
+                  {view === 'feedback' && (
+                    <motion.div
+                      key="feedback"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                      className="px-5 pt-4 pb-8"
+                    >
+                      <FeedbackView onDone={() => setView('home')} />
+                    </motion.div>
+                  )}
+
+                  {/* ── LOYALTY / REWARDS ────────────────────────────────────── */}
+                  {view === 'loyalty' && (
+                    <motion.div
+                      key="loyalty"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                      className="px-5 pt-4 pb-8"
+                    >
+                      <LoyaltyView activeCustomerId={activeCustomerId} onLink={id => onLinkCustomer?.(id)} />
                     </motion.div>
                   )}
 
@@ -953,27 +1007,27 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                         <span className="text-2xl">🌿</span>
                         <div>
                           <p className="font-playfair font-semibold text-[14px]" style={{ color: 'var(--olive)' }}>
-                            Jain-Friendly Options Available
+                            {tr('service.jainAvailable')}
                           </p>
                           <p className="font-inter text-[11px]" style={{ color: 'var(--ink-soft)' }}>
-                            Always inform your waiter before ordering
+                            {tr('service.jainInformWaiter')}
                           </p>
                         </div>
                       </div>
 
                       {JAIN_INFO.map((item, i) => (
                         <motion.div
-                          key={item.q}
+                          key={item.qKey}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.06 }}
                           className="flex flex-col gap-1"
                         >
                           <p className="font-inter font-semibold text-[13px]" style={{ color: 'var(--maroon)' }}>
-                            {item.q}
+                            {tr(item.qKey)}
                           </p>
                           <p className="font-inter text-[12px] leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
-                            {item.a}
+                            {tr(item.aKey)}
                           </p>
                           {i < JAIN_INFO.length - 1 && <div className="gold-divider mt-1" />}
                         </motion.div>
@@ -982,12 +1036,12 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
                       <motion.button
                         whileTap={{ scale: 0.97 }}
                         onClick={() => {
-                          handleSend('jain-waiter', 'Jain query — waiter coming', '~2 min')
+                          handleSend('jain-waiter', tr('service.jainInfo'), '~2 min')
                         }}
                         className="w-full py-3 rounded-full font-inter font-semibold text-[13px] mt-2"
                         style={{ background: 'rgba(79,122,60,0.12)', color: 'var(--olive)', border: '1px solid rgba(79,122,60,0.3)' }}
                       >
-                        Still have questions? Call waiter
+                        {tr('service.jainStillQuestions')}
                       </motion.button>
                     </motion.div>
                   )}

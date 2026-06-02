@@ -100,37 +100,30 @@ function invoiceInsert(restaurantId: string, inv: Invoice) {
 
 // ── ensureBillingForUser ────────────────────────────────────────────────────
 /**
- * Idempotent bootstrap. If the user already has an app_users row, return its
- * restaurant_id unchanged. Otherwise create a restaurant, an admin membership,
- * a starter Cinematic subscription, and the two seed invoices — mirroring
- * buildBilling() in src/data/opsSeed.ts — then return the new restaurant_id.
+ * Idempotent bootstrap. Provisions the restaurant + admin membership via the
+ * SECURITY DEFINER `bootstrap_tenant` RPC (which bypasses the restaurants RLS
+ * chicken-and-egg — see 0004_bootstrap_rpc.sql), then seeds the billing rows
+ * (Cinematic subscription + two invoices + video screens) once, only if this
+ * tenant has no subscription yet. Returns the restaurant_id.
  */
-export async function ensureBillingForUser(userId: string): Promise<string> {
+export async function ensureBillingForUser(): Promise<string> {
   const db = client()
 
-  // Already bootstrapped? Return the existing restaurant_id, no duplicates.
-  const { data: existing, error: lookupErr } = await db
-    .from('app_users')
+  // 1. Provision (or look up) the tenant server-side. Idempotent.
+  const { data: rid, error: rpcErr } = await db.rpc('bootstrap_tenant', {
+    p_name: 'My Restaurant',
+  })
+  if (rpcErr) throw new Error(rpcErr.message)
+  const restaurantId = rid as string
+
+  // 2. Already have a subscription? Billing is seeded — nothing more to do.
+  const { data: existingSub, error: subLookupErr } = await db
+    .from('subscriptions')
     .select('restaurant_id')
-    .eq('user_id', userId)
+    .eq('restaurant_id', restaurantId)
     .maybeSingle()
-  if (lookupErr) throw new Error(lookupErr.message)
-  if (existing) return (existing as { restaurant_id: string }).restaurant_id
-
-  // 1. Restaurant.
-  const { data: restaurant, error: restErr } = await db
-    .from('restaurants')
-    .insert({ name: 'My Restaurant' })
-    .select('id')
-    .single()
-  if (restErr) throw new Error(restErr.message)
-  const restaurantId = (restaurant as { id: string }).id
-
-  // 2. Membership (admin).
-  const { error: memberErr } = await db
-    .from('app_users')
-    .insert({ user_id: userId, restaurant_id: restaurantId, role: 'admin' })
-  if (memberErr) throw new Error(memberErr.message)
+  if (subLookupErr) throw new Error(subLookupErr.message)
+  if (existingSub) return restaurantId
 
   // 3. Starter subscription — Cinematic, started now, renews in a year.
   const pkg = packageById('cinematic')

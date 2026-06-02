@@ -1,6 +1,7 @@
 import { Sparkles, Bell, ShoppingBag } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from '../../theme/ThemeContext'
+import { useT } from '../../i18n'
 import type { ThemeTokens } from '../../theme/themes'
 
 interface BottomNavProps {
@@ -12,6 +13,7 @@ interface BottomNavProps {
 
 export function BottomNav({ orderCount, onAskAI, onWaiter, onViewOrder }: BottomNavProps) {
   const { tokens: t } = useTheme()
+  const tr = useT()
   const hard = t.navStyle === 'underline'
   const divider = hard ? t.ruleColor : 'rgba(217,160,58,0.4)'
 
@@ -26,9 +28,9 @@ export function BottomNav({ orderCount, onAskAI, onWaiter, onViewOrder }: Bottom
       }}
     >
     <div className="flex items-stretch w-full max-w-5xl mx-auto">
-      <NavBtn icon={<Sparkles size={16} />} label="Ask AI" onClick={onAskAI} theme={t} />
+      <NavBtn icon={<Sparkles size={16} />} label={tr('nav.askAI')} onClick={onAskAI} theme={t} />
       <div style={{ width: 1, background: divider }} />
-      <NavBtn icon={<Bell size={16} />} label="Waiter" onClick={onWaiter} theme={t} />
+      <NavBtn icon={<Bell size={16} />} label={tr('nav.waiter')} onClick={onWaiter} theme={t} />
       <div style={{ width: 1, background: divider }} />
       <NavBtn
         icon={
@@ -44,7 +46,7 @@ export function BottomNav({ orderCount, onAskAI, onWaiter, onViewOrder }: Bottom
             )}
           </div>
         }
-        label="Order"
+        label={tr('nav.order')}
         onClick={onViewOrder}
         theme={t}
       />

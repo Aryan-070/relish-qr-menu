@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { categories, type MenuItem } from '../data/menu'
 import { TopBar } from '../components/molecules/TopBar'
 import { CategoryNav } from '../components/molecules/CategoryNav'
 import { BottomNav } from '../components/molecules/BottomNav'
 import { CategoryPage } from './CategoryPage'
+import { MenuSearch } from './MenuSearch'
 import { slideLeft, slideRight } from '../animations/variants'
 
 interface MenuBookletProps {
@@ -24,6 +25,12 @@ export function MenuBooklet({
 }: MenuBookletProps) {
   const [activeCatId, setActiveCatId] = useState(categories[0].id)
   const [direction, setDirection] = useState<'left' | 'right'>('left')
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  const handleSearchItemTap = (item: MenuItem) => {
+    setSearchOpen(false)
+    onItemTap(item)
+  }
 
   const handleCategoryChange = (id: string) => {
     const nextIdx = categories.findIndex(c => c.id === id)
@@ -42,7 +49,7 @@ export function MenuBooklet({
     >
       {/* Sticky top */}
       <div className="flex-shrink-0">
-        <TopBar activeCategoryId={activeCatId} onWaiter={onWaiter} />
+        <TopBar activeCategoryId={activeCatId} onWaiter={onWaiter} onSearch={() => setSearchOpen(true)} />
         <CategoryNav activeId={activeCatId} onChange={handleCategoryChange} />
       </div>
 
@@ -74,6 +81,13 @@ export function MenuBooklet({
           onViewOrder={onViewOrder}
         />
       </div>
+
+      {/* Search overlay */}
+      <AnimatePresence>
+        {searchOpen && (
+          <MenuSearch onClose={() => setSearchOpen(false)} onItemTap={handleSearchItemTap} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

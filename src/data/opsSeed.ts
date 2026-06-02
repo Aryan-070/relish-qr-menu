@@ -4,12 +4,19 @@
 
 import { categories } from './menu'
 import type {
+  Customer,
   EditableMenuItem,
+  Feedback,
+  LoyaltyTier,
   OrderLine,
   OrderRecord,
+  Reservation,
+  ReservationStatus,
   ServiceRequest,
   Staff,
   Table,
+  WaitlistEntry,
+  WaitStatus,
   Zone,
 } from '../console/lib/types'
 import { packageById, makeInvoice, type BillingState, type Invoice } from '../console/lib/billing'
@@ -23,9 +30,13 @@ export interface OpsSeed {
   orders: OrderRecord[]
   requests: ServiceRequest[]
   billing: BillingState
+  feedback: Feedback[]
+  customers: Customer[]
+  reservations: Reservation[]
+  waitlist: WaitlistEntry[]
 }
 
-export const OPS_VERSION = 3
+export const OPS_VERSION = 4
 const HISTORY_DAYS = 30
 const DAY_MS = 86_400_000
 
@@ -273,8 +284,107 @@ function buildBilling(): BillingState {
 }
 
 /** Build a fresh, deterministic dataset anchored to the current date. */
+// ── Loyalty / CRM / reservations / feedback seed data ───────────────────────
+const CUSTOMER_NAMES = [
+  'Aarav Sharma', 'Diya Patel', 'Vivaan Reddy', 'Ananya Iyer', 'Aditya Nair',
+  'Ishita Rao', 'Kabir Mehta', 'Saanvi Gupta', 'Reyansh Joshi', 'Myra Kapoor',
+  'Arjun Singh', 'Aadhya Verma', 'Vihaan Bose', 'Anika Desai', 'Krishna Menon', 'Pari Malhotra',
+]
+const CUSTOMER_TAGS = ['Regular', 'Big spender', 'Birthday soon', 'Jain', 'Family', 'New']
+const FEEDBACK_COMMENTS = [
+  'Loved the paneer tikka!', 'Service was a touch slow today.', 'Beautiful ambience.',
+  'Food arrived a bit cold.', 'Best gelato in town — will be back!', 'Lovely evening, thank you.',
+  'Could improve the seating spacing.',
+]
+
+export function tierForPoints(points: number): LoyaltyTier {
+  if (points >= 1500) return 'Gold'
+  if (points >= 600) return 'Silver'
+  return 'Bronze'
+}
+
+function phoneNumber(rng: () => number): string {
+  let n = `${randInt(rng, 6, 9)}`
+  for (let i = 1; i < 10; i++) n += randInt(rng, 0, 9)
+  return `+91 ${n.slice(0, 5)} ${n.slice(5)}`
+}
+
+function buildCustomers(rng: () => number, now: number): Customer[] {
+  return CUSTOMER_NAMES.map((name, i) => {
+    const visits = randInt(rng, 1, 40)
+    const lifetimeSpend = visits * randInt(rng, 350, 1200)
+    const points = Math.round(lifetimeSpend / 10)
+    const tags = [...CUSTOMER_TAGS].sort(() => rng() - 0.5).slice(0, randInt(rng, 0, 2))
+    return {
+      id: `cus-${String(i + 1).padStart(3, '0')}`,
+      name,
+      phone: phoneNumber(rng),
+      points,
+      tier: tierForPoints(points),
+      visits,
+      lifetimeSpend,
+      tags,
+      lastVisit: now - randInt(rng, 0, 60) * DAY_MS,
+      joinedAt: now - randInt(rng, 60, 720) * DAY_MS,
+    }
+  })
+}
+
+function buildReservations(rng: () => number, now: number, tables: Table[]): Reservation[] {
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  const base = start.getTime()
+  const slotHalfHours = [24, 26, 27, 38, 39, 40, 41, 42] // ×0.5h → 12:00 … 21:00
+  const pastStatuses: ReservationStatus[] = ['completed', 'seated', 'no-show']
+  return slotHalfHours.map((slot, i) => {
+    const at = base + slot * 1_800_000
+    const past = at < now
+    const status: ReservationStatus = past ? pick(rng, pastStatuses) : 'booked'
+    return {
+      id: `res-${String(i + 1).padStart(3, '0')}`,
+      name: pick(rng, CUSTOMER_NAMES),
+      phone: phoneNumber(rng),
+      partySize: randInt(rng, 2, 8),
+      at,
+      tableId: status === 'seated' ? pick(rng, tables).id : null,
+      status,
+      notes: rng() < 0.3 ? pick(rng, ['Window seat please', 'Anniversary', 'High chair needed', 'Jain meal']) : undefined,
+      createdAt: now - randInt(rng, 1, 5) * DAY_MS,
+    }
+  })
+}
+
+function buildWaitlist(rng: () => number, now: number): WaitlistEntry[] {
+  const count = randInt(rng, 2, 4)
+  return Array.from({ length: count }, (_, i) => ({
+    id: `wait-${String(i + 1).padStart(3, '0')}`,
+    name: pick(rng, CUSTOMER_NAMES).split(' ')[0],
+    phone: phoneNumber(rng),
+    partySize: randInt(rng, 2, 6),
+    quotedMins: (i + 1) * 10 + randInt(rng, 0, 5),
+    status: (i === 0 ? 'notified' : 'waiting') as WaitStatus,
+    addedAt: now - randInt(rng, 1, 30) * 60_000,
+  }))
+}
+
+function buildFeedback(rng: () => number, now: number, tables: Table[]): Feedback[] {
+  const count = randInt(rng, 4, 7)
+  return Array.from({ length: count }, (_, i) => {
+    const rating = weightedPick(rng, [5, 4, 3, 2, 1], [40, 25, 15, 12, 8])
+    return {
+      id: `fb-seed-${i + 1}`,
+      rating,
+      comment: rng() < 0.7 ? pick(rng, FEEDBACK_COMMENTS) : undefined,
+      tableId: pick(rng, tables).id,
+      createdAt: now - randInt(rng, 0, 14) * DAY_MS - randInt(rng, 0, 86_400) * 1000,
+      routedToPublic: rating >= 4,
+    }
+  }).sort((a, b) => b.createdAt - a.createdAt)
+}
+
 export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
   const rng = mulberry32(seed)
+  const now = Date.now()
   const staff = buildStaff()
   const waiterIds = staff.filter(s => s.role === 'waiter').map(s => s.id)
   const menu = buildMenu()
@@ -284,12 +394,16 @@ export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
   const billing = buildBilling()
   return {
     version: OPS_VERSION,
-    generatedAt: Date.now(),
+    generatedAt: now,
     staff,
     tables,
     menu,
     orders,
     requests,
     billing,
+    feedback: buildFeedback(rng, now, tables),
+    customers: buildCustomers(rng, now),
+    reservations: buildReservations(rng, now, tables),
+    waitlist: buildWaitlist(rng, now),
   }
 }

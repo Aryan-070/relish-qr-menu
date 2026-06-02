@@ -7,10 +7,22 @@ import { AddToOrder } from './screens/AddToOrder'
 import { ServicePanel } from './screens/ServicePanel'
 import { OrderPanel } from './screens/OrderPanel'
 import { useOrder } from './hooks/useOrder'
-import { type MenuItem } from './data/menu'
+import { type MenuItem, getCategoryForItem } from './data/menu'
+import { type SelectedModifier, selectionLabel, selectionUnitPrice } from './data/modifiers'
+import { type Combo } from './data/combos'
+import { type OrderRecord, type OrderLine } from './console/lib/types'
+import { resolveGuestTableId } from './lib/tableSession'
 import { fadeIn } from './animations/variants'
+
+// The table this guest is seated at — read from the scanned QR's `?t=` param,
+// falling back to a fixed demo table. Resolved once at load (a scan is a full
+// page navigation), see src/lib/tableSession.ts.
+const GUEST_TABLE_ID = resolveGuestTableId()
 import { ThemeProvider, useTheme } from './theme/ThemeContext'
 import { MediaModeProvider } from './theme/MediaModeContext'
+import { OpsProvider, useOpsStore } from './console/store/useOpsStore'
+import { AuthProvider } from './console/auth/AuthContext'
+import { LanguageProvider, LanguageSwitcher } from './i18n'
 import { ThemeSwitcher } from './components/molecules/ThemeSwitcher'
 import { MediaModeSwitcher } from './components/molecules/MediaModeSwitcher'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -48,11 +60,13 @@ function AppInner() {
   const [landingVariant, setLandingVariant] = useState<LandingVariant>('reel')
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
-  const [addingItem, setAddingItem] = useState<{ item: MenuItem; customization: string } | null>(null)
+  const [addingItem, setAddingItem] = useState<{ item: MenuItem; label: string; unitPrice: number } | null>(null)
   const [waiterOpen, setWaiterOpen] = useState(false)
   const [orderOpen, setOrderOpen] = useState(false)
+  const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null)
 
-  const { orderItems, addItem, removeItem, updateQuantity, updateNote, total, count } = useOrder()
+  const { orderItems, addItem, addCombo, removeItem, updateQuantity, updateNote, clear, total, count } = useOrder()
+  const ops = useOpsStore()
 
   const enterStaff = () => {
     setAppMode('staff')
@@ -88,13 +102,68 @@ function AppInner() {
 
   const handleItemTap = (item: MenuItem) => setSelectedItem(item)
 
-  const handleAddToOrder = (item: MenuItem, customization: string) => {
-    addItem(item, customization)
+  const handleAddToOrder = (item: MenuItem, modifiers: SelectedModifier[]) => {
+    addItem(item, modifiers)
     setSelectedItem(null)
-    setAddingItem({ item, customization })
+    setAddingItem({
+      item,
+      label: selectionLabel(modifiers),
+      unitPrice: selectionUnitPrice(item.price, modifiers),
+    })
+  }
+
+  const handleAddCombo = (combo: Combo) => {
+    addCombo(combo)
+    setAddingItem({
+      item: {
+        id: `combo:${combo.id}`,
+        name: combo.name,
+        price: combo.comboPrice,
+        description: '',
+        isJain: false,
+        canBeJain: false,
+        tags: [],
+        pairings: {},
+        customizations: [],
+      },
+      label: combo.itemNames.join(' · '),
+      unitPrice: combo.comboPrice,
+    })
   }
 
   const handleAddConfirmDone = () => setAddingItem(null)
+
+  // Commit the guest cart to the shared ops store so it surfaces on the
+  // waiter floor and the kitchen display, then reset the cart.
+  const handlePlaceOrder = () => {
+    if (orderItems.length === 0) return
+    const lines: OrderLine[] = orderItems.map(o => ({
+      itemId: o.item.id,
+      name: o.item.name,
+      price: o.unitPrice,
+      qty: o.quantity,
+      categoryId: getCategoryForItem(o.item.id) || 'combo',
+      modifiers: o.label || undefined,
+      note: o.note,
+    }))
+    const seatedTable = ops.state.tables.find(t => t.id === GUEST_TABLE_ID)
+    const order: OrderRecord = {
+      id: `ORD-${String(Date.now()).slice(-6)}`,
+      tableId: GUEST_TABLE_ID,
+      waiterId: seatedTable?.waiterId ?? '',
+      placedAt: Date.now(),
+      lines,
+      total,
+      paid: false,
+      status: 'new',
+      source: 'guest',
+    }
+    ops.placeOrder(order)
+    // Accrue loyalty points for a linked member (1 point per ₹10 spent).
+    if (activeCustomerId) ops.adjustPoints(activeCustomerId, Math.floor(total / 10))
+    // Cart is cleared when the panel closes (see OrderPanel onWaiter), so the
+    // "Calling waiter…" confirmation animation still has items to show.
+  }
 
   return (
     <div className="app-shell" data-ui-theme={theme}>
@@ -161,6 +230,7 @@ function AppInner() {
               onBack={goBackFromRecommend}
               onOpenMenu={goToMenu}
               onWaiter={openWaiter}
+              onAddCombo={handleAddCombo}
             />
           </motion.div>
         )}
@@ -204,7 +274,8 @@ function AppInner() {
       {/* Add to order confirmation slip */}
       <AddToOrder
         item={addingItem?.item ?? null}
-        customization={addingItem?.customization}
+        label={addingItem?.label}
+        unitPrice={addingItem?.unitPrice}
         onContinue={handleAddConfirmDone}
         onShowWaiter={() => { handleAddConfirmDone(); setWaiterOpen(true) }}
       />
@@ -218,7 +289,8 @@ function AppInner() {
         onRemove={removeItem}
         onUpdateQty={updateQuantity}
         onUpdateNote={updateNote}
-        onWaiter={() => { setOrderOpen(false); setTimeout(openWaiter, 80) }}
+        onPlaceOrder={handlePlaceOrder}
+        onWaiter={() => { setOrderOpen(false); clear(); setTimeout(openWaiter, 80) }}
       />
 
       {/* Service panel — replaces WaiterPanel */}
@@ -230,6 +302,8 @@ function AppInner() {
         onViewOrder={() => { setWaiterOpen(false); setTimeout(() => setOrderOpen(true), 80) }}
         orderCount={count}
         total={total}
+        activeCustomerId={activeCustomerId}
+        onLinkCustomer={setActiveCustomerId}
       />
 
       {/* Global UI-theme switcher — collapsed gear, anchored per-screen so it never overlaps nav */}
@@ -237,6 +311,11 @@ function AppInner() {
 
       {/* Media-mode switcher — Video/Photo toggle, opposite corner from the theme gear */}
       <MediaModeSwitcher screen={screen} />
+
+      {/* Language switcher — bottom-left utility cluster, above the staff entry */}
+      <div className="fixed bottom-14 left-3 z-50">
+        <LanguageSwitcher />
+      </div>
 
       {/* Discreet staff-console entry — bottom-left, all guest screens */}
       <motion.button
@@ -264,7 +343,13 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <MediaModeProvider>
-          <AppInner />
+          <LanguageProvider>
+            <AuthProvider>
+              <OpsProvider>
+                <AppInner />
+              </OpsProvider>
+            </AuthProvider>
+          </LanguageProvider>
         </MediaModeProvider>
       </ThemeProvider>
     </ErrorBoundary>

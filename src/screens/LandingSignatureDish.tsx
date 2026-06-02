@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sprout, Leaf, Sparkles } from 'lucide-react'
+import { formatMoney } from '../lib/money'
+import { useT } from '../i18n'
+import type { TranslationKey } from '../i18n'
 
 interface DishConfig {
   id: string
@@ -97,10 +100,10 @@ const BUBBLE_SIZES    = [58, 50, 54, 46, 50]
 const BUBBLE_FLOAT    = ['bubble-float-a', 'bubble-float-b', 'bubble-float-c', 'bubble-float-a', 'bubble-float-b']
 const BUBBLE_DURATIONS = [3.2, 2.8, 3.6, 2.5, 3.0]
 
-const BADGES = [
-  { label: '100% Veg',    Icon: Sprout },
-  { label: 'Jain Options', Icon: Leaf },
-  { label: 'Fresh Daily',  Icon: Sparkles },
+const BADGES: { labelKey: TranslationKey; Icon: typeof Sprout }[] = [
+  { labelKey: 'landing.badgeVeg',   Icon: Sprout },
+  { labelKey: 'landing.badgeJain',  Icon: Leaf },
+  { labelKey: 'landing.badgeFresh', Icon: Sparkles },
 ]
 const BADGE_ANIMS = ['badge-bob', 'badge-pulse', 'badge-twinkle']
 
@@ -227,7 +230,8 @@ function AuraRings({ color, size = 326 }: { color: string; size?: number | strin
 
 // ── Word-by-word blur-focus tagline ──────────────────────────────────────────
 function TaglineReveal({ trigger }: { trigger: number }) {
-  const words = 'A journey through flavours of the world'.split(' ')
+  const tr = useT()
+  const words = tr('brand.journey').split(' ')
   return (
     <AnimatePresence mode="wait">
       <motion.p
@@ -261,6 +265,7 @@ function DishPopup({
   onDismiss: () => void
   onOpenMenu: () => void
 }) {
+  const tr = useT()
   return (
     <>
       <motion.div
@@ -308,7 +313,7 @@ function DishPopup({
             {particle.label}
           </p>
           <span className="font-inter font-semibold" style={{ fontSize: 13, color: '#8B1024', background: 'rgba(139,16,36,0.08)', padding: '2px 10px', borderRadius: 20 }}>
-            ₹{particle.price}
+            {formatMoney(particle.price)}
           </span>
           <div style={{ width: '80%', height: 1, background: 'linear-gradient(to right, transparent, rgba(217,160,58,0.42), transparent)' }} />
           <button
@@ -316,10 +321,10 @@ function DishPopup({
             className="font-inter font-semibold w-full"
             style={{ fontSize: 12, color: '#FFF8EA', background: 'linear-gradient(135deg, #7A0E1E, #8B1024)', border: 'none', borderRadius: 12, padding: '9px 0', cursor: 'pointer', letterSpacing: '0.04em', boxShadow: '0 4px 14px rgba(139,16,36,0.30)' }}
           >
-            View in Menu
+            {tr('action.viewInMenu')}
           </button>
           <p className="font-cormorant italic" style={{ fontSize: 11, color: 'rgba(42,30,30,0.36)', margin: 0 }}>
-            tap anywhere to close
+            {tr('action.tapToClose')}
           </p>
         </div>
       </motion.div>
@@ -374,6 +379,7 @@ function useCarousel() {
 
 // ── Electric Open Menu ───────────────────────────────────────────────────────
 function ElectricOpenMenuBtn({ onClick }: { onClick: () => void }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -387,13 +393,14 @@ function ElectricOpenMenuBtn({ onClick }: { onClick: () => void }) {
         <AnimatePresence>
           {tapped && <motion.span key="rpl" className="absolute inset-0 rounded-2xl pointer-events-none" initial={{ scale: 0.55, opacity: 0.5 }} animate={{ scale: 2.6, opacity: 0 }} exit={{}} transition={{ duration: 0.6, ease: 'easeOut' }} style={{ background: 'rgba(255,255,255,0.25)' }} />}
         </AnimatePresence>
-        <span className="relative z-10">Open Menu</span>
+        <span className="relative z-10">{tr('action.openMenu')}</span>
       </motion.button>
     </div>
   )
 }
 
 function LightGoldBtn({ onClick }: { onClick: () => void }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -408,13 +415,14 @@ function LightGoldBtn({ onClick }: { onClick: () => void }) {
       </AnimatePresence>
       <span className="relative z-10 flex items-center justify-center gap-2">
         <motion.span animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: 'linear' }} style={{ display: 'inline-flex', lineHeight: 1 }}><Sparkles size={12} strokeWidth={2} /></motion.span>
-        Recommend Something
+        {tr('action.recommend')}
       </span>
     </motion.button>
   )
 }
 
 function LightGhostBtn({ onClick }: { onClick: () => void }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -427,7 +435,7 @@ function LightGhostBtn({ onClick }: { onClick: () => void }) {
       <AnimatePresence>
         {tapped && <motion.span key="grpl2" className="absolute inset-0 rounded-2xl pointer-events-none" initial={{ scale: 0.55, opacity: 0.35 }} animate={{ scale: 2.6, opacity: 0 }} exit={{}} transition={{ duration: 0.6, ease: 'easeOut' }} style={{ background: 'rgba(139,16,36,0.08)' }} />}
       </AnimatePresence>
-      <span className="relative z-10">Call Waiter</span>
+      <span className="relative z-10">{tr('landing.callWaiter')}</span>
     </motion.button>
   )
 }
@@ -441,6 +449,7 @@ interface Props {
 }
 
 export function LandingSignatureDish({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const tr = useT()
   const { activeIndex, select, stopTimer, resumeTimer, handleTouchStart, handleTouchEnd } = useCarousel()
   const [tappedParticle, setTappedParticle] = useState<TappedParticle | null>(null)
   const dish = DISHES[activeIndex]
@@ -516,7 +525,7 @@ export function LandingSignatureDish({ onOpenMenu, onRecommend, onWaiter }: Prop
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.18, duration: 0.7 }}
           className="font-inter uppercase"
           style={{ fontSize: 10, letterSpacing: '0.22em', color: 'rgba(42,30,30,0.45)' }}>
-          — Tonight's Table —
+          — {tr('landing.tonightsTable')} —
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -533,7 +542,7 @@ export function LandingSignatureDish({ onOpenMenu, onRecommend, onWaiter }: Prop
             animation: 'relish-shimmer 2.8s linear infinite',
           }}
         >
-          Relish
+          {tr('brand.name')}
         </motion.h1>
       </div>
 
@@ -655,9 +664,9 @@ export function LandingSignatureDish({ onOpenMenu, onRecommend, onWaiter }: Prop
 
         <div className="flex items-center justify-center gap-1.5 mb-3.5">
           {BADGES.map((b, i) => (
-            <span key={b.label} className="font-inter uppercase tracking-wide rounded-full inline-flex items-center gap-1"
+            <span key={b.labelKey} className="font-inter uppercase tracking-wide rounded-full inline-flex items-center gap-1"
               style={{ fontSize: 8, letterSpacing: '0.10em', padding: '3px 8px', background: `${dish.accentColor}12`, border: `1px solid ${dish.accentColor}40`, color: dish.accentColor, animation: `${BADGE_ANIMS[i]} 2.4s ease-in-out ${i * 0.38}s infinite`, transition: 'color 0.6s ease, border-color 0.6s ease, background 0.6s ease' }}>
-              <b.Icon size={9} strokeWidth={2.25} /> {b.label}
+              <b.Icon size={9} strokeWidth={2.25} /> {tr(b.labelKey)}
             </span>
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useT } from '../i18n'
 
 interface Props {
   onOpenMenu: () => void
@@ -20,6 +21,7 @@ const HERO_POSTER_SRC = ''     // '/assets/hero-poster.jpg'
 
 // ── Animated primary button (Open Menu) ──────────────────────────────────────
 function PrimaryBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -60,13 +62,14 @@ function PrimaryBtn({ onClick, delay }: { onClick: () => void; delay: number }) 
           />
         )}
       </AnimatePresence>
-      <span className="relative z-10">Open Menu</span>
+      <span className="relative z-10">{tr('action.openMenu')}</span>
     </motion.button>
   )
 }
 
 // ── Gold recommend button ────────────────────────────────────────────────────
 function GoldBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -108,7 +111,7 @@ function GoldBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
         >
           ✦
         </motion.span>
-        Recommend Something
+        {tr('action.recommend')}
       </span>
     </motion.button>
   )
@@ -116,6 +119,7 @@ function GoldBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
 
 // ── Ghost waiter button ──────────────────────────────────────────────────────
 function GhostBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -148,13 +152,14 @@ function GhostBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
           />
         )}
       </AnimatePresence>
-      <span className="relative z-10">Call Waiter</span>
+      <span className="relative z-10">{tr('landing.callWaiter')}</span>
     </motion.button>
   )
 }
 
 // ── Main landing ─────────────────────────────────────────────────────────────
 export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const tr = useT()
   return (
     <div
       className="relative flex flex-col min-h-full overflow-hidden"
@@ -237,7 +242,7 @@ export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
           className="font-cormorant italic mb-4"
           style={{ fontSize: 'clamp(18px, 2vw, 26px)', color: 'rgba(255,248,234,0.70)', lineHeight: 1.5 }}
         >
-          A journey through flavours of the world
+          {tr('brand.journey')}
         </motion.p>
 
         {/* Trust badges — stagger scale-in */}
@@ -247,9 +252,9 @@ export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
           transition={{ delay: 0.75, duration: 0.5 }}
           className="flex items-center gap-2 mb-7 flex-wrap justify-center"
         >
-          {['100% Veg', 'Jain Options', 'Fresh Daily'].map((badge, i) => (
+          {(['landing.badgeVeg', 'landing.badgeJain', 'landing.badgeFresh'] as const).map((badgeKey, i) => (
             <motion.span
-              key={badge}
+              key={badgeKey}
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.80 + i * 0.08, type: 'spring', stiffness: 300, damping: 14 }}
@@ -260,7 +265,7 @@ export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
                 color: 'rgba(217,160,58,0.92)',
               }}
             >
-              {badge}
+              {tr(badgeKey)}
             </motion.span>
           ))}
         </motion.div>

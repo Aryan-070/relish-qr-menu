@@ -17,6 +17,12 @@ const VIEW_TITLE: Record<ConsoleView, string> = {
   'waiter-tables': 'My Tables',
   'waiter-queue': 'Service Queue',
   'waiter-billing': 'Billing',
+  kds: 'Kitchen Display',
+  'table-qr': 'Table QR Codes',
+  reservations: 'Reservations & Waitlist',
+  loyalty: 'Loyalty & CRM',
+  feedback: 'Guest Feedback',
+  campaigns: 'Marketing Campaigns',
 }
 
 const RANGE_VIEWS: ConsoleView[] = ['admin-dashboard', 'reports', 'manager-staff']

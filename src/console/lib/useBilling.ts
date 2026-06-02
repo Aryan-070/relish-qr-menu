@@ -52,7 +52,7 @@ export function useBilling(): UseBilling {
     let active = true
     setLoading(true)
     setError(null)
-    ensureBillingForUser(auth.user.id)
+    ensureBillingForUser()
       .then(async rid => {
         if (!active) return
         setRestaurantId(rid)

@@ -49,8 +49,9 @@ export function consolidateLines(orders: OrderRecord[]): ConsolidatedLine[] {
 
 /**
  * Given a pre-tax subtotal and a discount percentage (0–50), derive the
- * discount, 5% service charge, 5% GST and grand total. Service charge and tax
- * are both computed on the discounted subtotal.
+ * discount, 5% service charge, 5% GST and grand total. Service charge and GST
+ * are both computed on the discounted subtotal and added on top — GST is always
+ * applied at billing time. `total = taxable + serviceCharge + tax`.
  */
 export function computeTotals(subtotal: number, discountPct: number): ComputedTotals {
   const safePct = Math.min(50, Math.max(0, discountPct))

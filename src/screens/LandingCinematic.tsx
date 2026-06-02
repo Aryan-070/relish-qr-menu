@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { LqipVideo } from '../components/atoms/LqipVideo'
 import { useMediaMode } from '../theme/MediaModeContext'
 import { videoRenditions } from '../data/videoManifest'
+import { useT } from '../i18n'
 
 interface Props {
   onOpenMenu: () => void
@@ -22,6 +23,7 @@ const CHIPS = [
 
 // ── Animated primary button (Open Menu) — verbatim from LandingCover ─────────
 function PrimaryBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -60,13 +62,14 @@ function PrimaryBtn({ onClick, delay }: { onClick: () => void; delay: number }) 
           />
         )}
       </AnimatePresence>
-      <span className="relative z-10">Open Menu</span>
+      <span className="relative z-10">{tr('action.openMenu')}</span>
     </motion.button>
   )
 }
 
 // ── Gold recommend button — verbatim from LandingCover ───────────────────────
 function GoldBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -107,7 +110,7 @@ function GoldBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
         >
           ✦
         </motion.span>
-        Recommend Something
+        {tr('action.recommend')}
       </span>
     </motion.button>
   )
@@ -115,6 +118,7 @@ function GoldBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
 
 // ── Ghost waiter button — verbatim from LandingCover ─────────────────────────
 function GhostBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
+  const tr = useT()
   const [tapped, setTapped] = useState(false)
   const fire = () => { setTapped(true); onClick(); setTimeout(() => setTapped(false), 700) }
 
@@ -146,13 +150,14 @@ function GhostBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
           />
         )}
       </AnimatePresence>
-      <span className="relative z-10">Call Waiter</span>
+      <span className="relative z-10">{tr('landing.callWaiter')}</span>
     </motion.button>
   )
 }
 
 // ── Cinematic landing — full-bleed looping hero video + chip strip ───────────
 export function LandingCinematic({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const tr = useT()
   const { posterOnly } = useMediaMode()
 
   return (
@@ -216,7 +221,7 @@ export function LandingCinematic({ onOpenMenu, onRecommend, onWaiter }: Props) {
           className="font-cormorant italic mt-2 text-center"
           style={{ fontSize: 'clamp(15px, 2vw, 23px)', color: 'rgba(255,248,234,0.74)' }}
         >
-          A journey through flavours of the world
+          {tr('brand.journey')}
         </motion.p>
       </motion.div>
 

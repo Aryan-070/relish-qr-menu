@@ -30,7 +30,14 @@ export interface OrderLine {
   price: number
   qty: number
   categoryId: string
+  /** Selected modifiers, as a display string (e.g. "Extra cheese · Jalapeños"). */
+  modifiers?: string
+  /** Free-text kitchen note from the guest. */
+  note?: string
 }
+
+/** Kitchen ticket lifecycle, driven from the KDS. */
+export type OrderStatus = 'new' | 'preparing' | 'ready' | 'served'
 
 export interface OrderRecord {
   id: string // 'ORD-00123'
@@ -40,6 +47,10 @@ export interface OrderRecord {
   lines: OrderLine[]
   total: number
   paid: boolean
+  /** Kitchen status. Absent on legacy/seed orders (treated as in-progress when unpaid). */
+  status?: OrderStatus
+  /** Channel the order came from — distinguishes guest scan-to-order from staff entry. */
+  source?: 'guest' | 'staff'
 }
 
 export interface Staff {
@@ -52,6 +63,62 @@ export interface Staff {
 
 export type RequestType = 'waiter' | 'water' | 'bill' | 'assistance' | 'cleanup'
 export type RequestStatus = 'pending' | 'claimed' | 'resolved'
+
+/** Post-visit guest feedback (star rating + optional comment), captured in-app. */
+export interface Feedback {
+  id: string
+  /** 1–5 stars. */
+  rating: number
+  comment?: string
+  tableId?: string
+  createdAt: number // epoch ms
+  /** Whether the guest was routed to a public review (high rating) or kept private. */
+  routedToPublic: boolean
+}
+
+// ── Loyalty / CRM ───────────────────────────────────────────────────────────
+export type LoyaltyTier = 'Bronze' | 'Silver' | 'Gold'
+
+/** A loyalty/CRM customer profile. */
+export interface Customer {
+  id: string
+  name: string
+  phone: string
+  points: number
+  tier: LoyaltyTier
+  visits: number
+  lifetimeSpend: number // rupees
+  tags: string[]
+  lastVisit: number // epoch ms
+  joinedAt: number // epoch ms
+}
+
+// ── Reservations / waitlist ─────────────────────────────────────────────────
+export type ReservationStatus = 'booked' | 'seated' | 'completed' | 'cancelled' | 'no-show'
+
+export interface Reservation {
+  id: string
+  name: string
+  phone: string
+  partySize: number
+  at: number // epoch ms — the booked time
+  tableId: string | null
+  status: ReservationStatus
+  notes?: string
+  createdAt: number
+}
+
+export type WaitStatus = 'waiting' | 'notified' | 'seated' | 'left'
+
+export interface WaitlistEntry {
+  id: string
+  name: string
+  phone?: string
+  partySize: number
+  quotedMins: number
+  status: WaitStatus
+  addedAt: number // epoch ms
+}
 
 export interface ServiceRequest {
   id: string

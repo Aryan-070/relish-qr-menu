@@ -1,59 +1,109 @@
 import { useState, useCallback, useMemo } from 'react'
 import { type MenuItem } from '../data/menu'
+import {
+  type SelectedModifier,
+  selectionUnitPrice,
+  selectionLabel,
+  selectionKey,
+} from '../data/modifiers'
+import { type Combo, comboLineId } from '../data/combos'
 
 export interface OrderItem {
   item: MenuItem
   quantity: number
-  customization: string
+  /** Selected priced modifiers for this line. */
+  modifiers: SelectedModifier[]
+  /** Base price + modifier deltas, for one unit. */
+  unitPrice: number
+  /** Display summary of the selection ('' when only base prep). */
+  label: string
   note?: string
+  /** Stable identity = item id + sorted modifier selection. */
+  lineId: string
 }
 
 export function useOrder() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
 
-  const addItem = useCallback((item: MenuItem, customization = 'Regular') => {
+  const addItem = useCallback((item: MenuItem, modifiers: SelectedModifier[] = []) => {
+    const lineId = selectionKey(item.id, modifiers)
     setOrderItems(prev => {
-      const existing = prev.find(o => o.item.id === item.id && o.customization === customization)
+      const existing = prev.find(o => o.lineId === lineId)
       if (existing) {
-        return prev.map(o =>
-          o.item.id === item.id && o.customization === customization
-            ? { ...o, quantity: o.quantity + 1 }
-            : o,
-        )
+        return prev.map(o => (o.lineId === lineId ? { ...o, quantity: o.quantity + 1 } : o))
       }
-      return [...prev, { item, quantity: 1, customization }]
+      return [
+        ...prev,
+        {
+          item,
+          quantity: 1,
+          modifiers,
+          unitPrice: selectionUnitPrice(item.price, modifiers),
+          label: selectionLabel(modifiers),
+          lineId,
+        },
+      ]
     })
   }, [])
 
-  const removeItem = useCallback((itemId: string, customization: string) => {
-    setOrderItems(prev => prev.filter(o => !(o.item.id === itemId && o.customization === customization)))
+  const addCombo = useCallback((combo: Combo) => {
+    const lineId = comboLineId(combo.id)
+    setOrderItems(prev => {
+      const existing = prev.find(o => o.lineId === lineId)
+      if (existing) {
+        return prev.map(o => (o.lineId === lineId ? { ...o, quantity: o.quantity + 1 } : o))
+      }
+      // A combo rides on the same OrderItem shape via a synthetic MenuItem so
+      // the order panel renders it like any other line (name + label + price).
+      const comboItem: MenuItem = {
+        id: lineId,
+        name: combo.name,
+        price: combo.comboPrice,
+        description: '',
+        isJain: false,
+        canBeJain: false,
+        tags: [],
+        pairings: {},
+        customizations: [],
+      }
+      return [
+        ...prev,
+        {
+          item: comboItem,
+          quantity: 1,
+          modifiers: [],
+          unitPrice: combo.comboPrice,
+          label: combo.itemNames.join(' · '),
+          lineId,
+        },
+      ]
+    })
   }, [])
 
-  const updateQuantity = useCallback((itemId: string, customization: string, delta: number) => {
+  const removeItem = useCallback((lineId: string) => {
+    setOrderItems(prev => prev.filter(o => o.lineId !== lineId))
+  }, [])
+
+  const updateQuantity = useCallback((lineId: string, delta: number) => {
     setOrderItems(prev =>
-      prev.map(o =>
-        o.item.id === itemId && o.customization === customization
-          ? { ...o, quantity: Math.max(1, o.quantity + delta) }
-          : o,
-      ),
+      prev.map(o => (o.lineId === lineId ? { ...o, quantity: Math.max(1, o.quantity + delta) } : o)),
     )
   }, [])
 
-  const updateNote = useCallback((itemId: string, customization: string, note: string) => {
-    setOrderItems(prev =>
-      prev.map(o =>
-        o.item.id === itemId && o.customization === customization
-          ? { ...o, note }
-          : o,
-      ),
-    )
+  const updateNote = useCallback((lineId: string, note: string) => {
+    setOrderItems(prev => prev.map(o => (o.lineId === lineId ? { ...o, note } : o)))
   }, [])
 
-  const total = useMemo(() => orderItems.reduce((sum, o) => sum + o.item.price * o.quantity, 0), [orderItems])
+  const clear = useCallback(() => setOrderItems([]), [])
+
+  const total = useMemo(
+    () => orderItems.reduce((sum, o) => sum + o.unitPrice * o.quantity, 0),
+    [orderItems],
+  )
   const count = useMemo(() => orderItems.reduce((sum, o) => sum + o.quantity, 0), [orderItems])
 
   return useMemo(
-    () => ({ orderItems, addItem, removeItem, updateQuantity, updateNote, total, count }),
-    [orderItems, addItem, removeItem, updateQuantity, updateNote, total, count],
+    () => ({ orderItems, addItem, addCombo, removeItem, updateQuantity, updateNote, clear, total, count }),
+    [orderItems, addItem, addCombo, removeItem, updateQuantity, updateNote, clear, total, count],
   )
 }

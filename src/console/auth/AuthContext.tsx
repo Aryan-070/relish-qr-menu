@@ -13,6 +13,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import { ensureTenant } from '../lib/provisionTenant'
 import type { Role } from '../lib/types'
 
 export type AuthMode = 'demo' | 'supabase'
@@ -23,6 +24,9 @@ export interface AuthValue {
   status: AuthStatus
   user: User | null
   appRole: Role | null
+  /** The signed-in user's restaurant (supabase mode). Null in demo mode or
+   *  before provisioning completes. The ops store keys all sync on this. */
+  restaurantId: string | null
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -35,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>(mode === 'supabase' ? 'loading' : 'ready')
   const [user, setUser] = useState<User | null>(null)
   const [appRole, setAppRole] = useState<Role | null>(null)
+  const [restaurantId, setRestaurantId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -54,28 +59,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Drive the console role from the signed-in user's app_users row (supabase mode).
-  // Demo mode has no client, so appRole stays null and the demo switcher governs role.
+  // Provision the tenant on first sign-in, then drive the console role +
+  // restaurantId from the user's app_users row (supabase mode). ensureTenant is
+  // idempotent: it creates a restaurant + admin membership + seeds demo data only
+  // when no membership exists yet, otherwise it's a no-op read. Demo mode has no
+  // client, so appRole/restaurantId stay null and the demo switcher governs role.
   useEffect(() => {
     if (!supabase) return
     if (!user) {
       setAppRole(null)
+      setRestaurantId(null)
       return
     }
     let active = true
-    supabase
-      .from('app_users')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active) return
-        if (error) {
-          setAppRole(null)
-          return
-        }
-        setAppRole((data?.role as Role | undefined) ?? null)
-      })
+    void (async () => {
+      try {
+        await ensureTenant({ id: user.id, email: user.email })
+      } catch {
+        /* provisioning failed — fall through; membership read below stays null */
+      }
+      if (!active || !supabase) return
+      const { data } = await supabase
+        .from('app_users')
+        .select('role, restaurant_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!active) return
+      setAppRole((data?.role as Role | undefined) ?? null)
+      setRestaurantId((data?.restaurant_id as string | undefined) ?? null)
+    })()
     return () => {
       active = false
     }
@@ -87,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user,
       appRole,
+      restaurantId,
       signIn: async (email, password) => {
         if (!supabase) return { error: 'Auth is not configured.' }
         const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -101,9 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (supabase) await supabase.auth.signOut()
         setUser(null)
         setAppRole(null)
+        setRestaurantId(null)
       },
     }),
-    [mode, status, user, appRole],
+    [mode, status, user, appRole, restaurantId],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
