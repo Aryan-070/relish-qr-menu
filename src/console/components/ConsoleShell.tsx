@@ -13,6 +13,7 @@ const VIEW_TITLE: Record<ConsoleView, string> = {
   'manager-floor': 'Floor',
   'manager-menu': 'Menu Management',
   'manager-staff': 'Staff Performance',
+  'admin-billing': 'Billing & Subscription',
   'waiter-tables': 'My Tables',
   'waiter-queue': 'Service Queue',
   'waiter-billing': 'Billing',

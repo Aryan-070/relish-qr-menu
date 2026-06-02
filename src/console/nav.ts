@@ -7,6 +7,7 @@ import {
   BellRing,
   Receipt,
   History,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react'
 import type { Role } from './lib/types'
@@ -18,6 +19,7 @@ export type ConsoleView =
   | 'manager-floor'
   | 'manager-menu'
   | 'manager-staff'
+  | 'admin-billing'
   | 'waiter-tables'
   | 'waiter-queue'
   | 'waiter-billing'
@@ -43,6 +45,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { view: 'records', label: 'Records', icon: History },
     { view: 'manager-menu', label: 'Menu', icon: UtensilsCrossed },
     { view: 'manager-staff', label: 'Staff', icon: Users },
+    { view: 'admin-billing', label: 'Billing', icon: CreditCard },
   ],
   manager: [
     { view: 'manager-floor', label: 'Floor', icon: LayoutGrid },

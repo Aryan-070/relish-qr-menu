@@ -12,6 +12,7 @@ import type {
   Table,
   Zone,
 } from '../console/lib/types'
+import { packageById, makeInvoice, type BillingState, type Invoice } from '../console/lib/billing'
 
 export interface OpsSeed {
   version: number
@@ -21,9 +22,10 @@ export interface OpsSeed {
   menu: EditableMenuItem[]
   orders: OrderRecord[]
   requests: ServiceRequest[]
+  billing: BillingState
 }
 
-export const OPS_VERSION = 2
+export const OPS_VERSION = 3
 const HISTORY_DAYS = 30
 const DAY_MS = 86_400_000
 
@@ -253,6 +255,23 @@ function buildRequests(rng: () => number, tables: Table[], waiterIds: string[]):
   return reqs.sort((a, b) => a.createdAt - b.createdAt)
 }
 
+// The restaurant's own Relish subscription, shown in the Billing console.
+// Seeded on the Cinematic package: a paid build invoice ~300 days ago and an
+// upcoming annual renewal (~65 days out) still due.
+function buildBilling(): BillingState {
+  const pkg = packageById('cinematic')
+  const startedAt = Date.now() - 300 * DAY_MS
+  const renewalAt = startedAt + 365 * DAY_MS
+  const invoices: Invoice[] = [
+    makeInvoice('INV-0002', renewalAt, `Annual renewal — ${pkg.name}`, pkg.renewalYr, 'due'),
+    makeInvoice('INV-0001', startedAt, `${pkg.name} — one-time build & launch`, pkg.oneTime, 'paid'),
+  ]
+  return {
+    subscription: { packageId: pkg.id, startedAt, renewalAt, autoRenew: true, gstPct: 18 },
+    invoices,
+  }
+}
+
 /** Build a fresh, deterministic dataset anchored to the current date. */
 export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
   const rng = mulberry32(seed)
@@ -262,6 +281,7 @@ export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
   const tables = buildTables(rng, waiterIds)
   const orders = buildOrders(rng, menu, tables, waiterIds)
   const requests = buildRequests(rng, tables, waiterIds)
+  const billing = buildBilling()
   return {
     version: OPS_VERSION,
     generatedAt: Date.now(),
@@ -270,5 +290,6 @@ export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
     menu,
     orders,
     requests,
+    billing,
   }
 }

@@ -19,6 +19,15 @@ import type {
   EditableMenuItem,
   TableStatus,
 } from '../lib/types'
+import {
+  packageById,
+  makeInvoice,
+  nextInvoiceId,
+  type Invoice,
+  type PackageId,
+} from '../lib/billing'
+
+const YEAR_MS = 365 * 86_400_000
 
 const STORAGE_KEY = 'relish.ops.v1'
 
@@ -37,6 +46,9 @@ type Action =
   | { type: 'MENU_TOGGLE_AVAILABLE'; id: string }
   | { type: 'MENU_TOGGLE_SOLDOUT'; id: string }
   | { type: 'PAY_TABLES'; tableIds: string[] }
+  | { type: 'BILLING_SET_PACKAGE'; packageId: PackageId }
+  | { type: 'BILLING_TOGGLE_AUTORENEW' }
+  | { type: 'BILLING_RENEW_NOW' }
   | { type: 'RESET' }
 
 function reducer(state: OpsState, action: Action): OpsState {
@@ -129,6 +141,78 @@ function reducer(state: OpsState, action: Action): OpsState {
         ),
       }
     }
+    case 'BILLING_SET_PACKAGE': {
+      const b = state.billing
+      if (action.packageId === b.subscription.packageId) return state
+      const oldPkg = packageById(b.subscription.packageId)
+      const newPkg = packageById(action.packageId)
+      // Re-rate any open (due) renewal invoice to the new package's annual price
+      // so the history matches what the customer will actually owe.
+      const rerated = b.invoices.map(i =>
+        i.status === 'due'
+          ? makeInvoice(i.id, i.date, `Annual renewal — ${newPkg.name}`, newPkg.renewalYr, 'due')
+          : i,
+      )
+      // On an upgrade, bill the one-time build-fee difference now.
+      const delta = newPkg.oneTime - oldPkg.oneTime
+      const invoices: Invoice[] =
+        delta > 0
+          ? [
+              makeInvoice(
+                nextInvoiceId(rerated),
+                Date.now(),
+                `Upgrade ${oldPkg.name} → ${newPkg.name} (build fee difference)`,
+                delta,
+                'paid',
+              ),
+              ...rerated,
+            ]
+          : rerated
+      return {
+        ...state,
+        billing: {
+          subscription: { ...b.subscription, packageId: action.packageId },
+          invoices,
+        },
+      }
+    }
+    case 'BILLING_TOGGLE_AUTORENEW':
+      return {
+        ...state,
+        billing: {
+          ...state.billing,
+          subscription: {
+            ...state.billing.subscription,
+            autoRenew: !state.billing.subscription.autoRenew,
+          },
+        },
+      }
+    case 'BILLING_RENEW_NOW': {
+      const b = state.billing
+      const pkg = packageById(b.subscription.packageId)
+      // Settle the open renewal(s). Keep each invoice's issue date intact —
+      // `date` is when it was raised, not when it was paid.
+      const settled = b.invoices.map(i =>
+        i.status === 'due' ? { ...i, status: 'paid' as const } : i,
+      )
+      // Anchor the next renewal to today if the subscription was already overdue,
+      // so paying always advances the date into the future.
+      const nextRenewal = Math.max(b.subscription.renewalAt, Date.now()) + YEAR_MS
+      const upcoming = makeInvoice(
+        nextInvoiceId(b.invoices),
+        nextRenewal,
+        `Annual renewal — ${pkg.name}`,
+        pkg.renewalYr,
+        'due',
+      )
+      return {
+        ...state,
+        billing: {
+          subscription: { ...b.subscription, renewalAt: nextRenewal },
+          invoices: [upcoming, ...settled],
+        },
+      }
+    }
     case 'RESET':
       return generateOpsSeed()
     default:
@@ -163,6 +247,9 @@ export interface OpsStore {
   menuToggleAvailable: (id: string) => void
   menuToggleSoldOut: (id: string) => void
   payTables: (tableIds: string[]) => void
+  billingSetPackage: (packageId: PackageId) => void
+  billingToggleAutoRenew: () => void
+  billingRenewNow: () => void
   resetDemoData: () => void
 }
 
@@ -194,6 +281,9 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       menuToggleAvailable: id => dispatch({ type: 'MENU_TOGGLE_AVAILABLE', id }),
       menuToggleSoldOut: id => dispatch({ type: 'MENU_TOGGLE_SOLDOUT', id }),
       payTables: tableIds => dispatch({ type: 'PAY_TABLES', tableIds }),
+      billingSetPackage: packageId => dispatch({ type: 'BILLING_SET_PACKAGE', packageId }),
+      billingToggleAutoRenew: () => dispatch({ type: 'BILLING_TOGGLE_AUTORENEW' }),
+      billingRenewNow: () => dispatch({ type: 'BILLING_RENEW_NOW' }),
       resetDemoData: () => dispatch({ type: 'RESET' }),
     }),
     [state],

@@ -37,3 +37,9 @@ raw-categories/
 # Downloaded video renditions (regenerate with `npm run fetch:videos`).
 # Large (~120MB across resolutions) — kept out of git; app falls back to posters.
 public/assets/video/
+
+# Local env secrets (.env.example IS committed as a template; *.local covered above)
+.env
+
+# Vercel
+.vercel
