@@ -129,17 +129,24 @@ interface SelectFieldProps {
   onChange: (v: string) => void
   options: Array<{ value: string; label: string }>
 }
+// Radix <Select.Item> forbids an empty-string value (it reserves "" to clear the
+// selection). Several option sets legitimately use "" for an "unassigned / none"
+// choice, so map "" to a sentinel for Radix and translate it back on change.
+const EMPTY_OPTION = '__empty__'
+const toRadix = (v: string) => (v === '' ? EMPTY_OPTION : v)
+const fromRadix = (v: string) => (v === EMPTY_OPTION ? '' : v)
+
 export function SelectField({ label, value, onChange, options }: SelectFieldProps) {
   const id = useId()
   return (
     <LabelWrap label={label} htmlFor={id}>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={toRadix(value)} onValueChange={v => onChange(fromRadix(v))}>
         <SelectTrigger id={id} className="w-full bg-white text-[14px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {options.map(o => (
-            <SelectItem key={o.value} value={o.value}>
+            <SelectItem key={o.value} value={toRadix(o.value)}>
               {o.label}
             </SelectItem>
           ))}
