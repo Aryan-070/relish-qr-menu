@@ -13,12 +13,18 @@ export default {
         gold: '#D9A03A',
         olive: '#4F7A3C',
         mute: '#a89a8a',
+        sage: '#8A9A7B',
+        terracotta: '#B85C44',
       },
       fontFamily: {
         playfair: ['"Playfair Display"', 'Georgia', 'serif'],
         cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         inter: ['Inter', 'system-ui', 'sans-serif'],
         caveat: ['Caveat', 'cursive'],
+        fraunces: ['Fraunces', 'Georgia', 'serif'],
+        satoshi: ['Satoshi', 'system-ui', 'sans-serif'],
+        general: ['"General Sans"', 'system-ui', 'sans-serif'],
+        'geist-mono': ['"Geist Mono"', '"JetBrains Mono"', 'monospace'],
       },
       zIndex: {
         60: '60',

@@ -14,7 +14,7 @@ const STORAGE_KEY = 'relish-ui-theme'
 function readStored(): UiTheme {
   try {
     const s = localStorage.getItem(STORAGE_KEY)
-    if (s === 'warm' || s === 'hybrid' || s === 'brutalist') return s
+    if (s === 'warm' || s === 'hybrid' || s === 'brutalist' || s === 'editorial') return s
   } catch {
     /* ignore */
   }

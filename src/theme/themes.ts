@@ -1,7 +1,7 @@
 // Tri-theme UI system: warm (refined fine-dining), hybrid (refined-brutalist),
 // brutalist (full editorial). One component contract, three skins — selected at runtime.
 
-export type UiTheme = 'warm' | 'hybrid' | 'brutalist'
+export type UiTheme = 'warm' | 'hybrid' | 'brutalist' | 'editorial'
 
 // Dietary / tag / chef / spice pill styling — theme-aware so the chips read
 // soft & rounded in warm, hard-edged & monospaced in hybrid/brutalist.
@@ -23,6 +23,7 @@ export interface ThemeTokens {
   ink: string
   inkSoft: string
   accent: string // maroon primary
+  accent2: string // secondary accent (sage in editorial; mirrors `accent` elsewhere)
   // card frame
   cardRadius: number
   cardBorder: string
@@ -58,6 +59,9 @@ export interface ThemeTokens {
   headerSpacing: string
   // nav
   navStyle: 'pill' | 'underline'
+  // optional CSS `filter` applied to all video/poster media so footage sits in
+  // the theme's palette (editorial = warm grade). Omitted → no grade.
+  videoFilter?: string
 }
 
 // 2026 type system (research-vetted, all on Google Fonts)
@@ -69,6 +73,9 @@ const DMSERIF = "'DM Serif Display', Georgia, serif"     // hybrid header serif
 const MARTIAN = "'Martian Mono', 'Courier New', monospace"   // hybrid mono
 const SYNE = "'Syne', Arial, sans-serif"                 // brutalist display
 const JETBRAINS = "'JetBrains Mono', 'Courier New', monospace" // brutalist body/mono
+const SATOSHI = "'Satoshi', system-ui, sans-serif"       // editorial UI / nav / pills (Fontshare)
+const GENERAL = "'General Sans', system-ui, sans-serif"  // editorial body / description (Fontshare)
+const GEIST_MONO = "'Geist Mono', 'JetBrains Mono', monospace" // editorial price / numerals
 
 export const THEMES: Record<UiTheme, ThemeTokens> = {
   warm: {
@@ -79,6 +86,7 @@ export const THEMES: Record<UiTheme, ThemeTokens> = {
     ink: '#2A1E1E',
     inkSoft: '#5b4a44',
     accent: '#8B1024',
+    accent2: '#8B1024',
     cardRadius: 16,
     cardBorder: '1px solid rgba(217,160,58,0.25)',
     cardShadow: '0 2px 12px rgba(42,30,30,0.08)',
@@ -115,6 +123,7 @@ export const THEMES: Record<UiTheme, ThemeTokens> = {
     ink: '#2A1E1E',
     inkSoft: '#4a3f3a',
     accent: '#8B1024',
+    accent2: '#8B1024',
     cardRadius: 0,
     cardBorder: 'none',
     cardShadow: 'none',
@@ -151,6 +160,7 @@ export const THEMES: Record<UiTheme, ThemeTokens> = {
     ink: '#111111',
     inkSoft: '#444444',
     accent: '#8B1024',
+    accent2: '#8B1024',
     cardRadius: 0,
     cardBorder: 'none',
     cardShadow: 'none',
@@ -179,6 +189,47 @@ export const THEMES: Record<UiTheme, ThemeTokens> = {
     headerSpacing: '-0.015em',
     navStyle: 'underline',
   },
+  // 2026 editorial direction — Cloud-Dancer cream + terracotta/sage/espresso,
+  // serif-forward (Fraunces) with a modern grotesque body (General Sans / Satoshi).
+  // Saturation kept <80%, no pure black, terracotta-tinted diffusion shadow.
+  editorial: {
+    pill: { radius: 999, font: SATOSHI, transform: 'uppercase', bracket: false, monochrome: false, monoInk: '#1F1C18' },
+    label: 'Editorial',
+    bg: '#F2EFE8',
+    cardBg: '#F8F5EF',
+    ink: '#1F1C18',
+    inkSoft: '#5A4F45',
+    accent: '#B85C44',
+    accent2: '#8A9A7B',
+    cardRadius: 20,
+    cardBorder: '1px solid #E3D9CA',
+    cardShadow: '0 6px 28px rgba(184,92,68,0.07)',
+    cardSeparator: 'shadow',
+    ruleColor: '#E3D9CA',
+    thumbRadius: 16,
+    thumbBorder: '1px solid #E3D9CA',
+    titleFont: FRAUNCES,
+    titleTransform: 'none',
+    titleWeight: 600,
+    titleSize: 16.5,
+    titleSpacing: '-0.01em',
+    descFont: GENERAL,
+    descColor: '#5A4F45',
+    accentFont: INSTRUMENT,
+    priceFont: GEIST_MONO,
+    priceWeight: 600,
+    priceSize: 14.5,
+    priceColor: '#B85C44',
+    addShape: 'pill',
+    addLabel: '+',
+    headerFont: FRAUNCES,
+    headerTransform: 'none',
+    headerSize: 30,
+    headerColor: '#1F1C18',
+    headerSpacing: '-0.02em',
+    navStyle: 'pill',
+    videoFilter: 'saturate(1.06) contrast(1.02) brightness(1.02) sepia(0.08)',
+  },
 }
 
-export const THEME_ORDER: UiTheme[] = ['warm', 'hybrid', 'brutalist']
+export const THEME_ORDER: UiTheme[] = ['warm', 'hybrid', 'brutalist', 'editorial']

@@ -160,7 +160,7 @@ export function FloorView() {
                 </span>
                 <span
                   className="text-[22px] leading-none tabular-nums"
-                  style={{ fontFamily: t.headerFont, color: t.ink, fontWeight: 700 }}
+                  style={{ fontFamily: "'Geist Mono','JetBrains Mono',monospace", color: t.ink, fontWeight: 600 }}
                 >
                   {counts[status]}
                 </span>

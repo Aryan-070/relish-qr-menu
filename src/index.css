@@ -102,6 +102,32 @@ html, body {
   height: 1px;
 }
 
+/* Editorial — 2026 Cloud-Dancer cream + terracotta/sage/espresso. Warmer, softer
+   surface than warm; paper texture re-tinted to terracotta/sage so dots read warm. */
+[data-ui-theme="editorial"] {
+  --paper: #F2EFE8;
+  --paper-2: #F8F5EF;
+  --ink: #1F1C18;
+  --ink-soft: #5A4F45;
+  --maroon: #B85C44; /* terracotta becomes the "primary accent" within this skin */
+  --gold: #C9A24A;
+  --olive: #8A9A7B;  /* sage */
+}
+[data-ui-theme="editorial"].app-shell {
+  background: #F2EFE8;
+}
+[data-ui-theme="editorial"] .paper-bg {
+  background-color: #F2EFE8;
+  background-image:
+    radial-gradient(circle at 22px 22px, rgba(138,154,123,0.05) 2px, transparent 0),
+    radial-gradient(circle at 11px 11px, rgba(184,92,68,0.04) 1px, transparent 0);
+  background-size: 44px 44px, 22px 22px;
+}
+[data-ui-theme="editorial"] .gold-divider {
+  background: linear-gradient(to right, transparent, #C9A24A, transparent);
+  height: 1.5px;
+}
+
 /* Re-skin the serif display/accent utilities per theme so all panel titles
    (Order / Service / Recommendation / ItemDetail) follow the theme's type.
    Higher specificity than the base .font-* class, so it wins. */
@@ -109,9 +135,18 @@ html, body {
 [data-ui-theme="hybrid"]    .font-playfair { font-family: 'DM Serif Display', Georgia, serif; }
 [data-ui-theme="brutalist"] .font-playfair { font-family: 'Syne', 'Arial Black', sans-serif; letter-spacing: -0.01em; }
 
+[data-ui-theme="editorial"] .font-playfair  { font-family: 'Fraunces', Georgia, serif; }
+
 [data-ui-theme="warm"]      .font-cormorant { font-family: 'Instrument Serif', Georgia, serif; }
 [data-ui-theme="hybrid"]    .font-cormorant { font-family: 'Martian Mono', monospace; font-style: normal; }
 [data-ui-theme="brutalist"] .font-cormorant { font-family: 'JetBrains Mono', monospace; font-style: normal; }
+[data-ui-theme="editorial"] .font-cormorant { font-family: 'Instrument Serif', Georgia, serif; }
+
+/* Staff console data-density type scope — sans + mono, no serif (dashboard rule).
+   Numerals/IDs/timestamps inside .console-mono render in Geist Mono. */
+.console-shell { font-family: 'Satoshi', system-ui, sans-serif; }
+.console-shell .console-mono,
+.console-shell [data-numeric] { font-family: 'Geist Mono', 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
 
 /* Paper texture background */
 .paper-bg {

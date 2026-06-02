@@ -19,6 +19,7 @@ import { fadeIn } from './animations/variants'
 // page navigation), see src/lib/tableSession.ts.
 const GUEST_TABLE_ID = resolveGuestTableId()
 import { ThemeProvider, useTheme } from './theme/ThemeContext'
+import { ComponentStyleProvider } from './theme/ComponentStyleContext'
 import { MediaModeProvider } from './theme/MediaModeContext'
 import { OpsProvider, useOpsStore } from './console/store/useOpsStore'
 import { AuthProvider } from './console/auth/AuthContext'
@@ -83,7 +84,7 @@ function AppInner() {
   // so hook order stays stable across guest/staff toggles (Rules of Hooks).
   if (appMode === 'staff') {
     return (
-      <div className="app-shell" data-ui-theme={theme}>
+      <div className="app-shell console-shell" data-ui-theme={theme}>
         <Suspense fallback={null}>
           <ConsoleApp onExit={exitStaff} />
         </Suspense>
@@ -342,15 +343,17 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <MediaModeProvider>
+        <ComponentStyleProvider>
+          <MediaModeProvider>
           <LanguageProvider>
             <AuthProvider>
-              <OpsProvider>
-                <AppInner />
-              </OpsProvider>
-            </AuthProvider>
-          </LanguageProvider>
-        </MediaModeProvider>
+                <OpsProvider>
+                  <AppInner />
+                </OpsProvider>
+              </AuthProvider>
+            </LanguageProvider>
+          </MediaModeProvider>
+        </ComponentStyleProvider>
       </ThemeProvider>
     </ErrorBoundary>
   )

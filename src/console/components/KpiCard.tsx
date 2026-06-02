@@ -28,14 +28,19 @@ export function KpiCard({ label, value, delta, spark, goodWhenUp = true, classNa
         {label}
       </span>
       <div className="flex items-end justify-between gap-2">
-        <span className="text-[26px] leading-none tabular-nums" style={{ fontFamily: t.headerFont, color: t.ink, fontWeight: 700 }}>
+        {/* Data-density: metric value in mono with tabular figures so digits align
+            across cards — the dashboard reads as an instrument, not editorial copy. */}
+        <span
+          className="text-[26px] leading-none tabular-nums"
+          style={{ fontFamily: "'Geist Mono','JetBrains Mono',monospace", color: t.ink, fontWeight: 600, letterSpacing: '-0.02em' }}
+        >
           {value}
         </span>
         {spark && spark.length > 1 && <Sparkline data={spark} width={84} height={28} />}
       </div>
       {hasDelta && (
-        <span className="text-[12px] font-semibold" style={{ color: deltaColor, fontFamily: t.priceFont }}>
-          {pct(delta!)} <span className="font-normal" style={{ color: t.descColor }}>vs prev</span>
+        <span className="text-[12px] font-semibold tabular-nums" style={{ color: deltaColor, fontFamily: "'Geist Mono','JetBrains Mono',monospace" }}>
+          {pct(delta!)} <span className="font-normal" style={{ color: t.descColor, fontFamily: t.descFont }}>vs prev</span>
         </span>
       )}
     </motion.div>
