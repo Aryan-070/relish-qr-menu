@@ -1,22 +1,19 @@
 import { useId, type ReactNode } from 'react'
 import { useTheme } from '../../theme/ThemeContext'
-import { controlRadius } from '../lib/skin'
-import { cn } from '../lib/format'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
-function useFieldStyle() {
-  const { tokens: t } = useTheme()
-  return {
-    input: {
-      borderRadius: controlRadius(t),
-      border: `1px solid ${t.ruleColor}`,
-      background: '#FFFFFF',
-      color: t.ink,
-      fontFamily: t.descFont,
-    } as const,
-    label: { fontFamily: t.descFont, color: t.inkSoft } as const,
-    accent: t.accent,
-  }
-}
+// White input surface reads clearer than the cream paper on console panels.
+const FIELD_CLS = 'w-full bg-white text-[14px]'
 
 interface LabelWrapProps {
   label: string
@@ -25,19 +22,21 @@ interface LabelWrapProps {
   children: ReactNode
 }
 function LabelWrap({ label, htmlFor, hint, children }: LabelWrapProps) {
-  const s = useFieldStyle()
+  const { tokens: t } = useTheme()
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-[12px] font-semibold uppercase tracking-wider" style={s.label}>
+      <Label
+        htmlFor={htmlFor}
+        className="text-[12px] font-semibold uppercase tracking-wider"
+        style={{ fontFamily: t.descFont, color: t.inkSoft }}
+      >
         {label}
-      </label>
+      </Label>
       {children}
       {hint && <span className="text-[11px]" style={{ color: 'var(--mute,#a89a8a)' }}>{hint}</span>}
     </div>
   )
 }
-
-const FOCUS = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-maroon'
 
 interface TextFieldProps {
   label: string
@@ -49,17 +48,15 @@ interface TextFieldProps {
 }
 export function TextField({ label, value, onChange, placeholder, hint, type = 'text' }: TextFieldProps) {
   const id = useId()
-  const s = useFieldStyle()
   return (
     <LabelWrap label={label} htmlFor={id} hint={hint}>
-      <input
+      <Input
         id={id}
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
-        className={cn('px-3 py-2 text-[14px] w-full', FOCUS)}
-        style={s.input}
+        className={FIELD_CLS}
       />
     </LabelWrap>
   )
@@ -75,23 +72,32 @@ interface NumberFieldProps {
 }
 export function NumberField({ label, value, onChange, min = 0, prefix, hint }: NumberFieldProps) {
   const id = useId()
-  const s = useFieldStyle()
+  const { tokens: t } = useTheme()
   return (
     <LabelWrap label={label} htmlFor={id} hint={hint}>
-      <div className="flex items-center px-3 py-2 w-full" style={s.input}>
-        {prefix && <span className="text-[14px] mr-1" style={{ color: s.label.color }}>{prefix}</span>}
-        <input
+      <div className="relative">
+        {prefix && (
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px]"
+            style={{ color: t.inkSoft }}
+          >
+            {prefix}
+          </span>
+        )}
+        <Input
           id={id}
           type="number"
           min={min}
           value={Number.isFinite(value) ? value : ''}
           onChange={e => onChange(Number(e.target.value))}
-          className={cn('text-[14px] w-full bg-transparent', FOCUS)}
-          style={{ color: s.input.color, fontFamily: s.input.fontFamily }}
+          className={cnWidth(prefix)}
         />
       </div>
     </LabelWrap>
   )
+}
+function cnWidth(prefix?: string) {
+  return prefix ? `${FIELD_CLS} pl-7` : FIELD_CLS
 }
 
 interface TextAreaFieldProps {
@@ -103,17 +109,15 @@ interface TextAreaFieldProps {
 }
 export function TextAreaField({ label, value, onChange, rows = 3, placeholder }: TextAreaFieldProps) {
   const id = useId()
-  const s = useFieldStyle()
   return (
     <LabelWrap label={label} htmlFor={id}>
-      <textarea
+      <Textarea
         id={id}
         rows={rows}
         value={value}
         placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
-        className={cn('px-3 py-2 text-[14px] w-full resize-none leading-relaxed', FOCUS)}
-        style={s.input}
+        className={`${FIELD_CLS} resize-none leading-relaxed`}
       />
     </LabelWrap>
   )
@@ -127,22 +131,20 @@ interface SelectFieldProps {
 }
 export function SelectField({ label, value, onChange, options }: SelectFieldProps) {
   const id = useId()
-  const s = useFieldStyle()
   return (
     <LabelWrap label={label} htmlFor={id}>
-      <select
-        id={id}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className={cn('px-3 py-2 text-[14px] w-full cursor-pointer', FOCUS)}
-        style={s.input}
-      >
-        {options.map(o => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id} className="w-full bg-white text-[14px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map(o => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </LabelWrap>
   )
 }
@@ -156,13 +158,7 @@ interface ToggleFieldProps {
 export function ToggleField({ label, description, checked, onChange }: ToggleFieldProps) {
   const { tokens: t } = useTheme()
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className="flex items-center justify-between gap-3 w-full text-left cursor-pointer"
-    >
+    <div className="flex w-full items-center justify-between gap-3 text-left">
       <span>
         <span className="block text-[13px] font-semibold" style={{ fontFamily: t.descFont, color: t.ink }}>
           {label}
@@ -173,15 +169,7 @@ export function ToggleField({ label, description, checked, onChange }: ToggleFie
           </span>
         )}
       </span>
-      <span
-        className="relative w-10 h-6 rounded-full shrink-0 transition-colors"
-        style={{ background: checked ? t.accent : 'rgba(42,30,30,0.18)' }}
-      >
-        <span
-          className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-          style={{ transform: checked ? 'translateX(16px)' : 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
-        />
-      </span>
-    </button>
+      <Switch checked={checked} onCheckedChange={onChange} aria-label={label} />
+    </div>
   )
 }
