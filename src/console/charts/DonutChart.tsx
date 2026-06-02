@@ -79,7 +79,7 @@ export function DonutChart({
       <ul className="flex flex-col gap-1.5 min-w-0">
         {arcs.map(a => (
           <li key={a.label} className="flex items-center gap-2 text-[13px]">
-            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: a.color }} aria-hidden />
+            <span className="w-2.5 h-2.5 rounded-[2px] shrink-0" style={{ background: a.color }} aria-hidden />
             <span className="truncate" style={{ fontFamily: t.descFont, color: t.ink }}>
               {a.label}
             </span>

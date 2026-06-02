@@ -209,7 +209,7 @@ export function OrderPanel({
                                   value={orderItem.note ?? ''}
                                   onChange={e => onUpdateNote(key, e.target.value)}
                                   rows={2}
-                                  className="w-full font-inter text-[12px] resize-none rounded-lg px-3 py-2 outline-none"
+                                  className="w-full font-inter text-[12px] resize-none rounded-[8px] px-3 py-2 outline-none"
                                   style={{
                                     background: 'rgba(217,160,58,0.08)',
                                     border: '1px solid rgba(217,160,58,0.3)',

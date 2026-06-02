@@ -239,7 +239,7 @@ export function BillingView() {
               <button
                 key={p.id}
                 onClick={() => setChoice(p.id)}
-                className="text-left p-3 rounded-lg transition-colors cursor-pointer"
+                className="text-left p-3 rounded-[8px] transition-colors cursor-pointer"
                 style={{
                   border: `1px solid ${active ? t.accent : t.ruleColor}`,
                   background: active ? 'rgba(110,31,44,0.06)' : 'transparent',

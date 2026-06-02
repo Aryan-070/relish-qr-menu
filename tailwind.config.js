@@ -15,6 +15,42 @@ export default {
         mute: '#a89a8a',
         sage: '#8A9A7B',
         terracotta: '#B85C44',
+        // ── shadcn / Cult UI / Watermelon token bridge ──────────────────────
+        // Backed by CSS vars defined per [data-ui-theme] block in index.css, so
+        // bg-background / text-foreground / border-border etc. follow the 4 themes.
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
+        primary: {
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
+        },
+        destructive: {
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)',
+        },
+        muted: {
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
+        },
+        popover: {
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)',
+        },
+        card: {
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)',
+        },
       },
       fontFamily: {
         playfair: ['"Playfair Display"', 'Georgia', 'serif'],
@@ -35,6 +71,10 @@ export default {
       },
       borderRadius: {
         'rs-sm': '6px', 'rs-md': '8px', 'rs-lg': '12px', 'rs-xl': '16px', 'rs-2xl': '24px',
+        // shadcn radius scale, theme-driven via --radius (per [data-ui-theme])
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
       },
       fontSize: {
         // Display & headings carry negative tracking so large serif/sans hold

@@ -233,3 +233,33 @@ export const THEMES: Record<UiTheme, ThemeTokens> = {
 }
 
 export const THEME_ORDER: UiTheme[] = ['warm', 'hybrid', 'brutalist', 'editorial']
+
+// ── shadcn / Cult UI / Watermelon token bridge ──────────────────────────────
+// Derive the shadcn CSS-variable set from a theme's tokens. Injected onto :root
+// at runtime by ThemeProvider so library components (in-shell AND Radix portals,
+// which mount on document.body) inherit the active skin. themes.ts stays the
+// single source of truth — these vars are NOT hand-mirrored in CSS.
+export function shadcnVars(t: ThemeTokens): Record<string, string> {
+  return {
+    '--background': t.bg,
+    '--foreground': t.ink,
+    '--card': t.cardBg,
+    '--card-foreground': t.ink,
+    '--popover': t.cardBg,
+    '--popover-foreground': t.ink,
+    '--primary': t.accent,
+    '--primary-foreground': t.bg,
+    '--secondary': t.bg,
+    '--secondary-foreground': t.ink,
+    '--muted': t.bg,
+    '--muted-foreground': t.inkSoft,
+    '--accent': t.bg,
+    '--accent-foreground': t.ink,
+    '--destructive': '#D71920',
+    '--destructive-foreground': '#FFFFFF',
+    '--border': t.ruleColor,
+    '--input': t.ruleColor,
+    '--ring': t.accent,
+    '--radius': `${t.cardRadius}px`,
+  }
+}

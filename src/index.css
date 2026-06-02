@@ -33,6 +33,20 @@
   --elevation-3: 0 4px 20px rgba(42,30,30,0.10);
   --elevation-4: 0 8px 40px rgba(42,30,30,0.12), 0 2px 8px rgba(42,30,30,0.08);
   --elevation-5: 0 -4px 32px rgba(42,30,30,0.16);
+
+  /* shadcn / Cult UI / Watermelon token bridge — first-paint fallback (warm).
+     ThemeProvider overwrites these on :root at runtime per active theme
+     (see shadcnVars in src/theme/themes.ts). */
+  --background: #FFF8EA;        --foreground: #2A1E1E;
+  --card: #FFF8EA;              --card-foreground: #2A1E1E;
+  --popover: #FFF8EA;           --popover-foreground: #2A1E1E;
+  --primary: #8B1024;           --primary-foreground: #FFF8EA;
+  --secondary: #FFF8EA;         --secondary-foreground: #2A1E1E;
+  --muted: #FFF8EA;             --muted-foreground: #5b4a44;
+  --accent: #FFF8EA;            --accent-foreground: #2A1E1E;
+  --destructive: #D71920;       --destructive-foreground: #FFFFFF;
+  --border: rgba(42,30,30,0.12); --input: rgba(42,30,30,0.12); --ring: #8B1024;
+  --radius: 16px;
 }
 
 /* Blur-up shimmer placeholder */
