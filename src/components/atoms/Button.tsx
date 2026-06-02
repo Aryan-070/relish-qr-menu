@@ -3,6 +3,7 @@ import type { ReactNode, CSSProperties } from 'react'
 import { useTheme } from '../../theme/ThemeContext'
 import { useComponentStyle } from '../../theme/ComponentStyleContext'
 import { MagneticButton } from '../fx/MagneticButton'
+import { BorderBeam } from '../fx/BorderBeam'
 
 type Variant = 'primary' | 'gold' | 'ghost' | 'maroon'
 
@@ -67,6 +68,9 @@ export function Button({
       ? { scale: 0.95 }
       : { scale: 0.955, y: 2 }
 
+  // Border-beam treatment on filled CTAs in the livelier engines (classic stays calm).
+  const showBeam = isFilled && engine !== 'classic' && !disabled
+
   const btn = (
     <motion.button
       whileHover={whileHover}
@@ -75,6 +79,7 @@ export function Button({
       onClick={disabled ? undefined : onClick}
       style={{
         ...colors,
+        position: 'relative',
         borderRadius: hard ? 0 : 9999,
         fontFamily: hard ? t.descFont : t.pill.font,
         textTransform: hard ? 'uppercase' : 'none',
@@ -94,6 +99,7 @@ export function Button({
         .filter(Boolean)
         .join(' ')}
     >
+      {showBeam && <BorderBeam color="rgba(255,255,255,0.7)" duration={hard ? 5 : 4} />}
       {children}
     </motion.button>
   )
