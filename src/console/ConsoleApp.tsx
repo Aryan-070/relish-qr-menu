@@ -23,6 +23,12 @@ import { Reservations } from './views/Reservations'
 import { LoyaltyCrm } from './views/LoyaltyCrm'
 import { FeedbackInbox } from './views/FeedbackInbox'
 import { Campaigns } from './views/Campaigns'
+import { Inventory } from './views/Inventory'
+import { Promotions } from './views/Promotions'
+import { CashLossView } from './views/CashLossView'
+import { StaffAdmin } from './views/StaffAdmin'
+import { Roster } from './views/Roster'
+import { GroupDashboard } from './views/GroupDashboard'
 import { useAuth } from './auth/AuthContext'
 import { SignIn } from './auth/SignIn'
 
@@ -63,6 +69,18 @@ function renderView(view: ConsoleView) {
       return <FeedbackInbox />
     case 'campaigns':
       return <Campaigns />
+    case 'inventory':
+      return <Inventory />
+    case 'promotions':
+      return <Promotions />
+    case 'cash-loss':
+      return <CashLossView />
+    case 'staff-admin':
+      return <StaffAdmin />
+    case 'roster':
+      return <Roster />
+    case 'group':
+      return <GroupDashboard />
     default:
       return null
   }

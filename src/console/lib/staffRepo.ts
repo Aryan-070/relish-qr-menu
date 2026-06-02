@@ -39,6 +39,10 @@ function rowToStaff(row: StaffRow): Staff {
     role: row.role as Role,
     shift: row.shift as 'AM' | 'PM',
     hue: row.hue,
+    // RBAC fields aren't persisted in this legacy table yet; default to no
+    // explicit grants + active so the row satisfies the extended Staff type.
+    permissions: [],
+    active: true,
   }
 }
 

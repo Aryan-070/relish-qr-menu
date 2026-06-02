@@ -6,6 +6,7 @@ import { ItemDetail } from './screens/ItemDetail'
 import { AddToOrder } from './screens/AddToOrder'
 import { ServicePanel } from './screens/ServicePanel'
 import { OrderPanel } from './screens/OrderPanel'
+import { Checkout } from './screens/Checkout'
 import { useOrder } from './hooks/useOrder'
 import { type MenuItem, getCategoryForItem } from './data/menu'
 import { type SelectedModifier, selectionLabel, selectionUnitPrice } from './data/modifiers'
@@ -39,6 +40,12 @@ const LandingReel = lazy(() => import('./screens/LandingReel').then(m => ({ defa
 const MenuBooklet = lazy(() => import('./screens/MenuBooklet').then(m => ({ default: m.MenuBooklet })))
 const RecommendationFlow = lazy(() => import('./screens/RecommendationFlow').then(m => ({ default: m.RecommendationFlow })))
 const ConsoleApp = lazy(() => import('./console/ConsoleApp').then(m => ({ default: m.ConsoleApp })))
+const Kiosk = lazy(() => import('./screens/Kiosk').then(m => ({ default: m.Kiosk })))
+
+// Kiosk mode: a full-screen self-order station, activated by `?kiosk=1` in the
+// URL (read once at load — a kiosk is provisioned via its own URL).
+const KIOSK_MODE =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('kiosk') === '1'
 
 type Screen = 'cover' | 'menu' | 'recommend'
 type LandingVariant = 'classic' | 'gastronomique' | 'editorial' | 'botanica' | 'signature' | 'cinematic' | 'reel'
@@ -65,6 +72,10 @@ function AppInner() {
   const [addingItem, setAddingItem] = useState<{ item: MenuItem; label: string; unitPrice: number } | null>(null)
   const [waiterOpen, setWaiterOpen] = useState(false)
   const [orderOpen, setOrderOpen] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  // When the panel opens because the guest just paid, land it on feedback.
+  const [serviceInitialView, setServiceInitialView] = useState<'feedback' | undefined>(undefined)
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null)
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null)
   // Transient status the Dynamic Island flashes (placed/waiter) before settling
   // back to its derived cart/idle state.
@@ -88,8 +99,18 @@ function AppInner() {
     }
   }
 
-  // All hooks are declared above this point — keep the early return below them
-  // so hook order stays stable across guest/staff toggles (Rules of Hooks).
+  // All hooks are declared above this point — keep the early returns below them
+  // so hook order stays stable across guest/staff/kiosk toggles (Rules of Hooks).
+  if (KIOSK_MODE) {
+    return (
+      <div className="app-shell" data-ui-theme={theme}>
+        <Suspense fallback={null}>
+          <Kiosk />
+        </Suspense>
+      </div>
+    )
+  }
+
   if (appMode === 'staff') {
     return (
       <div className="app-shell console-shell" data-ui-theme={theme}>
@@ -107,7 +128,7 @@ function AppInner() {
 
   const goToRecommend = () => setScreen('recommend')
 
-  const openWaiter = () => { setWaiterOpen(true); flashIsland('waiter') }
+  const openWaiter = () => { setServiceInitialView(undefined); setWaiterOpen(true); flashIsland('waiter') }
 
   const handleItemTap = (item: MenuItem) => setSelectedItem(item)
 
@@ -156,8 +177,10 @@ function AppInner() {
       note: o.note,
     }))
     const seatedTable = ops.state.tables.find(t => t.id === GUEST_TABLE_ID)
+    const orderId = `ORD-${String(Date.now()).slice(-6)}`
+    setLastOrderId(orderId)
     const order: OrderRecord = {
-      id: `ORD-${String(Date.now()).slice(-6)}`,
+      id: orderId,
       tableId: GUEST_TABLE_ID,
       waiterId: seatedTable?.waiterId ?? '',
       placedAt: Date.now(),
@@ -173,6 +196,23 @@ function AppInner() {
     if (activeCustomerId) ops.adjustPoints(activeCustomerId, Math.floor(total / 10))
     // Cart is cleared when the panel closes (see OrderPanel onWaiter), so the
     // "Calling waiter…" confirmation animation still has items to show.
+  }
+
+  // Open the pay-at-table checkout for the current cart/bill.
+  const handleOpenCheckout = () => {
+    if (orderItems.length === 0) return
+    setOrderOpen(false)
+    setTimeout(() => setCheckoutOpen(true), 80)
+  }
+
+  // Payment succeeded: mark the table's orders paid, clear the cart, then route
+  // the guest into the post-pay feedback flow (the Sunday review pattern).
+  const handlePaid = () => {
+    ops.payTables([GUEST_TABLE_ID])
+    clear()
+    setCheckoutOpen(false)
+    setServiceInitialView('feedback')
+    setTimeout(() => setWaiterOpen(true), 120)
   }
 
   return (
@@ -300,13 +340,26 @@ function AppInner() {
         onUpdateQty={updateQuantity}
         onUpdateNote={updateNote}
         onPlaceOrder={handlePlaceOrder}
+        onCheckout={handleOpenCheckout}
         onWaiter={() => { setOrderOpen(false); clear(); setTimeout(openWaiter, 80) }}
+      />
+
+      {/* Pay-at-table checkout — settle the bill from the guest's phone */}
+      <Checkout
+        open={checkoutOpen}
+        items={orderItems}
+        subtotal={total}
+        reference={lastOrderId ?? `ORD-${GUEST_TABLE_ID}`}
+        onClose={() => setCheckoutOpen(false)}
+        onPaid={handlePaid}
+        onAddUpsell={(item) => addItem(item)}
       />
 
       {/* Service panel — replaces WaiterPanel */}
       <ServicePanel
         open={waiterOpen}
-        onClose={() => setWaiterOpen(false)}
+        initialView={serviceInitialView}
+        onClose={() => { setWaiterOpen(false); setServiceInitialView(undefined) }}
         onRecommend={() => { setWaiterOpen(false); setTimeout(goToRecommend, 80) }}
         onOpenMenu={() => { setWaiterOpen(false); setTimeout(goToMenu, 80) }}
         onViewOrder={() => { setWaiterOpen(false); setTimeout(() => setOrderOpen(true), 80) }}

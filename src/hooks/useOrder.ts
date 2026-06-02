@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { type MenuItem } from '../data/menu'
 import {
   type SelectedModifier,
@@ -22,8 +22,33 @@ export interface OrderItem {
   lineId: string
 }
 
+const CART_STORAGE_KEY = 'relish.cart.v1'
+
+/** SSR-safe, parse-guarded read of the persisted cart. Returns [] on any failure. */
+function loadStoredCart(): OrderItem[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(CART_STORAGE_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed as OrderItem[]
+  } catch {
+    return []
+  }
+}
+
 export function useOrder() {
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([])
+  const [orderItems, setOrderItems] = useState<OrderItem[]>(loadStoredCart)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(orderItems))
+    } catch {
+      // Storage unavailable (private mode / quota) — degrade silently.
+    }
+  }, [orderItems])
 
   const addItem = useCallback((item: MenuItem, modifiers: SelectedModifier[] = []) => {
     const lineId = selectionKey(item.id, modifiers)
@@ -94,7 +119,16 @@ export function useOrder() {
     setOrderItems(prev => prev.map(o => (o.lineId === lineId ? { ...o, note } : o)))
   }, [])
 
-  const clear = useCallback(() => setOrderItems([]), [])
+  const clear = useCallback(() => {
+    setOrderItems([])
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem(CART_STORAGE_KEY)
+      } catch {
+        // Storage unavailable — nothing to clear.
+      }
+    }
+  }, [])
 
   const total = useMemo(
     () => orderItems.reduce((sum, o) => sum + o.unitPrice * o.quantity, 0),

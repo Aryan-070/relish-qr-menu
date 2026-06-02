@@ -34,6 +34,8 @@ export interface OrderLine {
   modifiers?: string
   /** Free-text kitchen note from the guest. */
   note?: string
+  /** Seat number this line is assigned to (for by-seat splits). */
+  seat?: number
 }
 
 /** Kitchen ticket lifecycle, driven from the KDS. */
@@ -51,7 +53,25 @@ export interface OrderRecord {
   status?: OrderStatus
   /** Channel the order came from — distinguishes guest scan-to-order from staff entry. */
   source?: 'guest' | 'staff'
+  /** Voided by staff (governance/audit). Excluded from revenue. */
+  voided?: boolean
+  /** Comped by staff (on the house). Excluded from revenue. */
+  comp?: boolean
+  /** Manager discount applied to this order, as a percentage (0–100). */
+  discountPct?: number
 }
+
+// ── RBAC / roster / multi-location (Phase 3) ────────────────────────────────
+/** Granular staff capabilities, gated per role and editable in Staff Admin. */
+export type Permission =
+  | 'void'
+  | 'comp'
+  | 'discount'
+  | 'refund'
+  | 'edit-menu'
+  | 'manage-stock'
+  | 'manage-staff'
+  | 'view-reports'
 
 export interface Staff {
   id: string // 'W1'
@@ -59,6 +79,40 @@ export interface Staff {
   role: Role
   shift: 'AM' | 'PM'
   hue: number // 0-360, drives the generated avatar tint
+  /** Granular permissions; defaults seeded by role (admin=all, manager=most, waiter=minimal). */
+  permissions: Permission[]
+  /** Whether the staff member is active (vs. deactivated). */
+  active: boolean
+  /** Optional contact email. */
+  email?: string
+}
+
+/** A scheduled shift for a staff member (roster). */
+export interface Shift {
+  id: string
+  staffId: string
+  date: number // epoch ms — day of the shift
+  startHour: number // 0–23
+  endHour: number // 0–23
+}
+
+/** A clock-in/clock-out record (attendance). */
+export interface Attendance {
+  id: string
+  staffId: string
+  clockIn: number // epoch ms
+  clockOut?: number // epoch ms — absent while still clocked in
+}
+
+/** A location/outlet in a multi-venue group. */
+export interface Outlet {
+  id: string
+  name: string
+  city: string
+  revenue: number // rupees
+  orders: number
+  staff: number
+  isCurrent: boolean
 }
 
 export type RequestType = 'waiter' | 'water' | 'bill' | 'assistance' | 'cleanup'
@@ -151,6 +205,10 @@ export interface EditableMenuItem {
   videoUrl?: string
   /** Extra marketing / dietary labels (see MENU_BADGES). */
   badges: string[]
+  /** Modifier/add-on groups attached to this item (e.g. size, extras). */
+  modifierGroups?: import('../../data/modifiers').ModifierGroup[]
+  /** Per-item GST/HSN rate as a percentage; falls back to 5 when absent. */
+  taxRatePct?: number
 }
 
 /** Selectable marketing / dietary labels for the menu editor. */
@@ -240,3 +298,89 @@ export const DATE_RANGES: DateRange[] = [
   { days: 14, label: 'Last 14 days' },
   { days: 30, label: 'Last 30 days' },
 ]
+
+// ── Governance / audit (Phase 1) ────────────────────────────────────────────
+export type AuditType = 'void' | 'comp' | 'discount' | 'merge' | 'transfer'
+
+export interface AuditEntry {
+  id: string
+  type: AuditType
+  orderId?: string
+  tableId?: string
+  amount?: number
+  reason: string
+  staffId?: string
+  createdAt: number
+}
+
+// ── Inventory / procurement (Phase 2) ───────────────────────────────────────
+export interface Ingredient {
+  id: string
+  name: string
+  unit: string
+  stock: number
+  lowThreshold: number
+  costPerUnit: number
+  supplierId?: string
+}
+
+export interface RecipeLine {
+  ingredientId: string
+  qty: number
+}
+
+export interface Recipe {
+  itemId: string
+  lines: RecipeLine[]
+}
+
+export interface Supplier {
+  id: string
+  name: string
+  phone?: string
+  email?: string
+}
+
+export type PoStatus = 'draft' | 'ordered' | 'received'
+
+export interface PurchaseOrder {
+  id: string
+  supplierId: string
+  lines: { ingredientId: string; qty: number; cost: number }[]
+  status: PoStatus
+  createdAt: number
+  receivedAt?: number
+}
+
+export interface WastageEntry {
+  id: string
+  ingredientId: string
+  qty: number
+  reason: string
+  createdAt: number
+}
+
+export interface StockMovement {
+  id: string
+  ingredientId: string
+  delta: number
+  reason: 'order' | 'purchase' | 'wastage' | 'adjust'
+  refId?: string
+  createdAt: number
+}
+
+// ── Promotions (Phase 2) ────────────────────────────────────────────────────
+export type PromoKind = 'percent' | 'flat' | 'coupon'
+
+export interface Promo {
+  id: string
+  name: string
+  kind: PromoKind
+  value: number
+  code?: string
+  singleUse?: boolean
+  active: boolean
+  startHour?: number
+  endHour?: number
+  createdAt: number
+}

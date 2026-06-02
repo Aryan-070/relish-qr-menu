@@ -4,19 +4,31 @@
 
 import { categories } from './menu'
 import type {
+  Attendance,
+  AuditEntry,
   Customer,
   EditableMenuItem,
   Feedback,
+  Ingredient,
   LoyaltyTier,
   OrderLine,
   OrderRecord,
+  Outlet,
+  Permission,
+  Promo,
+  PurchaseOrder,
+  Recipe,
   Reservation,
   ReservationStatus,
   ServiceRequest,
+  Shift,
   Staff,
+  StockMovement,
+  Supplier,
   Table,
   WaitlistEntry,
   WaitStatus,
+  WastageEntry,
   Zone,
 } from '../console/lib/types'
 import { packageById, makeInvoice, type BillingState, type Invoice } from '../console/lib/billing'
@@ -34,9 +46,20 @@ export interface OpsSeed {
   customers: Customer[]
   reservations: Reservation[]
   waitlist: WaitlistEntry[]
+  auditLog: AuditEntry[]
+  ingredients: Ingredient[]
+  recipes: Recipe[]
+  suppliers: Supplier[]
+  purchaseOrders: PurchaseOrder[]
+  wastage: WastageEntry[]
+  stockMovements: StockMovement[]
+  promos: Promo[]
+  shifts: Shift[]
+  attendance: Attendance[]
+  outlets: Outlet[]
 }
 
-export const OPS_VERSION = 4
+export const OPS_VERSION = 6
 const HISTORY_DAYS = 30
 const DAY_MS = 86_400_000
 
@@ -94,10 +117,35 @@ function buildMenu(): EditableMenuItem[] {
   )
 }
 
+// Default RBAC grants per role. Admin gets everything; managers get most
+// operational powers but cannot manage staff; waiters get a minimal floor set.
+const ALL_PERMISSIONS: Permission[] = [
+  'void', 'comp', 'discount', 'refund', 'edit-menu', 'manage-stock', 'manage-staff', 'view-reports',
+]
+const MANAGER_PERMISSIONS: Permission[] = [
+  'void', 'comp', 'discount', 'refund', 'edit-menu', 'manage-stock', 'view-reports',
+]
+const WAITER_PERMISSIONS: Permission[] = ['void']
+
+function permissionsForRole(role: Staff['role']): Permission[] {
+  if (role === 'admin') return [...ALL_PERMISSIONS]
+  if (role === 'manager') return [...MANAGER_PERMISSIONS]
+  return [...WAITER_PERMISSIONS]
+}
+
+const emailForName = (name: string): string =>
+  `${name.toLowerCase().replace(/[^a-z]+/g, '.')}@relish.in`
+
 function buildStaff(): Staff[] {
   const staff: Staff[] = [
-    { id: 'admin', name: 'Priya Nair', role: 'admin', shift: 'PM', hue: 348 },
-    { id: 'mgr', name: 'Vikram Rao', role: 'manager', shift: 'PM', hue: 38 },
+    {
+      id: 'admin', name: 'Priya Nair', role: 'admin', shift: 'PM', hue: 348,
+      permissions: permissionsForRole('admin'), active: true, email: emailForName('Priya Nair'),
+    },
+    {
+      id: 'mgr', name: 'Vikram Rao', role: 'manager', shift: 'PM', hue: 38,
+      permissions: permissionsForRole('manager'), active: true, email: emailForName('Vikram Rao'),
+    },
   ]
   WAITER_NAMES.forEach((name, i) => {
     staff.push({
@@ -106,6 +154,9 @@ function buildStaff(): Staff[] {
       role: 'waiter',
       shift: i % 2 === 0 ? 'AM' : 'PM',
       hue: Math.round((i / WAITER_NAMES.length) * 320) + 10,
+      permissions: permissionsForRole('waiter'),
+      active: true,
+      email: emailForName(name),
     })
   })
   return staff
@@ -382,6 +433,258 @@ function buildFeedback(rng: () => number, now: number, tables: Table[]): Feedbac
   }).sort((a, b) => b.createdAt - a.createdAt)
 }
 
+// ── Inventory / procurement / promotions / audit seed data ──────────────────
+// Ingredient ids are stable string keys referenced by recipes, purchase orders,
+// wastage and stock movements. Stock/threshold/cost are whole numbers; cost is
+// in whole rupees per `unit` (major units, matching the rest of the app).
+interface IngredientSpec {
+  id: string
+  name: string
+  unit: string
+  stock: number
+  lowThreshold: number
+  costPerUnit: number
+  supplierId: string
+}
+
+// A couple are seeded deliberately close to (or at) their low threshold so the
+// low-stock UI always has something to surface — paneer & coffee beans below,
+// basil exactly at threshold.
+const INGREDIENT_SPECS: IngredientSpec[] = [
+  { id: 'ing-paneer', name: 'Paneer', unit: 'kg', stock: 3, lowThreshold: 4, costPerUnit: 320, supplierId: 'sup-001' },
+  { id: 'ing-tomato', name: 'Tomato', unit: 'kg', stock: 42, lowThreshold: 10, costPerUnit: 40, supplierId: 'sup-001' },
+  { id: 'ing-flour', name: 'Refined Flour', unit: 'kg', stock: 60, lowThreshold: 15, costPerUnit: 45, supplierId: 'sup-002' },
+  { id: 'ing-cheese', name: 'Mozzarella Cheese', unit: 'kg', stock: 9, lowThreshold: 5, costPerUnit: 520, supplierId: 'sup-001' },
+  { id: 'ing-coffee', name: 'Coffee Beans', unit: 'kg', stock: 2, lowThreshold: 3, costPerUnit: 900, supplierId: 'sup-003' },
+  { id: 'ing-milk', name: 'Milk', unit: 'ltr', stock: 55, lowThreshold: 20, costPerUnit: 60, supplierId: 'sup-001' },
+  { id: 'ing-basil', name: 'Fresh Basil', unit: 'kg', stock: 2, lowThreshold: 2, costPerUnit: 280, supplierId: 'sup-001' },
+  { id: 'ing-pasta', name: 'Pasta', unit: 'kg', stock: 34, lowThreshold: 10, costPerUnit: 130, supplierId: 'sup-002' },
+  { id: 'ing-sugar', name: 'Sugar', unit: 'kg', stock: 48, lowThreshold: 12, costPerUnit: 50, supplierId: 'sup-002' },
+  { id: 'ing-mushroom', name: 'Mushroom', unit: 'kg', stock: 11, lowThreshold: 6, costPerUnit: 240, supplierId: 'sup-001' },
+  { id: 'ing-corn', name: 'Sweet Corn', unit: 'kg', stock: 18, lowThreshold: 5, costPerUnit: 90, supplierId: 'sup-001' },
+  { id: 'ing-mango', name: 'Mango Pulp', unit: 'ltr', stock: 14, lowThreshold: 6, costPerUnit: 180, supplierId: 'sup-003' },
+]
+
+function buildSuppliers(): Supplier[] {
+  return [
+    { id: 'sup-001', name: 'FreshFarm Produce Co.', phone: '+91 98200 11223', email: 'orders@freshfarm.in' },
+    { id: 'sup-002', name: 'Grainhouse Distributors', phone: '+91 98200 44556', email: 'sales@grainhouse.in' },
+    { id: 'sup-003', name: 'Roast & Pulp Traders', phone: '+91 98200 77889', email: 'hello@roastpulp.in' },
+  ]
+}
+
+function buildIngredients(): Ingredient[] {
+  return INGREDIENT_SPECS.map(s => ({
+    id: s.id,
+    name: s.name,
+    unit: s.unit,
+    stock: s.stock,
+    lowThreshold: s.lowThreshold,
+    costPerUnit: s.costPerUnit,
+    supplierId: s.supplierId,
+  }))
+}
+
+// Bill-of-materials for a representative spread of dishes. Quantities are per
+// single serving, in the ingredient's own `unit`. Item ids come straight from
+// buildMenu (./menu categories) so they always resolve.
+function buildRecipes(): Recipe[] {
+  return [
+    { itemId: 'qb-005', lines: [{ ingredientId: 'ing-paneer', qty: 0.18 }, { ingredientId: 'ing-tomato', qty: 0.05 }] }, // Paneer Tikka
+    { itemId: 'qb-004', lines: [{ ingredientId: 'ing-flour', qty: 0.12 }, { ingredientId: 'ing-cheese', qty: 0.08 }] }, // Cheesy Garlic Bread
+    { itemId: 'ita-004', lines: [{ ingredientId: 'ing-flour', qty: 0.2 }, { ingredientId: 'ing-cheese', qty: 0.12 }, { ingredientId: 'ing-tomato', qty: 0.1 }, { ingredientId: 'ing-basil', qty: 0.01 }] }, // Margherita Pizza
+    { itemId: 'ita-001', lines: [{ ingredientId: 'ing-pasta', qty: 0.15 }, { ingredientId: 'ing-tomato', qty: 0.12 }] }, // Pasta Arrabbiata
+    { itemId: 'ita-006', lines: [{ ingredientId: 'ing-mushroom', qty: 0.1 }, { ingredientId: 'ing-milk', qty: 0.08 }] }, // Risotto ai Funghi
+    { itemId: 'soup-001', lines: [{ ingredientId: 'ing-tomato', qty: 0.2 }, { ingredientId: 'ing-basil', qty: 0.01 }] }, // Tomato Basil Bisque
+    { itemId: 'soup-002', lines: [{ ingredientId: 'ing-corn', qty: 0.12 }, { ingredientId: 'ing-milk', qty: 0.05 }] }, // Sweet Corn Soup
+    { itemId: 'bev-003', lines: [{ ingredientId: 'ing-coffee', qty: 0.02 }, { ingredientId: 'ing-milk', qty: 0.2 }, { ingredientId: 'ing-sugar', qty: 0.02 }] }, // Cold Coffee
+  ]
+}
+
+function buildPromos(now: number): Promo[] {
+  return [
+    {
+      id: 'promo-happyhour',
+      name: 'Happy Hour 20% Off',
+      kind: 'percent',
+      value: 20,
+      active: true,
+      startHour: 16,
+      endHour: 19,
+      createdAt: now - 40 * DAY_MS,
+    },
+    {
+      id: 'promo-flat100',
+      name: 'Flat ₹100 Off (orders above ₹999)',
+      kind: 'flat',
+      value: 100,
+      active: true,
+      createdAt: now - 22 * DAY_MS,
+    },
+    {
+      id: 'promo-welcome',
+      name: 'Welcome Coupon',
+      kind: 'coupon',
+      value: 15,
+      code: 'RELISH15',
+      singleUse: true,
+      active: false,
+      createdAt: now - 10 * DAY_MS,
+    },
+  ]
+}
+
+function buildPurchaseOrders(rng: () => number, now: number): PurchaseOrder[] {
+  const orders: PurchaseOrder[] = [
+    {
+      id: 'po-0001',
+      supplierId: 'sup-001',
+      lines: [
+        { ingredientId: 'ing-paneer', qty: 10, cost: 320 },
+        { ingredientId: 'ing-cheese', qty: 6, cost: 520 },
+        { ingredientId: 'ing-tomato', qty: 25, cost: 40 },
+      ],
+      status: 'received',
+      createdAt: now - randInt(rng, 6, 9) * DAY_MS,
+      receivedAt: now - randInt(rng, 3, 5) * DAY_MS,
+    },
+    {
+      id: 'po-0002',
+      supplierId: 'sup-003',
+      lines: [
+        { ingredientId: 'ing-coffee', qty: 5, cost: 900 },
+        { ingredientId: 'ing-mango', qty: 12, cost: 180 },
+      ],
+      status: 'ordered',
+      createdAt: now - randInt(rng, 1, 2) * DAY_MS,
+    },
+  ]
+  return orders
+}
+
+function buildWastage(rng: () => number, now: number): WastageEntry[] {
+  return [
+    {
+      id: 'waste-0001',
+      ingredientId: 'ing-tomato',
+      qty: 2,
+      reason: 'Overripe — discarded at close',
+      createdAt: now - randInt(rng, 1, 3) * DAY_MS,
+    },
+    {
+      id: 'waste-0002',
+      ingredientId: 'ing-milk',
+      qty: 3,
+      reason: 'Spoiled — fridge temperature excursion',
+      createdAt: now - randInt(rng, 0, 1) * DAY_MS - randInt(rng, 1, 8) * 3_600_000,
+    },
+  ]
+}
+
+function buildAudit(rng: () => number, now: number, orders: OrderRecord[], staffIds: string[]): AuditEntry[] {
+  const paid = orders.filter(o => o.paid)
+  const sample = (i: number): OrderRecord | undefined => paid[Math.floor(rng() * paid.length) + i] ?? paid[0]
+  const o1 = sample(0)
+  const o2 = sample(1)
+  const o3 = sample(2)
+  const staff = (i: number): string => staffIds[i % staffIds.length]
+  const entries: AuditEntry[] = [
+    {
+      id: 'aud-0001',
+      type: 'void',
+      orderId: o1?.id,
+      tableId: o1?.tableId,
+      amount: o1?.total,
+      reason: 'Wrong item fired to kitchen',
+      staffId: staff(0),
+      createdAt: now - randInt(rng, 1, 4) * DAY_MS,
+    },
+    {
+      id: 'aud-0002',
+      type: 'comp',
+      orderId: o2?.id,
+      tableId: o2?.tableId,
+      amount: o2?.total,
+      reason: 'Guest waited too long — manager comp',
+      staffId: staff(1),
+      createdAt: now - randInt(rng, 0, 2) * DAY_MS - randInt(rng, 1, 12) * 3_600_000,
+    },
+    {
+      id: 'aud-0003',
+      type: 'discount',
+      orderId: o3?.id,
+      tableId: o3?.tableId,
+      amount: o3 ? Math.round(o3.total * 0.1) : undefined,
+      reason: 'Loyalty 10% courtesy discount',
+      staffId: staff(2),
+      createdAt: now - randInt(rng, 0, 1) * DAY_MS - randInt(rng, 1, 6) * 3_600_000,
+    },
+  ]
+  return entries.sort((a, b) => b.createdAt - a.createdAt)
+}
+
+// ── Multi-location / roster / attendance seed data (Phase 3) ────────────────
+// Three outlets for the Group dashboard; the first is the currently-active one
+// (matching the rest of the seeded single-location dataset).
+function buildOutlets(): Outlet[] {
+  return [
+    { id: 'out-mumbai', name: 'Relish — Bandra', city: 'Mumbai', revenue: 1_842_000, orders: 4120, staff: 18, isCurrent: true },
+    { id: 'out-pune', name: 'Relish — Koregaon Park', city: 'Pune', revenue: 1_206_500, orders: 2980, staff: 13, isCurrent: false },
+    { id: 'out-bengaluru', name: 'Relish — Indiranagar', city: 'Bengaluru', revenue: 2_310_750, orders: 5240, staff: 22, isCurrent: false },
+  ]
+}
+
+// This-week roster: each staff member gets one shift per working day, with
+// AM/PM windows derived from their assigned shift. Monday-anchored.
+function buildShifts(rng: () => number, now: number, staff: Staff[]): Shift[] {
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  // Rewind to Monday of the current week (getDay: 0=Sun … 6=Sat).
+  const dow = start.getDay()
+  const mondayOffset = (dow + 6) % 7
+  const monday = start.getTime() - mondayOffset * DAY_MS
+
+  const shifts: Shift[] = []
+  let seq = 0
+  staff.forEach(s => {
+    if (!s.active) return
+    for (let d = 0; d < 6; d++) {
+      // Most staff work the bulk of the week; skip the odd day for variety.
+      if (rng() < 0.15) continue
+      const am = s.shift === 'AM'
+      seq += 1
+      shifts.push({
+        id: `shift-${String(seq).padStart(4, '0')}`,
+        staffId: s.id,
+        date: monday + d * DAY_MS,
+        startHour: am ? 9 : 16,
+        endHour: am ? 17 : 24,
+      })
+    }
+  })
+  return shifts
+}
+
+// A handful of live/closed attendance records for today: some staff clocked in
+// (still on the floor), a couple already clocked out.
+function buildAttendance(rng: () => number, now: number, staff: Staff[]): Attendance[] {
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  const todayMs = start.getTime()
+  const active = staff.filter(s => s.active)
+  const sample = active.slice(0, Math.min(active.length, 5))
+  return sample.map((s, i) => {
+    const clockIn = todayMs + (8 + randInt(rng, 0, 2)) * 3_600_000 + randInt(rng, 0, 59) * 60_000
+    const closed = i >= sample.length - 2 // last two have clocked out
+    return {
+      id: `att-${String(i + 1).padStart(4, '0')}`,
+      staffId: s.id,
+      clockIn,
+      clockOut: closed ? clockIn + randInt(rng, 5, 9) * 3_600_000 : undefined,
+    }
+  })
+}
+
 export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
   const rng = mulberry32(seed)
   const now = Date.now()
@@ -392,6 +695,7 @@ export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
   const orders = buildOrders(rng, menu, tables, waiterIds)
   const requests = buildRequests(rng, tables, waiterIds)
   const billing = buildBilling()
+  const staffIds = staff.map(s => s.id)
   return {
     version: OPS_VERSION,
     generatedAt: now,
@@ -405,5 +709,16 @@ export function generateOpsSeed(seed = 0x5e11a9): OpsSeed {
     customers: buildCustomers(rng, now),
     reservations: buildReservations(rng, now, tables),
     waitlist: buildWaitlist(rng, now),
+    auditLog: buildAudit(rng, now, orders, staffIds),
+    ingredients: buildIngredients(),
+    recipes: buildRecipes(),
+    suppliers: buildSuppliers(),
+    purchaseOrders: buildPurchaseOrders(rng, now),
+    wastage: buildWastage(rng, now),
+    stockMovements: [],
+    promos: buildPromos(now),
+    shifts: buildShifts(rng, now, staff),
+    attendance: buildAttendance(rng, now, staff),
+    outlets: buildOutlets(),
   }
 }

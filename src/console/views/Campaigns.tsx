@@ -23,6 +23,7 @@ import { SegmentedControl } from '../components/SegmentedControl'
 import { useToast } from '../components/Toast'
 import { isHard } from '../lib/skin'
 import { inr } from '../lib/format'
+import { getNotifyProvider } from '../../lib/notify'
 import { fadeUp, stagger } from '../../animations/variants'
 import type { StatusStyle } from '../lib/statusColors'
 import type { Customer, LoyaltyTier } from '../lib/types'
@@ -172,6 +173,7 @@ export function Campaigns() {
   const [autos, setAutos] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(AUTOMATIONS.map(a => [a.id, a.defaultOn])),
   )
+  const [sending, setSending] = useState(false)
 
   const now = Date.now()
 
@@ -183,15 +185,47 @@ export function Campaigns() {
   const channelMeta = CHANNEL_META[channel]
   const trimmed = message.trim()
   const overLimit = message.length > channelMeta.limit
-  const canSend = audience.length > 0 && trimmed.length > 0 && !overLimit
+  const canSend = audience.length > 0 && trimmed.length > 0 && !overLimit && !sending
 
   const applyTemplate = (tpl: Template) => {
     setMessage(tpl.body)
   }
 
-  const send = () => {
+  const send = async () => {
     if (!canSend) return
-    push(`Queued to ${audience.length} ${audience.length === 1 ? 'customer' : 'customers'} via ${channelMeta.label} (demo)`, 'success')
+    setSending(true)
+    const provider = getNotifyProvider()
+    // Subject only carries for email; channel is used as-is (ChannelId ⊆ NotifyChannel).
+    const subject = channel === 'email' ? 'A message from Relish' : undefined
+    try {
+      const results = await Promise.all(
+        audience.map(c =>
+          provider.send({
+            channel,
+            to: c.id,
+            body: trimmed.replace(/\{name\}/g, c.name),
+            subject,
+          }),
+        ),
+      )
+      const sent = results.filter(r => r.ok).length
+      const failed = results.length - sent
+      if (failed > 0) {
+        push(
+          `Sent to ${sent} of ${results.length} via ${channelMeta.label} — ${failed} failed (demo)`,
+          'info',
+        )
+      } else {
+        push(
+          `Sent to ${sent} ${sent === 1 ? 'customer' : 'customers'} via ${channelMeta.label} (demo)`,
+          'success',
+        )
+      }
+    } catch {
+      push('Send failed — please try again (demo)', 'warn')
+    } finally {
+      setSending(false)
+    }
   }
 
   const toggleAuto = (a: AutomationDef) => {
@@ -323,7 +357,8 @@ export function Campaigns() {
                   No messages are actually sent — this is a demo surface.
                 </p>
                 <Button variant="primary" size="md" onClick={send} disabled={!canSend}>
-                  <Send size={15} aria-hidden /> Send to {audience.length} via {channelMeta.label}
+                  <Send size={15} aria-hidden />{' '}
+                  {sending ? 'Sending…' : `Send to ${audience.length} via ${channelMeta.label}`}
                 </Button>
               </div>
             </div>
