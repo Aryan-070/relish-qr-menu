@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Sparkles, ArrowRight } from 'lucide-react'
 import { Chip } from '../components/atoms/Chip'
@@ -37,10 +37,13 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
   const currentSelections: string[] = selections[currentKey]
   const hasSelection = currentSelections.length > 0
 
-  const finalAnswers: RecommendationAnswers | null =
-    selections.moods.length > 0 || selections.partySizes.length > 0
-      ? { moods: selections.moods, partySizes: selections.partySizes }
-      : null
+  const finalAnswers: RecommendationAnswers | null = useMemo(
+    () =>
+      selections.moods.length > 0 || selections.partySizes.length > 0
+        ? { moods: selections.moods, partySizes: selections.partySizes }
+        : null,
+    [selections.moods, selections.partySizes],
+  )
 
   const results = useRecommendation(finalAnswers)
 
@@ -67,7 +70,7 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
   }
 
   return (
-    <div className="flex flex-col paper-bg" style={{ height: '100dvh', overflow: 'hidden' }}>
+    <div className="flex flex-col paper-bg" style={{ height: '100%', overflow: 'hidden' }}>
       {/* Header — fixed */}
       <div
         className="flex items-center gap-3 px-4 py-3 flex-shrink-0"

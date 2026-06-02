@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Relish — QR Menu Experience</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF7F0; --paper2:#F4ECDD; --ink:#2A1A18; --ink2:#5A4842;
+    --maroon:#6E1F2C; --maroon2:#8A2A38; --gold:#C0982F; --gold2:#E3C868;
+    --line:#E3D7C2;
+  }
+  *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  html,body{margin:0; padding:0;}
+  body{font-family:'Inter',sans-serif; color:var(--ink); background:var(--paper); font-size:11pt; line-height:1.5;}
+  h1,h2,h3{font-family:'Playfair Display',serif; margin:0; line-height:1.12;}
+  .page{width:210mm; height:296mm; padding:18mm 16mm; position:relative; page-break-after:always; overflow:hidden;}
+  .page:last-child{page-break-after:auto;}
+  @page{size:A4; margin:0;}
+
+  /* COVER */
+  .cover{background:radial-gradient(120% 80% at 70% 10%, #3a0d16 0%, #2a0810 45%, #190308 100%); color:#F4ECDD; display:flex; flex-direction:column; justify-content:space-between;}
+  .cover .kick{font-family:'Inter'; letter-spacing:.42em; font-size:9pt; text-transform:uppercase; color:var(--gold2); font-weight:600;}
+  .cover h1{font-size:74pt; font-weight:900; color:#fff; margin:6mm 0 0; letter-spacing:.01em;}
+  .cover .sub{font-family:'Cormorant Garamond'; font-style:italic; font-size:21pt; color:var(--gold2); margin-top:3mm;}
+  .cover .rule{height:2px; width:46mm; background:linear-gradient(90deg,var(--gold) 0%, transparent 100%); margin:10mm 0;}
+  .cover .promise{font-size:15pt; line-height:1.55; max-width:130mm; color:#EADFC9;}
+  .cover .foot{display:flex; justify-content:space-between; align-items:flex-end; font-size:9.5pt; color:#CDB98F; letter-spacing:.04em;}
+  .brackets{font-size:9pt; letter-spacing:.3em; color:var(--gold2);}
+
+  /* SECTION CHROME */
+  .eyebrow{font-size:8.5pt; letter-spacing:.34em; text-transform:uppercase; color:var(--maroon); font-weight:700; margin-bottom:4mm;}
+  h2.title{font-size:30pt; color:var(--maroon); font-weight:800;}
+  .lead{font-family:'Cormorant Garamond'; font-style:italic; font-size:16pt; color:var(--ink2); margin:3mm 0 8mm;}
+  .gold-rule{height:3px; width:30mm; background:var(--gold); margin:0 0 7mm;}
+
+  /* PILLARS */
+  .pillars{display:flex; flex-direction:column; gap:5mm; margin-top:2mm;}
+  .pillar{display:flex; gap:6mm; padding:6mm 7mm; background:var(--paper2); border-left:4px solid var(--gold); border-radius:2mm;}
+  .pillar .num{font-family:'Playfair Display'; font-size:26pt; font-weight:700; color:var(--maroon); opacity:.55; min-width:16mm;}
+  .pillar h3{font-size:15pt; color:var(--ink); margin-bottom:1.5mm;}
+  .pillar p{margin:0; font-size:10.5pt; color:var(--ink2);}
+
+  /* PROBLEM band */
+  .band{background:var(--maroon); color:#F4ECDD; border-radius:3mm; padding:8mm 9mm; margin:6mm 0;}
+  .band h3{color:#fff; font-size:17pt; margin-bottom:3mm;}
+  .band p{margin:0; color:#EAD9C4; font-size:11pt;}
+
+  /* FEATURE GRID */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:6mm;}
+  .fcard{background:#fff; border:1px solid var(--line); border-radius:3mm; padding:6mm 7mm;}
+  .fcard h3{font-size:14pt; color:var(--maroon); margin-bottom:3mm;}
+  .fcard ul{margin:0; padding-left:0; list-style:none;}
+  .fcard li{font-size:10pt; color:var(--ink2); padding:1.6mm 0 1.6mm 7mm; position:relative; border-bottom:1px dashed var(--line);}
+  .fcard li:last-child{border-bottom:none;}
+  .fcard li::before{content:"◆"; color:var(--gold); position:absolute; left:0; font-size:8pt; top:2.4mm;}
+
+  /* PRICING */
+  .tiers{display:grid; grid-template-columns:repeat(4,1fr); gap:3.5mm; margin-top:3mm;}
+  .tier{background:#fff; border:1px solid var(--line); border-radius:3mm; padding:5mm 3.8mm; display:flex; flex-direction:column;}
+  .tier.featured{background:var(--maroon); color:#F4ECDD; border-color:var(--maroon); box-shadow:0 5mm 12mm rgba(110,31,44,.18);}
+  .tier .tname{font-family:'Playfair Display'; font-size:13.5pt; font-weight:700; color:var(--maroon);}
+  .tier.featured .tname{color:var(--gold2);}
+  .tier .badge{display:inline-block; font-size:6pt; letter-spacing:.14em; background:var(--gold); color:#2a0810; padding:.8mm 2mm; border-radius:5px; font-weight:700; margin-bottom:1.5mm; width:max-content;}
+  .tier .price{font-family:'Playfair Display'; font-size:20pt; font-weight:800; margin:1.5mm 0 0;}
+  .tier .price small{display:block; font-size:7pt; font-weight:500; opacity:.7; margin-top:.8mm; letter-spacing:.1em; text-transform:uppercase;}
+  .tier .annual{font-size:7.8pt; color:var(--ink2); margin-bottom:2.5mm;}
+  .tier.featured .annual{color:#E0C9A8;}
+  .tier ul{list-style:none; margin:2.5mm 0 0; padding:0;}
+  .tier li{font-size:7.8pt; line-height:1.3; padding:1.3mm 0 1.3mm 4mm; position:relative; border-top:1px solid var(--line);}
+  .tier.featured li{border-top:1px solid rgba(255,255,255,.14);}
+  .tier li::before{content:"✓"; color:var(--gold); position:absolute; left:0; font-weight:700;}
+  .ent{margin-top:5mm; background:var(--paper2); border:1px dashed var(--maroon); border-radius:3mm; padding:5mm 7mm; display:flex; justify-content:space-between; align-items:center;}
+  .ent h3{font-size:14pt; color:var(--maroon);}
+  .ent .p{font-family:'Playfair Display'; font-size:15pt; color:var(--ink); font-weight:700;}
+  .note{font-size:8.5pt; color:var(--ink2); margin-top:4mm;}
+
+  /* VIDEO */
+  .vrow{display:grid; grid-template-columns:repeat(4,1fr); gap:4mm; margin-top:3mm;}
+  .vcard{background:linear-gradient(160deg,#2a0810,#4a121f); color:#F4ECDD; border-radius:3mm; padding:5mm; text-align:center;}
+  .vcard .vt{font-size:10.5pt; color:var(--gold2); font-weight:600; font-family:'Inter'; margin-bottom:2mm; min-height:11mm;}
+  .vcard .vp{font-family:'Playfair Display'; font-size:18pt; font-weight:700;}
+  .vsub{font-size:8.5pt; color:#D8C3A0;}
+  table.addon{width:100%; border-collapse:collapse; margin-top:5mm; font-size:10pt;}
+  table.addon th{background:var(--maroon); color:#fff; text-align:left; padding:3mm 4mm; font-weight:600; font-size:9.5pt;}
+  table.addon td{padding:3mm 4mm; border-bottom:1px solid var(--line);}
+  table.addon tr:nth-child(even) td{background:var(--paper2);}
+
+  /* STEPS / CTA */
+  .steps{display:grid; grid-template-columns:repeat(4,1fr); gap:4mm; margin-top:3mm;}
+  .step{text-align:center;}
+  .step .sn{width:13mm; height:13mm; border-radius:50%; background:var(--maroon); color:var(--gold2); font-family:'Playfair Display'; font-size:16pt; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 3mm;}
+  .step h3{font-size:11.5pt; color:var(--ink); margin-bottom:1.5mm;}
+  .step p{font-size:9pt; color:var(--ink2); margin:0;}
+  .cta{margin-top:auto; background:radial-gradient(120% 120% at 50% 0%, #3a0d16, #190308); color:#F4ECDD; border-radius:4mm; padding:11mm 9mm; text-align:center;}
+  .cta h2{font-size:26pt; color:#fff;}
+  .cta .g{font-family:'Cormorant Garamond'; font-style:italic; color:var(--gold2); font-size:15pt; margin:3mm 0 6mm;}
+  .cta .pill{display:inline-block; background:var(--gold); color:#2a0810; font-weight:700; padding:3.5mm 8mm; border-radius:30px; letter-spacing:.04em; font-size:11pt;}
+  .cta .contact{margin-top:6mm; font-size:9.5pt; color:#CDB98F; letter-spacing:.05em;}
+
+  .footer-tag{position:absolute; bottom:9mm; left:16mm; right:16mm; display:flex; justify-content:space-between; font-size:7.5pt; letter-spacing:.18em; text-transform:uppercase; color:#B3A488; border-top:1px solid var(--line); padding-top:3mm;}
+  .gst{font-size:8pt; color:var(--ink2); margin-top:2mm; font-style:italic;}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<section class="page cover">
+  <div>
+    <div class="brackets">⌜ &nbsp; EST. 2018 &nbsp; ⌝</div>
+    <div class="kick" style="margin-top:8mm;">Relish · International Veg Cuisine</div>
+    <h1>RELISH</h1>
+    <div class="sub">the cinematic QR menu experience</div>
+    <div class="rule"></div>
+    <div class="promise">Turn your menu into a cinematic, AI-guided experience — and your floor into a data-driven operation. Live in days. Priced for India.</div>
+  </div>
+  <div class="foot">
+    <span>A premium digital-menu platform for modern restaurants</span>
+    <span>2026 · Product &amp; Pricing Brochure</span>
+  </div>
+</section>
+
+<!-- THE PROBLEM + EXPERIENCE -->
+<section class="page">
+  <div class="eyebrow">Why restaurants switch to Relish</div>
+  <h2 class="title">A printed menu is a missed opportunity.</h2>
+  <div class="gold-rule"></div>
+  <div class="band">
+    <h3>The status quo costs you, every cover</h3>
+    <p>Static printed menus can't show the dish. Specials change but reprints lag. Guests wait for a waiter to ask a question. And at the end of the night, you have no data on what sold, when, or why. Relish fixes all four — on the phone already in your guest's hand.</p>
+  </div>
+  <div class="eyebrow" style="margin-top:7mm;">The Relish experience — five pillars</div>
+  <div class="pillars">
+    <div class="pillar"><div class="num">01</div><div><h3>Cinematic guest experience</h3><p>Seven designer themes, a GSAP hero film, and per-dish video. Guests feel the brand before the first bite.</p></div></div>
+    <div class="pillar"><div class="num">02</div><div><h3>AI that upsells for you</h3><p>A mood / budget / party-size recommender suggests the right dishes and raises average check — with zero staff effort.</p></div></div>
+    <div class="pillar"><div class="num">03</div><div><h3>Tableside service, digitized</h3><p>Call waiter, request water, split the bill, add gratuity, see Jain &amp; allergy info — fewer wait-times, happier tables.</p></div></div>
+    <div class="pillar"><div class="num">04</div><div><h3>A back-office that pays for itself</h3><p>Live floor map, full menu control, and real analytics: peak hours, top items, category mix, staff performance.</p></div></div>
+    <div class="pillar"><div class="num">05</div><div><h3>Premium, but priced for India</h3><p>One all-in fee from ₹15,000, then a yearly renewal. No POS rip-out, no app to download. Your guests just scan.</p></div></div>
+  </div>
+  <div class="footer-tag"><span>Relish · The cinematic QR menu</span><span>02</span></div>
+</section>
+
+<!-- FEATURE GRID -->
+<section class="page">
+  <div class="eyebrow">Everything in the box</div>
+  <h2 class="title">Two products, one platform.</h2>
+  <div class="gold-rule"></div>
+  <p class="lead">A guest-facing menu your customers love, and an operations console your staff runs the floor with.</p>
+  <div class="grid2">
+    <div class="fcard">
+      <h3>Guest QR App</h3>
+      <ul>
+        <li>7 landing &amp; hero themes (classic to editorial)</li>
+        <li>Full menu booklet with category navigation</li>
+        <li>Item detail sheets — photo, pairings, customizations</li>
+        <li>AI recommendation flow (mood · party · budget)</li>
+        <li>Cart &amp; order review</li>
+        <li>Service panel: waiter, water, split bill, gratuity</li>
+        <li>Jain / veg / allergy &amp; spice labelling</li>
+        <li>Per-dish &amp; per-screen cinematic video</li>
+        <li>3 switchable visual themes, mobile-first</li>
+        <li>Works on any phone — no app download</li>
+      </ul>
+    </div>
+    <div class="fcard">
+      <h3>Staff Operations Console</h3>
+      <ul>
+        <li>Admin dashboard — revenue, orders, avg check, turns</li>
+        <li>Charts: revenue trend, top items, category mix</li>
+        <li>Peak-hour heatmap &amp; busiest-tables table</li>
+        <li>Manager floor plan — 16 tables, 4 zones, live status</li>
+        <li>Menu manager — full CRUD, sold-out toggles</li>
+        <li>Staff performance — orders &amp; avg per waiter</li>
+        <li>Waiter views — my tables, service queue, billing</li>
+        <li>Print-ready receipts &amp; order history</li>
+        <li>Role-based access: admin · manager · waiter</li>
+        <li>Reports centre with date-range filtering</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">Live from day one: the full guest menu and the staff dashboard on your device. Cloud sync across devices, real-time order push, multi-location, POS integration and single sign-on roll out during onboarding or on Enterprise — your account manager confirms exactly what's live for your plan.</p>
+  <div class="footer-tag"><span>Relish · Feature overview</span><span>03</span></div>
+</section>
+
+<!-- PRICING -->
+<section class="page">
+  <div class="eyebrow">One fee. Everything included.</div>
+  <h2 class="title">Pick a package. Go live this week.</h2>
+  <div class="gold-rule"></div>
+  <div class="tiers">
+    <div class="tier">
+      <div class="tname">Web Menu</div>
+      <div class="price">₹15,000<small>one-time</small></div>
+      <div class="annual">then ₹2,999/yr</div>
+      <ul>
+        <li>Digital QR menu website</li>
+        <li>1 designer theme, mobile-first</li>
+        <li>Dish photos we optimize</li>
+        <li>Item details + dietary tags</li>
+        <li>No dashboard, no backend</li>
+        <li>We handle menu updates</li>
+      </ul>
+    </div>
+    <div class="tier">
+      <div class="tname">Classic</div>
+      <div class="price">₹24,999<small>one-time</small></div>
+      <div class="annual">then ₹2,999/yr</div>
+      <ul>
+        <li>Everything in Web Menu</li>
+        <li>All 3 designer themes</li>
+        <li>Full Staff Console + dashboard</li>
+        <li>Live floor, orders &amp; analytics</li>
+        <li>QR table tents + training</li>
+        <li>Image experience (no video)</li>
+      </ul>
+    </div>
+    <div class="tier featured">
+      <span class="badge">MOST POPULAR</span>
+      <div class="tname">Cinematic</div>
+      <div class="price">₹54,999<small>one-time</small></div>
+      <div class="annual">then ₹4,999/yr</div>
+      <ul>
+        <li>Everything in Classic</li>
+        <li>AI cinematic video across the menu</li>
+        <li>Custom hero film</li>
+        <li>Hero · categories · signature dishes</li>
+        <li>All video produced &amp; hosted by us</li>
+        <li>The full Relish experience</li>
+      </ul>
+    </div>
+    <div class="tier">
+      <div class="tname">Signature</div>
+      <div class="price">₹89,999<small>one-time</small></div>
+      <div class="annual">then ₹4,999/yr</div>
+      <ul>
+        <li>Everything in Cinematic</li>
+        <li>Bespoke hero film + video every screen</li>
+        <li>Full white-label — your brand, zero Relish marks</li>
+        <li>Multi-language menu (regional)</li>
+        <li>AI picks tuned to your menu</li>
+        <li>Annual video refresh + dedicated support</li>
+      </ul>
+    </div>
+  </div>
+  <div class="ent" style="border-color:var(--gold);">
+    <div><h3>Already have photos or videos?</h3><span style="font-size:9.5pt;color:var(--ink2);">We build around your media and take the saving straight off your one-time fee.</span></div>
+    <div class="p" style="color:var(--maroon);">−₹3,000 photos&nbsp;·&nbsp;−₹5,000 video</div>
+  </div>
+  <p class="gst">All prices exclusive of 18% GST. One fee covers the entire build — design, menu, photos &amp; video, QR codes, setup and training. The small annual renewal simply keeps your menu hosted, supported and updated. Multi-location &amp; chains: custom quote. 14-day pilot available.</p>
+  <div class="footer-tag"><span>Relish · Pricing</span><span>04</span></div>
+</section>
+
+<!-- VIDEO ADD-ONS -->
+<section class="page">
+  <div class="eyebrow">The cinematic difference</div>
+  <h2 class="title">Cinematic video, included.</h2>
+  <div class="gold-rule"></div>
+  <p class="lead">AI-generated cinematic film for your hero, your categories, your signature dishes — baked into one price, never billed per clip. No one else in India does this. It's what makes a Relish menu unforgettable.</p>
+  <div class="vrow">
+    <div class="vcard"><div class="vt">Hero film</div><div class="vp" style="font-size:12pt;">Included</div><div class="vsub">your signature opening</div></div>
+    <div class="vcard"><div class="vt">Category ambience</div><div class="vp" style="font-size:12pt;">Included</div><div class="vsub">every section, alive</div></div>
+    <div class="vcard"><div class="vt">Signature dishes</div><div class="vp" style="font-size:12pt;">Included</div><div class="vsub">your stars, in motion</div></div>
+    <div class="vcard"><div class="vt">Service moments</div><div class="vp" style="font-size:12pt;">Included</div><div class="vsub">waiter · water · bread</div></div>
+  </div>
+  <table class="addon">
+    <tr><th>How your video gets made</th><th>What it costs you</th></tr>
+    <tr><td>We generate the cinematic AI video for your menu — the slow, multi-pass, expensive part, handled end-to-end by us</td><td>Included in your one-time fee</td></tr>
+    <tr><td>You provide your own dish photos</td><td>−₹3,000 off the one-time fee</td></tr>
+    <tr><td>You provide your own ready videos</td><td>−₹5,000 off the one-time fee</td></tr>
+  </table>
+  <div class="band" style="margin-top:7mm;">
+    <h3>Network-smart, always</h3>
+    <p>Every clip ships in three bitrates and auto-selects by the guest's connection — crisp on 4G, light on 2G, still-image fallback on data-saver. Beautiful never means slow.</p>
+  </div>
+  <p class="gst">There is no per-clip or per-screen bill, ever — video is produced once and hosted for you under the annual renewal. Bring your own media and we pass the saving straight back.</p>
+  <div class="footer-tag"><span>Relish · Cinematic video</span><span>05</span></div>
+</section>
+
+<!-- HOW IT WORKS + CTA -->
+<section class="page" style="display:flex;flex-direction:column;">
+  <div class="eyebrow">From scan to service</div>
+  <h2 class="title">Live in four steps.</h2>
+  <div class="gold-rule"></div>
+  <div class="steps">
+    <div class="step"><div class="sn">1</div><h3>Share your menu</h3><p>Send us your current menu. We digitize, tag dietary info, and set your theme.</p></div>
+    <div class="step"><div class="sn">2</div><h3>Approve the look</h3><p>Pick a theme, approve any cinematic video screens you've added.</p></div>
+    <div class="step"><div class="sn">3</div><h3>Place your QR</h3><p>We send print-ready QR table tents. Guests scan — no app needed.</p></div>
+    <div class="step"><div class="sn">4</div><h3>Run the floor</h3><p>Your team logs into the console. Orders, tables, and analytics, live.</p></div>
+  </div>
+
+  <div class="grid2" style="margin-top:8mm;">
+    <div class="fcard"><h3>The ROI math</h3>
+      <ul>
+        <li>Visual menus lift order value 8–15% industry-wide</li>
+        <li>AI recommend upsells with zero staff effort</li>
+        <li>Faster tables via the service queue &amp; floor map</li>
+        <li>Zero reprint cost — change the menu in seconds</li>
+        <li>Renewal is nominal — roughly a reprinted menu set a year</li>
+      </ul>
+    </div>
+    <div class="fcard"><h3>Why now</h3>
+      <ul>
+        <li>QR-menu adoption is now the norm, not the novelty</li>
+        <li>Guests expect to scan, browse, and order from the table</li>
+        <li>Only Relish makes the menu cinematic &amp; AI-guided</li>
+        <li>India-priced — a fraction of global QR-menu SaaS</li>
+        <li>No POS to replace — Relish layers on what you have</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cta">
+    <h2>Give your menu a standing ovation.</h2>
+    <div class="g">Book a 15-minute demo — see your own dishes, cinematic.</div>
+    <span class="pill">Start your 14-day free trial →</span>
+    <div class="contact">hello@relish.menu &nbsp;·&nbsp; relish.menu &nbsp;·&nbsp; +91 00000 00000</div>
+  </div>
+  <div class="footer-tag"><span>Relish · International Veg Cuisine</span><span>06</span></div>
+</section>
+
+</body>
+</html>

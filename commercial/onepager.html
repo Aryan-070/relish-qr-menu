@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Relish — One Pager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{--paper:#FBF7F0;--paper2:#F4ECDD;--ink:#2A1A18;--ink2:#5A4842;--maroon:#6E1F2C;--gold:#C0982F;--gold2:#E3C868;--line:#E3D7C2;}
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  html,body{margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--paper);font-size:9.5pt;line-height:1.45;}
+  h1,h2,h3{font-family:'Playfair Display',serif;margin:0;line-height:1.1;}
+  .page{width:210mm;height:296mm;padding:13mm 14mm;position:relative;overflow:hidden;display:flex;flex-direction:column;}
+  @page{size:A4;margin:0;}
+  .head{background:radial-gradient(120% 130% at 80% 0%,#3a0d16,#220710);color:#F4ECDD;border-radius:3mm;padding:7mm 9mm;display:flex;justify-content:space-between;align-items:flex-end;}
+  .head .kick{letter-spacing:.34em;font-size:7.5pt;text-transform:uppercase;color:var(--gold2);font-weight:600;}
+  .head h1{font-size:40pt;font-weight:900;color:#fff;margin-top:2mm;}
+  .head .sub{font-family:'Cormorant Garamond';font-style:italic;font-size:15pt;color:var(--gold2);}
+  .head .right{text-align:right;font-size:8pt;color:#CDB98F;line-height:1.7;}
+  .cols{display:grid;grid-template-columns:1fr 1.05fr;gap:7mm;margin-top:7mm;flex:1;}
+  .eyebrow{font-size:7.5pt;letter-spacing:.28em;text-transform:uppercase;color:var(--maroon);font-weight:700;margin-bottom:3mm;}
+  .pill{display:flex;gap:4mm;margin-bottom:4mm;}
+  .pill .n{font-family:'Playfair Display';font-size:15pt;font-weight:700;color:var(--maroon);opacity:.5;min-width:8mm;}
+  .pill h3{font-size:11pt;margin-bottom:.5mm;}
+  .pill p{margin:0;font-size:8.7pt;color:var(--ink2);}
+  .pricebox{background:#fff;border:1px solid var(--line);border-radius:3mm;padding:6mm;}
+  .pricebox h3{color:var(--maroon);font-size:14pt;margin-bottom:1mm;}
+  .pricebox .note{font-size:8pt;color:var(--ink2);margin-bottom:3mm;}
+  table.pk{width:100%;border-collapse:collapse;font-size:9pt;}
+  table.pk th{text-align:left;color:#fff;background:var(--maroon);padding:2mm 2.5mm;font-size:8pt;font-weight:600;}
+  table.pk td{padding:2.2mm 2.5mm;border-bottom:1px solid var(--line);}
+  table.pk td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+  table.pk tr.feat td{background:var(--paper2);}
+  .vid{margin-top:4mm;background:linear-gradient(160deg,#2a0810,#4a121f);color:#F4ECDD;border-radius:3mm;padding:4mm 5mm;font-size:8.6pt;}
+  .vid b{color:var(--gold2);}
+  .byo{margin-top:3mm;border:1px dashed var(--gold);border-radius:3mm;padding:3.5mm 5mm;font-size:8.6pt;color:var(--ink);}
+  .byo b{color:var(--maroon);}
+  .steps{display:flex;gap:5mm;margin-top:6mm;}
+  .steps .s{flex:1;text-align:center;}
+  .steps .sn{width:9mm;height:9mm;border-radius:50%;background:var(--maroon);color:var(--gold2);font-family:'Playfair Display';font-weight:700;font-size:11pt;display:flex;align-items:center;justify-content:center;margin:0 auto 2mm;}
+  .steps h4{margin:0;font-size:9pt;color:var(--ink);}
+  .steps p{margin:.5mm 0 0;font-size:7.8pt;color:var(--ink2);}
+  .cta{margin-top:6mm;background:var(--maroon);color:#F4ECDD;border-radius:3mm;padding:5mm 7mm;display:flex;justify-content:space-between;align-items:center;}
+  .cta .g{font-family:'Cormorant Garamond';font-style:italic;color:var(--gold2);font-size:13pt;}
+  .cta .pill2{background:var(--gold);color:#2a0810;font-weight:700;padding:2.5mm 6mm;border-radius:20px;font-size:9.5pt;}
+  .foot{margin-top:4mm;text-align:center;font-size:7.5pt;letter-spacing:.12em;color:#9A8C76;text-transform:uppercase;}
+</style>
+</head>
+<body>
+<section class="page">
+  <div class="head">
+    <div>
+      <div class="kick">International Veg Cuisine</div>
+      <h1>RELISH</h1>
+      <div class="sub">the cinematic QR menu experience</div>
+    </div>
+    <div class="right">One all-in fee.<br>Live in days.<br>Priced for India.</div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <div class="eyebrow">Why Relish</div>
+      <div class="pill"><div class="n">01</div><div><h3>Cinematic experience</h3><p>7 designer themes, a hero film, per-dish video. Guests feel the brand before the first bite.</p></div></div>
+      <div class="pill"><div class="n">02</div><div><h3>AI that upsells</h3><p>A mood / budget / party recommender lifts average check with zero staff effort.</p></div></div>
+      <div class="pill"><div class="n">03</div><div><h3>Tableside service</h3><p>Call waiter, water, split bill, gratuity, Jain &amp; allergy info — faster tables.</p></div></div>
+      <div class="pill"><div class="n">04</div><div><h3>Back-office that pays</h3><p>Live floor map, menu control, real analytics: peak hours, top items, staff.</p></div></div>
+      <div class="pill"><div class="n">05</div><div><h3>No app, no POS swap</h3><p>Guests just scan. Relish layers onto what you already run.</p></div></div>
+
+      <div class="steps">
+        <div class="s"><div class="sn">1</div><h4>Share menu</h4><p>We digitize &amp; tag it</p></div>
+        <div class="s"><div class="sn">2</div><h4>Approve look</h4><p>Theme + video</p></div>
+        <div class="s"><div class="sn">3</div><h4>Place QR</h4><p>Print-ready tents</p></div>
+        <div class="s"><div class="sn">4</div><h4>Run floor</h4><p>Orders + data live</p></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="eyebrow">One fee. Everything included.</div>
+      <div class="pricebox">
+        <h3>Packages</h3>
+        <div class="note">Ex-GST · one-time build + annual renewal to keep it live</div>
+        <table class="pk">
+          <tr><th>Package</th><th>One-time</th><th>Renewal/yr</th></tr>
+          <tr><td>Web Menu <span style="color:var(--ink2);font-size:7.5pt;">· menu site, no dashboard</span></td><td class="num">₹15,000</td><td class="num">₹2,999</td></tr>
+          <tr><td>Classic <span style="color:var(--ink2);font-size:7.5pt;">· + staff console</span></td><td class="num">₹24,999</td><td class="num">₹2,999</td></tr>
+          <tr class="feat"><td>Cinematic <span style="color:var(--maroon);font-size:7.5pt;">★ AI video</span></td><td class="num">₹54,999</td><td class="num">₹4,999</td></tr>
+          <tr><td>Signature <span style="color:var(--ink2);font-size:7.5pt;">· full cinematic + white-label</span></td><td class="num">₹89,999</td><td class="num">₹4,999</td></tr>
+        </table>
+      </div>
+      <div class="vid"><b>Cinematic video, included.</b> AI film for your hero, categories &amp; signature dishes — baked into one price, never billed per clip. Network-smart: crisp on 4G, light on 2G.</div>
+      <div class="byo"><b>Already have media?</b> Bring your own photos (−₹3,000) or videos (−₹5,000) and we take it off the one-time fee.</div>
+
+      <div class="cta">
+        <div class="g">Book a 15-min demo —<br>see your dishes, cinematic.</div>
+        <div class="pill2">14-day pilot →</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">hello@relish.menu&nbsp;·&nbsp;relish.menu&nbsp;·&nbsp;+91 00000 00000&nbsp;·&nbsp;Relish · International Veg Cuisine</div>
+</section>
+</body>
+</html>

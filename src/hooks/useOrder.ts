@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { type MenuItem } from '../data/menu'
 
 export interface OrderItem {
@@ -10,7 +10,6 @@ export interface OrderItem {
 
 export function useOrder() {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([])
-  const [lastAdded, setLastAdded] = useState<MenuItem | null>(null)
 
   const addItem = useCallback((item: MenuItem, customization = 'Regular') => {
     setOrderItems(prev => {
@@ -24,8 +23,6 @@ export function useOrder() {
       }
       return [...prev, { item, quantity: 1, customization }]
     })
-    setLastAdded(item)
-    setTimeout(() => setLastAdded(null), 3000)
   }, [])
 
   const removeItem = useCallback((itemId: string, customization: string) => {
@@ -42,14 +39,21 @@ export function useOrder() {
     )
   }, [])
 
-  const updateNote = useCallback((itemId: string, note: string) => {
+  const updateNote = useCallback((itemId: string, customization: string, note: string) => {
     setOrderItems(prev =>
-      prev.map(o => o.item.id === itemId ? { ...o, note } : o),
+      prev.map(o =>
+        o.item.id === itemId && o.customization === customization
+          ? { ...o, note }
+          : o,
+      ),
     )
   }, [])
 
-  const total = orderItems.reduce((sum, o) => sum + o.item.price * o.quantity, 0)
-  const count = orderItems.reduce((sum, o) => sum + o.quantity, 0)
+  const total = useMemo(() => orderItems.reduce((sum, o) => sum + o.item.price * o.quantity, 0), [orderItems])
+  const count = useMemo(() => orderItems.reduce((sum, o) => sum + o.quantity, 0), [orderItems])
 
-  return { orderItems, addItem, removeItem, updateQuantity, updateNote, total, count, lastAdded }
+  return useMemo(
+    () => ({ orderItems, addItem, removeItem, updateQuantity, updateNote, total, count }),
+    [orderItems, addItem, removeItem, updateQuantity, updateNote, total, count],
+  )
 }

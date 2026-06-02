@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Relish — How it compares</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{--paper:#FBF7F0;--paper2:#F4ECDD;--ink:#2A1A18;--ink2:#5A4842;--maroon:#6E1F2C;--gold:#C0982F;--gold2:#E3C868;--line:#E3D7C2;--green:#2F6B4F;--mute:#B9A98C;}
+  *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  html,body{margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--paper);font-size:10pt;line-height:1.45;}
+  h1,h2,h3{font-family:'Playfair Display',serif;margin:0;line-height:1.1;}
+  .page{width:210mm;height:296mm;padding:15mm 14mm;position:relative;overflow:hidden;}
+  @page{size:A4;margin:0;}
+  .eyebrow{font-size:8pt;letter-spacing:.3em;text-transform:uppercase;color:var(--maroon);font-weight:700;margin-bottom:3mm;}
+  h1.title{font-size:27pt;color:var(--maroon);font-weight:800;}
+  .gold-rule{height:3px;width:28mm;background:var(--gold);margin:4mm 0 6mm;}
+  .lead{font-family:'Cormorant Garamond';font-style:italic;font-size:14pt;color:var(--ink2);margin:0 0 6mm;}
+  table.cmp{width:100%;border-collapse:collapse;font-size:8.6pt;}
+  table.cmp th{padding:3mm 2.5mm;text-align:center;font-size:8.5pt;font-weight:700;vertical-align:bottom;}
+  table.cmp th.feat{text-align:left;width:42mm;color:var(--maroon);font-family:'Playfair Display';}
+  table.cmp th.relish{background:var(--maroon);color:#fff;border-radius:3mm 3mm 0 0;}
+  table.cmp th.other{color:var(--ink2);}
+  table.cmp td{padding:2.5mm 2.5mm;text-align:center;border-bottom:1px solid var(--line);}
+  table.cmp td.f{text-align:left;font-weight:600;color:var(--ink);}
+  table.cmp td.relish{background:var(--paper2);font-weight:600;}
+  table.cmp tr:last-child td.relish{border-radius:0 0 3mm 3mm;}
+  .y{color:var(--green);font-weight:700;}
+  .n{color:var(--mute);}
+  .sub{font-size:7.6pt;color:var(--ink2);}
+  .note{margin-top:7mm;background:var(--paper2);border-left:4px solid var(--maroon);border-radius:2mm;padding:5mm 6mm;font-size:9.3pt;color:var(--ink);}
+  .note b{color:var(--maroon);}
+  .src{position:absolute;bottom:9mm;left:14mm;right:14mm;font-size:7.5pt;color:#9A8C76;border-top:1px solid var(--line);padding-top:3mm;line-height:1.6;}
+</style>
+</head>
+<body>
+<section class="page">
+  <div class="eyebrow">The honest comparison</div>
+  <h1 class="title">How Relish compares.</h1>
+  <div class="gold-rule"></div>
+  <p class="lead">Relish isn't a POS — it's the cinematic experience layer that sits on top of one. Here's where it wins, and where the others still do their job.</p>
+
+  <table class="cmp">
+    <tr>
+      <th class="feat"></th>
+      <th class="relish">Relish</th>
+      <th class="other">Petpooja</th>
+      <th class="other">MENU&nbsp;TIGER</th>
+      <th class="other">DotPe</th>
+    </tr>
+    <tr><td class="f">Pricing model</td><td class="relish">One-time + annual renewal</td><td>Annual subscription</td><td>Monthly SaaS</td><td>Per-transaction</td></tr>
+    <tr><td class="f">Entry cost</td><td class="relish">₹15,000 once</td><td>~₹10,000/yr</td><td>~₹3,268/mo</td><td>Free + commission</td></tr>
+    <tr><td class="f">Cinematic AI video</td><td class="relish"><span class="y">✓ included</span></td><td><span class="n">✗</span></td><td><span class="n">✗</span></td><td><span class="n">✗</span></td></tr>
+    <tr><td class="f">Per-clip video charges</td><td class="relish"><span class="y">None, ever</span></td><td>n/a</td><td>n/a</td><td>n/a</td></tr>
+    <tr><td class="f">AI dish recommendations</td><td class="relish"><span class="y">✓</span></td><td><span class="n">✗</span></td><td>Limited</td><td><span class="n">✗</span></td></tr>
+    <tr><td class="f">Designer themes</td><td class="relish"><span class="y">✓ 7 themes</span></td><td>Basic</td><td>Templates</td><td>Basic</td></tr>
+    <tr><td class="f">Staff console / dashboard</td><td class="relish"><span class="y">✓</span></td><td><span class="y">✓ (POS)</span></td><td><span class="y">✓</span></td><td>via Rista</td></tr>
+    <tr><td class="f">Jain &amp; allergy labelling</td><td class="relish"><span class="y">✓ built-in</span></td><td>Partial</td><td><span class="n">✗</span></td><td><span class="n">✗</span></td></tr>
+    <tr><td class="f">White-label (your brand)</td><td class="relish"><span class="y">✓ Signature</span></td><td><span class="n">✗</span></td><td>Add-on</td><td><span class="n">✗</span></td></tr>
+    <tr><td class="f">Multi-language menu</td><td class="relish"><span class="y">✓</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td><td>Partial</td></tr>
+    <tr><td class="f">No app download for guests</td><td class="relish"><span class="y">✓</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td><td><span class="y">✓</span></td></tr>
+    <tr><td class="f">India-priced (INR)</td><td class="relish"><span class="y">✓</span></td><td><span class="y">✓</span></td><td>USD</td><td><span class="y">✓</span></td></tr>
+    <tr><td class="f">Full POS · billing · inventory</td><td class="relish">Integrates</td><td><span class="y">✓ core</span></td><td>Partial</td><td><span class="y">✓</span></td></tr>
+  </table>
+
+  <div class="note"><b>How to position it:</b> if a restaurant needs billing, inventory and GST invoicing, Petpooja or DotPe do that — and Relish sits happily on top, turning their static QR menu into a cinematic, AI-guided experience no POS offers. Relish is the only one here that bundles AI video into a single price with no per-clip charge, and the only one with a true premium design system. Lead with the experience; let the POS keep doing the plumbing.</div>
+
+  <div class="src">Competitor figures from public 2025–26 pricing pages (Petpooja, MENU TIGER, DotPe). Petpooja ~₹7,500–10,000/yr; MENU TIGER from ~$38/mo (₹3,268); DotPe pay-per-transaction. Feature rows reflect publicly documented capabilities and may vary by plan — verify the prospect's current quote. Relish · International Veg Cuisine.</div>
+</section>
+</body>
+</html>

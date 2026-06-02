@@ -2,11 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ShoppingBag } from 'lucide-react'
 import { type MenuItem, getItemById, getCategoryForItem } from '../data/menu'
-import { Badge } from '../components/atoms/Badge'
+import { ChefSpecial, SpiceLevel, DietBadge, TagLabel } from '../components/atoms/DietaryBadges'
 import { Price } from '../components/atoms/Price'
 import { Button } from '../components/atoms/Button'
 import { CategoryIllustration } from '../components/atoms/CategoryIllustration'
-import { bottomSheet, stagger, fadeUp } from '../animations/variants'
+import { LqipVideo } from '../components/atoms/LqipVideo'
+import { stagger, fadeUp } from '../animations/variants'
+import { useTheme } from '../theme/ThemeContext'
+import { useMediaMode } from '../theme/MediaModeContext'
+import { resolveDishHeroVideo } from '../data/videoManifest'
 
 interface ItemDetailProps {
   item: MenuItem | null
@@ -16,17 +20,21 @@ interface ItemDetailProps {
 }
 
 export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetailProps) {
+  const { tokens: t } = useTheme()
+  const { posterOnly } = useMediaMode()
   const [selectedCustomization, setSelectedCustomization] = useState('Regular')
   const [heroErr, setHeroErr] = useState(false)
   const handleHeroErr = useCallback(() => setHeroErr(true), [])
 
   // Reset customization and image error whenever a new item opens
+  const itemId = item?.id
+  const firstCustomization = item?.customizations[0]
   useEffect(() => {
-    if (item) {
-      setSelectedCustomization(item.customizations[0] ?? 'Regular')
+    if (itemId) {
+      setSelectedCustomization(firstCustomization ?? 'Regular')
       setHeroErr(false)
     }
-  }, [item?.id])
+  }, [itemId, firstCustomization])
 
   const handleAdd = () => {
     if (!item) return
@@ -52,14 +60,15 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
             onClick={onClose}
           />
 
-          {/* Sheet — NOT draggable itself; only the handle drags */}
+          {/* Sheet — NOT draggable itself; only the handle drags.
+              Explicit inline transform animation (reliable vs named variant). */}
           <motion.div
             key="sheet"
-            variants={bottomSheet}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-[430px] rounded-t-3xl"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+            className="fixed bottom-0 inset-x-0 mx-auto z-50 w-full max-w-[480px] sm:max-w-[560px] rounded-t-3xl"
             style={{
               background: 'var(--paper)',
               boxShadow: 'var(--shadow-sheet)',
@@ -88,6 +97,7 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
             {/* Close button */}
             <button
               onClick={onClose}
+              aria-label="Close"
               className="absolute top-3.5 right-4 w-8 h-8 rounded-full flex items-center justify-center z-10"
               style={{ background: 'rgba(139,16,36,0.08)' }}
             >
@@ -105,12 +115,16 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
                   className="mb-4 mt-1"
                 >
                   {!heroErr ? (
-                    <img
+                    <LqipVideo
                       key={item.id}
-                      src={`/assets/dishes/${item.id}-hero.webp`}
+                      renditions={resolveDishHeroVideo(item).renditions}
+                      poster={resolveDishHeroVideo(item).poster}
                       alt={item.name}
-                      className="w-full aspect-[4/3] object-cover rounded-2xl"
-                      style={{ border: '1px solid rgba(217,160,58,0.2)' }}
+                      posterOnly={posterOnly}
+                      play="visible"
+                      wrapperClassName="w-full aspect-[4/3] rounded-2xl"
+                      wrapperStyle={{ border: '1px solid rgba(217,160,58,0.2)' }}
+                      videoClassName="w-full h-full object-cover"
                       onError={handleHeroErr}
                     />
                   ) : (
@@ -121,8 +135,14 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
                 {/* Title + price */}
                 <div className="flex items-start justify-between mb-1">
                   <h2
-                    className="font-playfair font-bold text-[22px] leading-tight flex-1 pr-4"
-                    style={{ color: 'var(--maroon)' }}
+                    className="font-bold leading-tight flex-1 pr-4"
+                    style={{
+                      fontFamily: t.headerFont,
+                      textTransform: t.headerTransform,
+                      fontSize: 23,
+                      letterSpacing: t.headerSpacing,
+                      color: t.headerColor,
+                    }}
                   >
                     {item.name}
                   </h2>
@@ -130,11 +150,13 @@ export function ItemDetail({ item, onClose, onAddToOrder, onWaiter }: ItemDetail
                 </div>
 
                 {/* Badges */}
-                <div className="flex gap-2 flex-wrap mb-3">
-                  {item.isJain && <Badge variant="jain">Jain</Badge>}
-                  {item.canBeJain && !item.isJain && <Badge variant="jain">Can be Jain</Badge>}
+                <div className="flex items-center gap-2 flex-wrap mb-3">
+                  {item.chefsSpecial && <ChefSpecial theme={t} />}
+                  {item.isJain && <DietBadge label="Jain" theme={t} />}
+                  {item.canBeJain && !item.isJain && <DietBadge label="Can be Jain" theme={t} />}
+                  {item.spiceLevel ? <SpiceLevel level={item.spiceLevel} theme={t} /> : null}
                   {item.tags.map(tag => (
-                    <Badge key={tag} variant="tag">{tag}</Badge>
+                    <TagLabel key={tag} label={tag} theme={t} />
                   ))}
                 </div>
 

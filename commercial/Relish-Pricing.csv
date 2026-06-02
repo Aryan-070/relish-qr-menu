@@ -1,0 +1,48 @@
+Relish Pricing & Unit Economics — INR, ex-GST. Model: one-time build + annual renewal. Edit INPUTS to flex.
+
+INPUTS,,Value,Notes
+FX rate (INR per USD),,86,
+GST (%),,18,Added on top of one-time AND renewal
+Payment fee effective (%),,2.36,Razorpay 2% + 18% GST on fee
+AI video gen passes per clip,,5-10,Higgsfield/Veo rarely lands first pass — main build COGS
+BYO photos discount (INR),,3000,Off the one-time fee
+BYO videos discount (INR),,5000,Off the one-time fee (kept small; we still save ~20k gen cost)
+BYO both discount (INR),,7000,
+
+PACKAGES,One-time INR (ex-GST),Renewal/yr INR (ex-GST),Video / dashboard,Segment
+Web Menu,15000,2999,No video / NO backend / NO dashboard,Menu-only static website
+Classic,24999,2999,None (images) + staff console,Cafe / QSR + dashboard
+Cinematic,54999,4999,AI video across menu,Casual & premium dining
+Signature,89999,4999,Full cinematic + white-label + multi-lang + AI tuning,Fine-dining / flagship
+Multi-location / chains,Custom,Custom,Full cinematic,5+ locations
+
+BUILD ECONOMICS (Cinematic),INR one-time,,,
+Go-live fee,54999,,,
+COGS AI video generation,-20000,,,Multi-pass Higgsfield/Veo
+COGS images/setup/QR/training,-5000,,,
+Build gross profit,29999,,,~55% margin
+,,,,
+With BYO video (-5000 price / -~18000 COGS),49999,,,Margin RISES — accretive
+
+RENEWAL ECONOMICS (high-margin recurring),Renewal/yr,Cost-to-serve/yr,Margin %,
+Web Menu,2999,400,87,
+Classic,2999,700,77,
+Cinematic,4999,1020,80,
+Signature,4999,1350,73,
+
+COST-TO-SERVE PER YEAR,Hosting+infra,Video egress,Support,Total/rest/yr
+Web Menu (no dashboard),120,0,280,400
+Classic,200,0,500,700
+Cinematic (R2/Bunny),300,120,600,1020
+Signature (heavy video),400,250,700,1350
+
+PAYMENT + GST,Rate,,,
+Razorpay domestic,2% + 18% GST on fee,2.36% effective,,
+GST on build & renewal,18%,On top of sticker,,
+GST registration threshold,20 lakh turnover,,,
+
+COMPETITOR BENCHMARK,Model,INR,,
+Petpooja (POS+QR),Monthly,625-833/mo,,
+MENU TIGER,Monthly SaaS,3268-10234/mo,,
+myDigiMenu,Monthly SaaS,3354+/mo,,
+Relish,One-time + annual renewal,15000-89999 + 2999-4999/yr,,Different shape: premium build + high-margin recurring

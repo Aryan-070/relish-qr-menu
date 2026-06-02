@@ -58,9 +58,10 @@ function Rule({ thick, mx }: { thick?: boolean; mx?: boolean }) {
 export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
   return (
     <div
-      className="relative flex flex-col min-h-dvh overflow-hidden"
+      className="relative flex flex-col min-h-full overflow-hidden"
       style={{ background: 'var(--paper)' }}
     >
+      <div className="relative flex flex-col flex-1 justify-between gap-[clamp(3px,1vh,16px)] mx-auto w-full" style={{ width: '100%', maxWidth: 'min(94vw, 960px)' }}>
       {/* Top thick rule */}
       <motion.div
         initial={{ scaleX: 0 }}
@@ -98,7 +99,7 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
         <h1
           className="font-playfair font-bold text-center w-full"
           style={{
-            fontSize: 90,
+            fontSize: 'min(clamp(90px, 12vw, 160px), 13vh)',
             color: 'var(--maroon)',
             letterSpacing: '-0.02em',
             lineHeight: 0.87,
@@ -136,6 +137,7 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
           alt="Relish editorial food spread"
           className="w-full aspect-[21/9] object-cover"
           style={{
+            maxHeight: '24vh',
             borderTop: '1px solid rgba(42,30,30,0.15)',
             borderBottom: '1px solid rgba(42,30,30,0.15)',
           }}
@@ -155,7 +157,7 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
         <div className="flex-1 pr-4" style={{ borderRight: '1px solid rgba(42,30,30,0.2)' }}>
           <p
             className="font-cormorant italic"
-            style={{ fontSize: 18, color: 'var(--ink-soft)', lineHeight: 1.38 }}
+            style={{ fontSize: 'clamp(18px, 2vw, 26px)', color: 'var(--ink-soft)', lineHeight: 1.38 }}
           >
             A Journey Through The World's Finest Vegetarian Cuisine
           </p>
@@ -228,7 +230,7 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
       </motion.div>
 
       {/* Bottom masthead */}
-      <div className="mt-auto">
+      <div>
         <Rule />
         <div
           className="py-2 px-4 flex justify-center"
@@ -242,24 +244,25 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
           </span>
         </div>
       </div>
+      </div>
 
       {/* Side ornaments */}
       <div
         className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ opacity: 0.06 }}
+        style={{ height: '70vh', opacity: 0.06 }}
       >
-        <svg width="14" height="120" viewBox="0 0 14 120" fill="none">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <svg width="14" height="100%" viewBox="0 0 14 480" preserveAspectRatio="none" fill="none">
+          {Array.from({ length: 20 }).map((_, i) => (
             <rect key={i} x="5" y={6 + i * 22} width="4" height="14" fill="#2A1E1E" />
           ))}
         </svg>
       </div>
       <div
         className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ opacity: 0.06 }}
+        style={{ height: '70vh', opacity: 0.06 }}
       >
-        <svg width="14" height="120" viewBox="0 0 14 120" fill="none">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <svg width="14" height="100%" viewBox="0 0 14 480" preserveAspectRatio="none" fill="none">
+          {Array.from({ length: 20 }).map((_, i) => (
             <rect key={i} x="5" y={6 + i * 22} width="4" height="14" fill="#2A1E1E" />
           ))}
         </svg>

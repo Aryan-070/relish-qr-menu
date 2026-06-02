@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Trash2, Plus, Minus, MessageSquare } from 'lucide-react'
+import { X, Trash2, Plus, Minus, MessageSquare, CheckCircle2 } from 'lucide-react'
 import { type OrderItem } from '../hooks/useOrder'
 import { Price } from '../components/atoms/Price'
-import { Button } from '../components/atoms/Button'
-import { bottomSheet } from '../animations/variants'
+import { btnPrimary, btnIcon, btnStep } from '../animations/variants'
 
 interface OrderPanelProps {
   open: boolean
@@ -13,7 +12,7 @@ interface OrderPanelProps {
   onClose: () => void
   onRemove: (itemId: string, customization: string) => void
   onUpdateQty: (itemId: string, customization: string, delta: number) => void
-  onUpdateNote: (itemId: string, note: string) => void
+  onUpdateNote: (itemId: string, customization: string, note: string) => void
   onWaiter: () => void
 }
 
@@ -28,6 +27,15 @@ export function OrderPanel({
   onWaiter,
 }: OrderPanelProps) {
   const [noteOpen, setNoteOpen] = useState<string | null>(null)
+  const [orderSent, setOrderSent] = useState(false)
+
+  const handlePlaceOrder = () => {
+    setOrderSent(true)
+    setTimeout(() => {
+      setOrderSent(false)
+      onWaiter()
+    }, 750)
+  }
 
   return (
     <AnimatePresence>
@@ -44,14 +52,14 @@ export function OrderPanel({
             onClick={onClose}
           />
 
-          {/* Panel */}
+          {/* Panel — explicit inline transform animation (reliable vs named variant) */}
           <motion.div
             key="order-panel"
-            variants={bottomSheet}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50 rounded-t-3xl overflow-hidden flex flex-col"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+            className="fixed bottom-0 inset-x-0 mx-auto w-full max-w-[480px] sm:max-w-[560px] z-50 rounded-t-3xl overflow-hidden flex flex-col"
             style={{
               background: 'var(--paper)',
               boxShadow: 'var(--shadow-sheet)',
@@ -79,13 +87,15 @@ export function OrderPanel({
                   {items.length === 0 ? 'Nothing added yet' : `${items.reduce((s, i) => s + i.quantity, 0)} item${items.reduce((s, i) => s + i.quantity, 0) !== 1 ? 's' : ''}`}
                 </p>
               </div>
-              <button
+              <motion.button
+                whileTap={btnIcon.tap}
                 onClick={onClose}
+                aria-label="Close order"
                 className="w-8 h-8 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(139,16,36,0.08)' }}
               >
                 <X size={15} style={{ color: 'var(--maroon)' }} />
-              </button>
+              </motion.button>
             </div>
 
             {/* Items list */}
@@ -123,7 +133,7 @@ export function OrderPanel({
                             {/* Qty controls */}
                             <div className="flex flex-col items-center gap-1.5 pt-0.5">
                               <motion.button
-                                whileTap={{ scale: 0.85 }}
+                                whileTap={btnStep.tap}
                                 onClick={() => onUpdateQty(orderItem.item.id, orderItem.customization, 1)}
                                 className="w-7 h-7 rounded-full flex items-center justify-center"
                                 style={{ background: 'rgba(139,16,36,0.1)' }}
@@ -134,7 +144,7 @@ export function OrderPanel({
                                 {orderItem.quantity}
                               </span>
                               <motion.button
-                                whileTap={{ scale: 0.85 }}
+                                whileTap={btnStep.tap}
                                 onClick={() => {
                                   if (orderItem.quantity <= 1) onRemove(orderItem.item.id, orderItem.customization)
                                   else onUpdateQty(orderItem.item.id, orderItem.customization, -1)
@@ -168,7 +178,7 @@ export function OrderPanel({
                             <div className="flex flex-col items-end gap-1.5">
                               <Price amount={orderItem.item.price * orderItem.quantity} size="sm" />
                               <motion.button
-                                whileTap={{ scale: 0.85 }}
+                                whileTap={{ scale: 0.82, rotate: -10, transition: { type: 'spring', stiffness: 500, damping: 24 } }}
                                 onClick={() => onRemove(orderItem.item.id, orderItem.customization)}
                               >
                                 <Trash2 size={13} style={{ color: 'var(--mute)' }} />
@@ -188,7 +198,7 @@ export function OrderPanel({
                                   autoFocus
                                   placeholder="e.g. Less spicy, no onion, extra sauce..."
                                   value={orderItem.note ?? ''}
-                                  onChange={e => onUpdateNote(orderItem.item.id, e.target.value)}
+                                  onChange={e => onUpdateNote(orderItem.item.id, orderItem.customization, e.target.value)}
                                   rows={2}
                                   className="w-full font-inter text-[12px] resize-none rounded-lg px-3 py-2 outline-none"
                                   style={{
@@ -237,7 +247,7 @@ export function OrderPanel({
                       Total
                     </p>
                     <p className="font-playfair font-bold text-[22px]" style={{ color: 'var(--maroon)' }}>
-                      ₹{total}
+                      ₹{total.toLocaleString('en-IN')}
                     </p>
                   </div>
                   <p className="font-inter text-[11px]" style={{ color: 'var(--mute)' }}>
@@ -247,9 +257,52 @@ export function OrderPanel({
 
                 {/* CTAs */}
                 <div className="flex gap-3">
-                  <Button variant="primary" fullWidth onClick={onWaiter}>
-                    Place Order with Waiter
-                  </Button>
+                  <motion.button
+                    whileTap={!orderSent ? btnPrimary.tap : undefined}
+                    onClick={handlePlaceOrder}
+                    disabled={orderSent}
+                    className="w-full py-3.5 rounded-full font-inter font-semibold text-[13.5px] relative overflow-hidden flex items-center justify-center gap-2 select-none"
+                    style={{
+                      background: 'linear-gradient(135deg, #A52030, #7A0E1E)',
+                      color: '#FFF8EA',
+                      boxShadow: '0 4px 16px rgba(139,16,36,0.28)',
+                      minHeight: 44,
+                    }}
+                  >
+                    {/* ambient shimmer */}
+                    <span
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background: 'linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.12) 50%, transparent 80%)',
+                        animation: 'shine-sweep 4s ease-in-out 0.5s infinite',
+                      }}
+                    />
+                    <AnimatePresence mode="wait">
+                      {orderSent ? (
+                        <motion.span
+                          key="check"
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0, opacity: 0 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+                          className="flex items-center gap-2 relative z-10"
+                        >
+                          <CheckCircle2 size={18} />
+                          <span>Calling waiter…</span>
+                        </motion.span>
+                      ) : (
+                        <motion.span
+                          key="label"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="relative z-10"
+                        >
+                          Place Order with Waiter
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </motion.button>
                 </div>
                 <p className="font-inter text-center text-[10px] mt-2" style={{ color: 'var(--mute)' }}>
                   Hand this to your waiter or tap to call them

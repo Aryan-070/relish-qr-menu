@@ -30,7 +30,7 @@ function PrimaryBtn({ onClick, delay }: { onClick: () => void; delay: number }) 
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay, type: 'spring', stiffness: 190, damping: 16 }}
       whileTap={{ scale: 0.93 }}
-      className="relative w-full py-[15px] rounded-2xl overflow-hidden font-inter font-semibold text-[14px] tracking-wide"
+      className="relative w-full py-[15px] lg:py-[17px] rounded-2xl overflow-hidden font-inter font-semibold text-[14px] lg:text-[15px] tracking-wide"
       style={{
         background: 'linear-gradient(135deg, #7A0E1E 0%, #A52030 45%, #8B1024 100%)',
         color: '#FFF8EA',
@@ -77,7 +77,7 @@ function GoldBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay, type: 'spring', stiffness: 190, damping: 16 }}
       whileTap={{ scale: 0.93 }}
-      className="relative w-full py-[15px] rounded-2xl overflow-hidden font-inter font-medium text-[14px] tracking-wide"
+      className="relative w-full py-[15px] lg:py-[17px] rounded-2xl overflow-hidden font-inter font-medium text-[14px] lg:text-[15px] tracking-wide"
       style={{
         background: 'linear-gradient(135deg, rgba(217,160,58,0.16) 0%, rgba(200,140,30,0.08) 100%)',
         color: '#D9A03A',
@@ -126,7 +126,7 @@ function GhostBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay, type: 'spring', stiffness: 190, damping: 18 }}
       whileTap={{ scale: 0.95 }}
-      className="relative w-full py-[15px] rounded-2xl overflow-hidden font-inter font-medium text-[13.5px] tracking-wide"
+      className="relative w-full py-[15px] lg:py-[17px] rounded-2xl overflow-hidden font-inter font-medium text-[13.5px] lg:text-[15px] tracking-wide"
       style={{
         background: 'transparent',
         color: 'rgba(255,248,234,0.52)',
@@ -157,7 +157,7 @@ function GhostBtn({ onClick, delay }: { onClick: () => void; delay: number }) {
 export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
   return (
     <div
-      className="relative flex flex-col min-h-dvh overflow-hidden"
+      className="relative flex flex-col min-h-full overflow-hidden"
       style={{ background: '#0B0305' }}
     >
       {/* ══════════════════════════════════════════════════════════════════
@@ -227,7 +227,7 @@ export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
            INTERACTIVE OVERLAY — Tagline + Trust Badges + Buttons
            Anchored to the bottom of the viewport over the gradient.
       ══════════════════════════════════════════════════════════════════ */}
-      <div className="relative flex flex-col items-center pb-10 px-8 text-center" style={{ zIndex: 20 }}>
+      <div className="relative flex flex-col items-center pb-10 lg:pb-16 px-8 text-center mx-auto w-full" style={{ zIndex: 20, maxWidth: 'min(92vw, 680px)' }}>
 
         {/* Tagline — fade-up with blur clear */}
         <motion.p
@@ -235,7 +235,7 @@ export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           transition={{ delay: 0.55, duration: 0.75 }}
           className="font-cormorant italic mb-4"
-          style={{ fontSize: 18, color: 'rgba(255,248,234,0.70)', lineHeight: 1.5 }}
+          style={{ fontSize: 'clamp(18px, 2vw, 26px)', color: 'rgba(255,248,234,0.70)', lineHeight: 1.5 }}
         >
           A journey through flavours of the world
         </motion.p>
@@ -253,7 +253,7 @@ export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.80 + i * 0.08, type: 'spring', stiffness: 300, damping: 14 }}
-              className="font-inter text-[9px] uppercase tracking-wide px-2.5 py-[3px] rounded-full"
+              className="font-inter text-[9px] lg:text-[10px] uppercase tracking-wide px-2.5 py-[3px] rounded-full"
               style={{
                 background: 'rgba(217,160,58,0.12)',
                 border: '1px solid rgba(217,160,58,0.40)',
@@ -266,7 +266,7 @@ export function LandingCover({ onOpenMenu, onRecommend, onWaiter }: Props) {
         </motion.div>
 
         {/* ── Premium animated buttons ─────────────────────────────── */}
-        <div className="flex flex-col gap-3 w-full max-w-[268px]">
+        <div className="flex flex-col gap-3 w-full max-w-[268px] sm:max-w-[360px] lg:max-w-[420px]">
           <PrimaryBtn onClick={onOpenMenu}  delay={0.95} />
           <GoldBtn    onClick={onRecommend} delay={1.08} />
           <GhostBtn   onClick={onWaiter}    delay={1.20} />

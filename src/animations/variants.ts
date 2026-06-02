@@ -21,11 +21,6 @@ export const stagger: Variants = {
   visible: { transition: { staggerChildren: 0.08 } },
 }
 
-export const staggerSlow: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.14 } },
-}
-
 export const scaleIn: Variants = {
   hidden: { opacity: 0, scale: 0.88 },
   visible: {
@@ -36,6 +31,9 @@ export const scaleIn: Variants = {
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.15 } },
 }
 
+// Category page transitions. With AnimatePresence in default (sync) mode the
+// entering page slides in over the leaving page, which fades out in place —
+// so there is never a blank frame (the old mode="wait" + x-exit left a ~280ms gap).
 export const slideLeft: Variants = {
   hidden: { opacity: 0, x: 60 },
   visible: {
@@ -45,8 +43,7 @@ export const slideLeft: Variants = {
   },
   exit: {
     opacity: 0,
-    x: -60,
-    transition: { ease: [0.4, 0, 0.6, 1], duration: 0.28 },
+    transition: { duration: 0.18, ease: [0.4, 0, 0.6, 1] },
   },
 }
 
@@ -59,42 +56,8 @@ export const slideRight: Variants = {
   },
   exit: {
     opacity: 0,
-    x: 60,
-    transition: { ease: [0.4, 0, 0.6, 1], duration: 0.28 },
+    transition: { duration: 0.18, ease: [0.4, 0, 0.6, 1] },
   },
-}
-
-export const bottomSheet: Variants = {
-  hidden: { y: '100%', opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { type: 'spring', stiffness: 260, damping: 28 },
-  },
-  exit: {
-    y: '100%',
-    opacity: 0,
-    transition: { ease: [0.4, 0, 0.6, 1], duration: 0.32 },
-  },
-}
-
-export const bottomPanel: Variants = {
-  hidden: { y: '100%', opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { type: 'spring', stiffness: 320, damping: 30 },
-  },
-  exit: {
-    y: '100%',
-    opacity: 0,
-    transition: { ease: [0.4, 0, 0.6, 1], duration: 0.24 },
-  },
-}
-
-export const chipTap = {
-  whileTap: { scale: 0.93 },
-  transition: { type: 'spring', stiffness: 500, damping: 20 },
 }
 
 export const orderSlip: Variants = {
@@ -137,55 +100,29 @@ export const questionReveal: Variants = {
   exit: { opacity: 0, y: -12, transition: { duration: 0.18 } },
 }
 
-export const resultCard: Variants = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: 'spring',
-      stiffness: 280,
-      damping: 26,
-      delay: i * 0.1,
-    },
-  }),
-}
-
-export const coverLogo: Variants = {
-  hidden: { opacity: 0, y: -20, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  },
-}
-
-export const coverCTA: Variants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.55, delay: 0.8 + i * 0.12, ease: [0.22, 1, 0.36, 1] },
-  }),
-}
-
 export const fullPanel: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { duration: 0.35 } },
   exit: { opacity: 0, transition: { duration: 0.25 } },
 }
 
-export const slideInRight: Variants = {
-  hidden: { x: '100%', opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: { type: 'spring', stiffness: 320, damping: 30 },
-  },
-  exit: {
-    x: '100%',
-    opacity: 0,
-    transition: { ease: [0.4, 0, 0.6, 1], duration: 0.22 },
-  },
+// ── 2025 trending mobile button press variants ──────────────────────────────
+// Use with whileTap / whileHover — not with the `variants` prop.
+
+export const btnPrimary = {
+  tap:   { scale: 0.955, y: 3, transition: { type: 'spring' as const, stiffness: 400, damping: 20 } },
+  hover: { scale: 1.015, transition: { type: 'spring' as const, stiffness: 300, damping: 22 } },
+}
+
+export const btnCard = {
+  tap:   { scale: 0.935, y: 2, transition: { type: 'spring' as const, stiffness: 350, damping: 22 } },
+  hover: { scale: 1.02,  transition: { type: 'spring' as const, stiffness: 280, damping: 24 } },
+}
+
+export const btnIcon = {
+  tap: { scale: 0.84, rotate: 8, transition: { type: 'spring' as const, stiffness: 500, damping: 28 } },
+}
+
+export const btnStep = {
+  tap: { scale: 0.78, transition: { type: 'spring' as const, stiffness: 600, damping: 22 } },
 }
