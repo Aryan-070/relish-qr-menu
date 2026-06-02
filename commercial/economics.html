@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Relish — Pricing &amp; Unit Economics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FBF7F0; --paper2:#F4ECDD; --ink:#2A1A18; --ink2:#5A4842;
+    --maroon:#6E1F2C; --maroon2:#8A2A38; --gold:#C0982F; --gold2:#E3C868;
+    --line:#E3D7C2; --green:#2F6B4F; --red:#9B3030;
+  }
+  *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  html,body{margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif; color:var(--ink); background:var(--paper); font-size:10.5pt; line-height:1.5;}
+  h1,h2,h3{font-family:'Playfair Display',serif; margin:0; line-height:1.14;}
+  .page{width:210mm; height:296mm; padding:17mm 16mm; position:relative; page-break-after:always; overflow:hidden;}
+  .page:last-child{page-break-after:auto;}
+  @page{size:A4; margin:0;}
+
+  .cover{background:radial-gradient(120% 80% at 30% 10%, #3a0d16, #2a0810 50%, #160307); color:#F4ECDD; display:flex; flex-direction:column; justify-content:space-between;}
+  .cover .kick{letter-spacing:.4em; font-size:9pt; text-transform:uppercase; color:var(--gold2); font-weight:600;}
+  .cover h1{font-size:48pt; font-weight:900; color:#fff; margin:7mm 0 0;}
+  .cover .sub{font-family:'Cormorant Garamond'; font-style:italic; font-size:19pt; color:var(--gold2); margin-top:3mm;}
+  .cover .rule{height:2px; width:46mm; background:linear-gradient(90deg,var(--gold),transparent); margin:9mm 0;}
+  .cover .meta{font-size:10pt; color:#D8C3A0; line-height:1.9;}
+  .cover .foot{font-size:8.5pt; color:#B89C70; letter-spacing:.05em; border-top:1px solid rgba(255,255,255,.12); padding-top:4mm;}
+  .conf{display:inline-block; border:1px solid var(--gold2); color:var(--gold2); font-size:7.5pt; letter-spacing:.25em; padding:1.5mm 3mm; border-radius:4px; margin-bottom:6mm;}
+
+  .eyebrow{font-size:8pt; letter-spacing:.3em; text-transform:uppercase; color:var(--maroon); font-weight:700; margin-bottom:3mm;}
+  h2.title{font-size:23pt; color:var(--maroon); font-weight:800;}
+  .gold-rule{height:3px; width:26mm; background:var(--gold); margin:4mm 0 6mm;}
+  p.intro{color:var(--ink2); font-size:10.5pt; margin:0 0 6mm;}
+
+  table{width:100%; border-collapse:collapse; margin:3mm 0 6mm; font-size:9.3pt;}
+  th{background:var(--maroon); color:#fff; text-align:left; padding:2.6mm 3mm; font-weight:600; font-size:8.8pt;}
+  td{padding:2.4mm 3mm; border-bottom:1px solid var(--line); color:var(--ink2);}
+  tr:nth-child(even) td{background:var(--paper2);}
+  td.num,th.num{text-align:right; font-variant-numeric:tabular-nums;}
+  .pos{color:var(--green); font-weight:600;} .neg{color:var(--red); font-weight:600;}
+  caption{caption-side:top; text-align:left; font-size:8pt; color:var(--ink2); font-style:italic; margin-bottom:1.5mm;}
+
+  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:4mm; margin:2mm 0 7mm;}
+  .kpi{background:#fff; border:1px solid var(--line); border-top:3px solid var(--gold); border-radius:2mm; padding:5mm;}
+  .kpi .v{font-family:'Playfair Display'; font-size:24pt; font-weight:800; color:var(--maroon);}
+  .kpi .l{font-size:8.5pt; color:var(--ink2); margin-top:1mm; line-height:1.35;}
+  .kpi.dark{background:var(--maroon); border-top-color:var(--gold2);}
+  .kpi.dark .v{color:var(--gold2);} .kpi.dark .l{color:#E6D4BC;}
+
+  .callout{background:var(--paper2); border-left:4px solid var(--maroon); border-radius:2mm; padding:5mm 6mm; margin:5mm 0; font-size:10pt; color:var(--ink);}
+  .callout b{color:var(--maroon);}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:6mm;}
+  h3.sub{font-size:13pt; color:var(--maroon); margin:5mm 0 2mm;}
+  .footer-tag{position:absolute; bottom:8mm; left:16mm; right:16mm; display:flex; justify-content:space-between; font-size:7.5pt; letter-spacing:.16em; text-transform:uppercase; color:#B3A488; border-top:1px solid var(--line); padding-top:3mm;}
+  .src{font-size:7.8pt; color:#9A8C76; margin-top:2mm; line-height:1.6;}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<section class="page cover">
+  <div>
+    <div class="kick">Relish · International Veg Cuisine</div>
+    <h1>Pricing &amp;<br>Unit Economics</h1>
+    <div class="sub">the business case behind the brochure</div>
+    <div class="rule"></div>
+    <div class="meta">
+      Market — India (₹ INR) &nbsp;·&nbsp; FX basis ₹86 / USD<br>
+      Scale frame — 50–500 restaurants<br>
+      All sticker prices exclusive of 18% GST<br>
+      Prepared 2026 · Internal / investor use
+    </div>
+  </div>
+  <div>
+    <span class="conf">CONFIDENTIAL</span>
+    <div class="foot">Grounded in 2025–26 hosting, payment &amp; competitor data. Sources cited throughout. View-volume is the single biggest swing factor and is modelled, not measured.</div>
+  </div>
+</section>
+
+<!-- HEADLINE ECONOMICS -->
+<section class="page">
+  <div class="eyebrow">The thesis in four numbers</div>
+  <h2 class="title">Money in the build. Recurring in the renewal.</h2>
+  <div class="gold-rule"></div>
+  <div class="kpis">
+    <div class="kpi dark"><div class="v">₹15k–90k</div><div class="l">One-time go-live fee per restaurant — the revenue engine</div></div>
+    <div class="kpi"><div class="v">55–70%</div><div class="l">Gross margin on the build, after AI-video COGS</div></div>
+    <div class="kpi"><div class="v">75–87%</div><div class="l">Margin on the ₹2,999–4,999/yr renewal — real recurring</div></div>
+    <div class="kpi"><div class="v">₹0</div><div class="l">Video egress on Cloudflare R2 — the hosting cost lever</div></div>
+  </div>
+  <p class="intro">Relish charges a single all-inclusive <b>one-time fee</b> to design, build and launch the menu — including the costly, multi-pass AI video generation. The <b>annual renewal</b> (₹2,999–4,999/yr) keeps the menu hosted, supported and updated — and because cost-to-serve is tiny, it carries a high margin and builds a real recurring revenue base on top of the build. Charging one number plus a yearly renewal, not a stack of line items, is what makes it pitchable.</p>
+
+  <div class="callout"><b>The wedge:</b> no competitor in India bundles cinematic / AI-generated video into a clean one-time price. Relish absorbs the expensive part (video that rarely lands in one pass) and gives only a small discount when the restaurant supplies its own media — so a bring-your-own-video build is actually our <b>highest-margin job</b>.</div>
+
+  <h3 class="sub">Cost-to-serve per restaurant / year</h3>
+  <table>
+    <caption>Renewal sits far above this line — the recurring stream is high-margin.</caption>
+    <tr><th>Package</th><th class="num">Hosting + infra</th><th class="num">Video egress</th><th class="num">Support alloc.</th><th class="num">Total / restaurant / yr</th></tr>
+    <tr><td>Web Menu — static site, no dashboard</td><td class="num">₹120</td><td class="num">₹0</td><td class="num">₹280</td><td class="num">~₹400</td></tr>
+    <tr><td>Classic — image menu + console</td><td class="num">₹200</td><td class="num">₹0</td><td class="num">₹500</td><td class="num">~₹700</td></tr>
+    <tr><td>Cinematic — R2 / Bunny video</td><td class="num">₹300</td><td class="num">₹120</td><td class="num">₹600</td><td class="num">~₹1,020</td></tr>
+    <tr><td>Signature — heavy video</td><td class="num">₹400</td><td class="num">₹250</td><td class="num">₹700</td><td class="num">~₹1,350</td></tr>
+  </table>
+  <div class="footer-tag"><span>Relish · Pricing &amp; Unit Economics</span><span>02</span></div>
+</section>
+
+<!-- COST STRUCTURE -->
+<section class="page">
+  <div class="eyebrow">Where the money goes</div>
+  <h2 class="title">Cost structure.</h2>
+  <div class="gold-rule"></div>
+
+  <h3 class="sub">Cloud hosting (monthly) — non-video infra is near-free at our scale</h3>
+  <table>
+    <tr><th>Provider / tier</th><th class="num">INR / mo</th><th>What you get</th></tr>
+    <tr><td>Cloudflare Pages (Free)</td><td class="num">₹0</td><td>Unlimited static bandwidth, 500 builds/mo</td></tr>
+    <tr><td>Cloudflare Workers (Paid)</td><td class="num">₹430</td><td>10M requests for the small backend/API</td></tr>
+    <tr><td>Supabase Pro</td><td class="num">₹2,150</td><td>8 GB DB, 100 GB storage, auth, 100K MAU</td></tr>
+    <tr><td>Hostinger India VPS (alt)</td><td class="num">₹599+</td><td>INR-native root NVMe VPS</td></tr>
+    <tr><td><b>Whole-platform fixed cost</b></td><td class="num"><b>≈ ₹2,580</b></td><td>CF Pages + Workers + Supabase, all restaurants</td></tr>
+  </table>
+
+  <h3 class="sub">Video streaming — the only variable that matters</h3>
+  <table>
+    <caption>Worked example: ~10 clips/restaurant, ~20 GB egress/month.</caption>
+    <tr><th>Provider</th><th>Egress price</th><th class="num">Cost / restaurant / mo</th></tr>
+    <tr><td>Cloudflare R2</td><td>$0 / GB (free egress)</td><td class="num pos">~₹0</td></tr>
+    <tr><td>Bunny Stream / CDN</td><td>$0.005 / GB</td><td class="num pos">~₹9</td></tr>
+    <tr><td>Mux (per-minute)</td><td>$0.0008 / min (720p)</td><td class="num">~₹114</td></tr>
+    <tr><td>Cloudflare Stream (per-minute)</td><td>$1 / 1,000 min delivered</td><td class="num">~₹144</td></tr>
+    <tr><td>AWS CloudFront (India edge)</td><td>$0.109 / GB</td><td class="num neg">~₹187</td></tr>
+  </table>
+  <div class="callout"><b>Strategy:</b> serve short looping menu clips from <b>Cloudflare R2 (free egress)</b> or Bunny. Avoid per-minute models (Stream/Mux) and the India CloudFront edge as view counts grow. Veo-3 generation is a <b>one-time</b> ~₹260–520/clip, recovered by the ₹1,999 production fee.</div>
+  <div class="footer-tag"><span>Relish · Pricing &amp; Unit Economics</span><span>03</span></div>
+</section>
+
+<!-- PRICING & MARGINS -->
+<section class="page">
+  <div class="eyebrow">Packages, build margin &amp; renewal</div>
+  <h2 class="title">What we charge, and what we keep.</h2>
+  <div class="gold-rule"></div>
+
+  <h3 class="sub">Packages (per location, ex-GST)</h3>
+  <table>
+    <tr><th>Package</th><th class="num">One-time</th><th class="num">Renewal / yr</th><th>Video</th><th>Segment</th></tr>
+    <tr><td>Web Menu</td><td class="num">₹15,000</td><td class="num">₹2,999</td><td>None · no dashboard</td><td>Menu-only website, no backend</td></tr>
+    <tr><td>Classic</td><td class="num">₹24,999</td><td class="num">₹2,999</td><td>None (images)</td><td>Café / QSR + staff console</td></tr>
+    <tr><td>Cinematic ⭐</td><td class="num">₹54,999</td><td class="num">₹4,999</td><td>AI video menu</td><td>Casual &amp; premium dining</td></tr>
+    <tr><td>Signature</td><td class="num">₹89,999</td><td class="num">₹4,999</td><td>Full cinematic</td><td>Fine-dining / flagship</td></tr>
+  </table>
+
+  <h3 class="sub">Build economics — Cinematic package</h3>
+  <table>
+    <tr><th>Line</th><th class="num">INR (one-time)</th></tr>
+    <tr><td>Go-live fee</td><td class="num">₹54,999</td></tr>
+    <tr><td>COGS — AI video generation (Higgsfield / Veo, multi-pass)</td><td class="num">−₹20,000</td></tr>
+    <tr><td>COGS — images, setup, QR, training</td><td class="num">−₹5,000</td></tr>
+    <tr><td><b>Build gross profit</b></td><td class="num pos"><b>₹29,999 · ~55%</b></td></tr>
+  </table>
+
+  <div class="two">
+    <div>
+      <h3 class="sub">Bring-your-own-media discount</h3>
+      <table>
+        <tr><th>Client provides</th><th class="num">Off one-time</th></tr>
+        <tr><td>Dish photos (we skip image work)</td><td class="num">−₹3,000</td></tr>
+        <tr><td>Ready videos (we skip costly AI gen)</td><td class="num">−₹5,000</td></tr>
+        <tr><td>Both</td><td class="num">−₹7,000</td></tr>
+      </table>
+      <p class="src" style="margin-top:1mm;">Discount stays small while we save ~₹20k of gen cost — so BYO-video is margin-accretive, and the client still feels rewarded.</p>
+    </div>
+    <div>
+      <h3 class="sub">Renewal economics (recurring)</h3>
+      <table>
+        <tr><th>Renewal / yr</th><th class="num">Cost/yr</th><th class="num">Margin</th></tr>
+        <tr><td>Web Menu ₹2,999</td><td class="num">₹400</td><td class="num pos">~87%</td></tr>
+        <tr><td>Classic ₹2,999</td><td class="num">₹700</td><td class="num pos">~77%</td></tr>
+        <tr><td>Cinematic ₹4,999</td><td class="num">₹1,020</td><td class="num pos">~80%</td></tr>
+        <tr><td>Signature ₹4,999</td><td class="num">₹1,350</td><td class="num pos">~73%</td></tr>
+      </table>
+      <p class="src" style="margin-top:1mm;">High-margin recurring on top of the build — hosting, support and updates cost little to deliver.</p>
+    </div>
+  </div>
+  <p class="src" style="margin-top:3mm;">Other revenue lines: multi-location / chain quotes, bespoke custom theme (₹9,999–24,999), annual video refresh, additional language packs. Setup, photography and QR tents are folded into the one-time fee.</p>
+  <div class="footer-tag"><span>Relish · Pricing &amp; Unit Economics</span><span>04</span></div>
+</section>
+
+<!-- PAYMENT, GST, COMPETITORS, SENSITIVITY -->
+<section class="page">
+  <div class="eyebrow">Mechanics, market &amp; sensitivity</div>
+  <h2 class="title">The numbers that move the model.</h2>
+  <div class="gold-rule"></div>
+
+  <h3 class="sub">Payment &amp; GST mechanics</h3>
+  <table>
+    <tr><th>Item</th><th>Rate</th><th>Effect</th></tr>
+    <tr><td>Razorpay domestic (UPI/card/netbanking)</td><td>2% + 18% GST on fee</td><td>≈ 2.36% effective off the top</td></tr>
+    <tr><td>GST on the build &amp; renewal</td><td>18%</td><td>Added on top; ₹54,999 build → ₹64,899 to customer</td></tr>
+    <tr><td>GST registration threshold (services)</td><td>₹20 lakh turnover</td><td>Mandatory above; collect &amp; remit</td></tr>
+  </table>
+
+  <h3 class="sub">Competitor benchmark (India)</h3>
+  <table>
+    <tr><th>Product</th><th>Model</th><th class="num">INR / mo</th><th>Note</th></tr>
+    <tr><td>Petpooja (POS + QR)</td><td>Annual</td><td class="num">₹625–833</td><td>The price anchor customers compare to</td></tr>
+    <tr><td>DotPe</td><td>Per-transaction</td><td class="num">variable</td><td>No fixed fee; payments-led</td></tr>
+    <tr><td>MENU TIGER</td><td>SaaS (USD)</td><td class="num">₹3,268–10,234</td><td>International pure-QR SaaS</td></tr>
+    <tr><td>myDigiMenu</td><td>SaaS (USD)</td><td class="num">₹3,354+</td><td>No free tier in India</td></tr>
+  </table>
+  <div class="callout">Competitors sell <b>monthly SaaS</b> (Petpooja ₹625–833/mo; global players ₹3,300–10,000/mo). Relish sells a <b>one-time build + nominal annual renewal</b> — a different, easier-to-say-yes-to shape, premium on the build (justified by cinematic + video + AI) and almost free to keep. And Relish is <b>alone in bundling cinematic video into one price</b>.</div>
+
+  <h3 class="sub">Sensitivity — the levers to watch</h3>
+  <table>
+    <tr><th>Input</th><th>Base</th><th>Why it matters</th></tr>
+    <tr><td>AI-video gen passes / clip</td><td>~5–10</td><td>The biggest COGS swing on the build — Higgsfield/Veo rarely lands first try</td></tr>
+    <tr><td>BYO-media take rate</td><td>—</td><td>Cuts our COGS as much as the quote; protects build margin</td></tr>
+    <tr><td>FX rate (INR/USD)</td><td>₹86</td><td>Moves every USD-priced gen &amp; hosting line</td></tr>
+    <tr><td>Video host</td><td>R2 / Bunny</td><td>₹0 vs ₹187 per restaurant — the renewal cost lever</td></tr>
+  </table>
+  <p class="src">All inputs are adjustable in <b>commercial/Relish-Pricing.csv</b>. Sources: Vercel, Cloudflare (R2/Stream/Pages/Workers), Bunny, Mux, AWS (CloudFront/Lightsail), Supabase, Neon, Hostinger, DigitalOcean, Razorpay, Petpooja, MENU TIGER, myDigiMenu pricing pages (2025–26). Confidence high on rates; medium on view-volume assumption.</p>
+  <div class="footer-tag"><span>Relish · Pricing &amp; Unit Economics</span><span>05</span></div>
+</section>
+
+</body>
+</html>
