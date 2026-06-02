@@ -12,7 +12,8 @@
     "optimize-images": "node scripts/optimize-images.mjs",
     "fetch:videos": "node scripts/fetch-videos.mjs",
     "pitch:capture": "node scripts/pitch/capture.mjs && node scripts/pitch/capture2.mjs",
-    "pitch:pdf": "node scripts/pitch/render.mjs"
+    "pitch:pdf": "node scripts/pitch/render.mjs Relish-Pitch-by-TheShahStack.pdf pitch/index.html && node scripts/pitch/render.mjs Relish-Sales-Deck.pdf pitch/sales.html",
+    "pitch:pdf:client": "PITCH_CLEAN=1 node scripts/pitch/render.mjs Relish-Pitch-Client.pdf pitch/index.html && PITCH_CLEAN=1 node scripts/pitch/render.mjs Relish-Sales-Deck-Client.pdf pitch/sales.html"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

@@ -13,10 +13,23 @@ const ROOT = process.cwd()
 const PORT = 8123
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' }
 
+const CLEAN = process.env.PITCH_CLEAN === '1'
+// Clean (client-facing) mode: strip the presenter layer (the playbook page +
+// every "Pitch it" note) by REMOVING those nodes from the DOM — a synchronous
+// inline script injected right before the Paged.js script, so pagination runs
+// on the reduced document (display:none would leave an empty page behind).
+const CLEAN_SCRIPT = '<script>document.querySelectorAll(".note, section[data-section=\'Pitch Playbook\']").forEach(function(n){n.remove()})</script>\n'
+const PAGED_TAG = '<script src="./paged.polyfill.js">'
+
 const server = http.createServer((req, res) => {
   const file = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]))
   if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.statusCode = 404; return res.end('not found') }
-  res.setHeader('Content-Type', MIME[path.extname(file)] || 'application/octet-stream')
+  const ext = path.extname(file)
+  res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream')
+  if (CLEAN && ext === '.html') {
+    const html = fs.readFileSync(file, 'utf8').replace(PAGED_TAG, CLEAN_SCRIPT + PAGED_TAG)
+    return res.end(html)
+  }
   fs.createReadStream(file).pipe(res)
 })
 await new Promise(r => server.listen(PORT, r))
