@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { type Category, type MenuItem } from '../data/menu'
 import { MenuCard } from '../components/molecules/MenuCard'
+import { FeaturedBento } from '../components/molecules/FeaturedBento'
 import { LqipVideo } from '../components/atoms/LqipVideo'
 import { useMediaMode } from '../theme/MediaModeContext'
 import { resolveCategoryVideo } from '../data/videoManifest'
@@ -137,6 +138,9 @@ export function CategoryPage({ category, onItemTap, onRecommend }: CategoryPageP
 
       {/* Item list — responsive grid (1 / 2 / 3 columns) */}
       <div className="px-4 py-4 w-full max-w-5xl mx-auto">
+        {/* Chef's Picks bento — asymmetric featured intro (theme-aware) */}
+        <FeaturedBento items={category.items} onTap={onItemTap} />
+
         <motion.ul
           variants={stagger}
           initial="hidden"

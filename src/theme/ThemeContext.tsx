@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react'
-import { type UiTheme, type ThemeTokens, THEMES } from './themes'
+import { type UiTheme, type ThemeTokens, THEMES, shadcnVars } from './themes'
 
 interface ThemeCtx {
   theme: UiTheme
@@ -14,7 +14,7 @@ const STORAGE_KEY = 'relish-ui-theme'
 function readStored(): UiTheme {
   try {
     const s = localStorage.getItem(STORAGE_KEY)
-    if (s === 'warm' || s === 'hybrid' || s === 'brutalist') return s
+    if (s === 'warm' || s === 'hybrid' || s === 'brutalist' || s === 'editorial') return s
   } catch {
     /* ignore */
   }
@@ -30,6 +30,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    // Mirror the active theme's shadcn token set onto :root so shadcn / Cult UI /
+    // Watermelon components — including Radix overlays that portal to document.body
+    // (outside the .app-shell where data-ui-theme lives) — inherit the active skin.
+    const root = document.documentElement
+    const vars = shadcnVars(THEMES[theme])
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
   }, [theme])
 
   const value = useMemo(

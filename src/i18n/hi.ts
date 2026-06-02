@@ -268,6 +268,7 @@ export const hi: Record<TranslationKey, string> = {
   'reco.picksTitle': 'आपकी रेलिश पसंद',
   'reco.picksSubtitle': 'आपकी पसंद के आधार पर',
   'reco.topPick': 'आपके लिए सर्वोत्तम पसंद',
+  'reco.chefsPicks': 'शेफ की पसंद',
   'reco.selectToContinue': 'जारी रखने के लिए कम से कम एक विकल्प चुनें',
   'reco.everythingWorthTrying': 'हमारे मेन्यू में हर चीज़ चखने लायक है!',
   'reco.notSureWhat': 'क्या ऑर्डर करें, तय नहीं कर पा रहे?',

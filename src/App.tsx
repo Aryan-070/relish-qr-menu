@@ -19,12 +19,14 @@ import { fadeIn } from './animations/variants'
 // page navigation), see src/lib/tableSession.ts.
 const GUEST_TABLE_ID = resolveGuestTableId()
 import { ThemeProvider, useTheme } from './theme/ThemeContext'
+import { ComponentStyleProvider } from './theme/ComponentStyleContext'
 import { MediaModeProvider } from './theme/MediaModeContext'
 import { OpsProvider, useOpsStore } from './console/store/useOpsStore'
 import { AuthProvider } from './console/auth/AuthContext'
 import { LanguageProvider, LanguageSwitcher } from './i18n'
 import { ThemeSwitcher } from './components/molecules/ThemeSwitcher'
 import { MediaModeSwitcher } from './components/molecules/MediaModeSwitcher'
+import { DynamicOrderIsland, type IslandMode } from './components/DynamicOrderIsland'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 // Code-split: non-default landings + secondary screens load on demand
@@ -64,6 +66,13 @@ function AppInner() {
   const [waiterOpen, setWaiterOpen] = useState(false)
   const [orderOpen, setOrderOpen] = useState(false)
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null)
+  // Transient status the Dynamic Island flashes (placed/waiter) before settling
+  // back to its derived cart/idle state.
+  const [islandFlash, setIslandFlash] = useState<'placed' | 'waiter' | null>(null)
+  const flashIsland = (m: 'placed' | 'waiter') => {
+    setIslandFlash(m)
+    window.setTimeout(() => setIslandFlash(null), 4000)
+  }
 
   const { orderItems, addItem, addCombo, removeItem, updateQuantity, updateNote, clear, total, count } = useOrder()
   const ops = useOpsStore()
@@ -83,7 +92,7 @@ function AppInner() {
   // so hook order stays stable across guest/staff toggles (Rules of Hooks).
   if (appMode === 'staff') {
     return (
-      <div className="app-shell" data-ui-theme={theme}>
+      <div className="app-shell console-shell" data-ui-theme={theme}>
         <Suspense fallback={null}>
           <ConsoleApp onExit={exitStaff} />
         </Suspense>
@@ -98,7 +107,7 @@ function AppInner() {
 
   const goToRecommend = () => setScreen('recommend')
 
-  const openWaiter = () => setWaiterOpen(true)
+  const openWaiter = () => { setWaiterOpen(true); flashIsland('waiter') }
 
   const handleItemTap = (item: MenuItem) => setSelectedItem(item)
 
@@ -159,6 +168,7 @@ function AppInner() {
       source: 'guest',
     }
     ops.placeOrder(order)
+    flashIsland('placed')
     // Accrue loyalty points for a linked member (1 point per ₹10 spent).
     if (activeCustomerId) ops.adjustPoints(activeCustomerId, Math.floor(total / 10))
     // Cart is cleared when the panel closes (see OrderPanel onWaiter), so the
@@ -306,6 +316,17 @@ function AppInner() {
         onLinkCustomer={setActiveCustomerId}
       />
 
+      {/* Dynamic Island — live order/waiter status; appears only when there's
+          something to surface (cart items or a transient placed/waiter flash). */}
+      {(screen === 'menu' || screen === 'recommend') && (count > 0 || islandFlash) && (
+        <DynamicOrderIsland
+          mode={(islandFlash ?? 'cart') as IslandMode}
+          count={count}
+          total={total}
+          onView={() => setOrderOpen(true)}
+        />
+      )}
+
       {/* Global UI-theme switcher — collapsed gear, anchored per-screen so it never overlaps nav */}
       <ThemeSwitcher screen={screen} />
 
@@ -342,15 +363,17 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <MediaModeProvider>
+        <ComponentStyleProvider>
+          <MediaModeProvider>
           <LanguageProvider>
             <AuthProvider>
-              <OpsProvider>
-                <AppInner />
-              </OpsProvider>
-            </AuthProvider>
-          </LanguageProvider>
-        </MediaModeProvider>
+                <OpsProvider>
+                  <AppInner />
+                </OpsProvider>
+              </AuthProvider>
+            </LanguageProvider>
+          </MediaModeProvider>
+        </ComponentStyleProvider>
       </ThemeProvider>
     </ErrorBoundary>
   )

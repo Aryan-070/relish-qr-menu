@@ -3,6 +3,9 @@ import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import { type MenuItem, getCategoryForItem } from '../../data/menu'
 import { useTheme } from '../../theme/ThemeContext'
+import { useComponentStyle } from '../../theme/ComponentStyleContext'
+import { TiltCard } from '../fx/TiltCard'
+import { SpotlightCard } from '../fx/SpotlightCard'
 import { CategoryIcon } from '../../lib/categoryIcons'
 import { LqipVideo } from '../atoms/LqipVideo'
 import { useMediaMode } from '../../theme/MediaModeContext'
@@ -10,6 +13,12 @@ import { resolveDishVideo } from '../../data/videoManifest'
 import { DietBadge, TagLabel, SpiceLevel, ChefSpecial } from '../atoms/DietaryBadges'
 import { formatMoney } from '../../lib/money'
 import { useT } from '../../i18n'
+
+/** #RRGGBB → rgba() with the given alpha. */
+function hexA(hex: string, a: number): string {
+  const h = hex.replace('#', '')
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`
+}
 
 const CATEGORY_BG: Record<string, string> = {
   beverages:  'linear-gradient(135deg,rgba(217,160,58,0.18),rgba(244,208,63,0.28))',
@@ -27,6 +36,7 @@ interface MenuCardProps {
 export function MenuCard({ item, onTap }: MenuCardProps) {
   const tr = useT()
   const { tokens: t } = useTheme()
+  const { style: engine } = useComponentStyle()
   const { posterOnly } = useMediaMode()
   const catId = getCategoryForItem(item.id)
   const bg = CATEGORY_BG[catId] ?? CATEGORY_BG.quickbites
@@ -37,21 +47,8 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
   const open = () => onTap(item)
   const addTap = (e: React.MouseEvent) => { e.stopPropagation(); onTap(item) }
 
-  return (
-    <motion.div
-      whileTap={{ scale: 0.985 }}
-      onClick={open}
-      className="flex items-stretch gap-3 cursor-pointer"
-      style={{
-        background: t.cardBg,
-        borderRadius: t.cardRadius,
-        border: isRule ? 'none' : t.cardBorder,
-        borderBottom: isRule ? `1.5px solid ${t.ruleColor}` : t.cardBorder,
-        boxShadow: t.cardShadow,
-        padding: 12,
-        minHeight: 88,
-      }}
-    >
+  const inner = (
+    <>
       {/* Thumbnail — vertically centered, 80px, theme radius */}
       <div
         className="relative overflow-hidden flex items-center justify-center"
@@ -141,6 +138,52 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
           </div>
         </div>
       </div>
+    </>
+  )
+
+  const cardStyle: React.CSSProperties = {
+    background: t.cardBg,
+    borderRadius: t.cardRadius,
+    border: isRule ? 'none' : t.cardBorder,
+    borderBottom: isRule ? `1.5px solid ${t.ruleColor}` : t.cardBorder,
+    boxShadow: t.cardShadow,
+    padding: 12,
+    minHeight: 88,
+  }
+
+  // Spectacle engine: 3D tilt + cursor-tracked spotlight behind the content.
+  // Rule-list themes (hybrid/brutalist) skip tilt — a flat editorial list reads
+  // wrong in 3D — and only get the spotlight sheen.
+  if (engine === 'spectacle') {
+    const spotlit = (
+      <SpotlightCard
+        onClick={open}
+        color={hexA(t.accent, 0.14)}
+        className="flex items-stretch gap-3 cursor-pointer"
+        style={{ ...cardStyle, overflow: 'hidden' }}
+      >
+        {inner}
+      </SpotlightCard>
+    )
+    return isRule ? spotlit : <TiltCard max={6}>{spotlit}</TiltCard>
+  }
+
+  // Motion engine: spring lift + deepened tinted shadow on hover.
+  const motionHover =
+    engine === 'motion' && !isRule
+      ? { y: -3, boxShadow: `0 14px 34px ${hexA(t.accent, 0.16)}` }
+      : undefined
+
+  return (
+    <motion.div
+      whileTap={{ scale: 0.985 }}
+      whileHover={motionHover}
+      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+      onClick={open}
+      className="flex items-stretch gap-3 cursor-pointer"
+      style={cardStyle}
+    >
+      {inner}
     </motion.div>
   )
 }

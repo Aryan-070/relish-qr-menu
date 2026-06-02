@@ -3,6 +3,10 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
 import { cn } from '../lib/format'
 
+// Data-density: numeric (right-aligned) columns render in mono with tabular
+// figures so digits line up column-wise — the dashboard reads as an instrument.
+const MONO = "'Geist Mono','JetBrains Mono',monospace"
+
 export interface Column<Row> {
   key: string
   header: string
@@ -117,15 +121,23 @@ export function DataTable<Row>({
           ) : (
             sorted.map(row => (
               <tr key={rowKey(row)} style={{ borderBottom: `1px solid ${t.ruleColor}` }} className="hover:bg-black/[0.02]">
-                {columns.map(col => (
-                  <td
-                    key={col.key}
-                    className="py-2.5 px-2"
-                    style={{ textAlign: col.align ?? 'left', fontFamily: t.descFont, color: t.ink }}
-                  >
-                    {col.render(row)}
-                  </td>
-                ))}
+                {columns.map(col => {
+                  const numeric = col.align === 'right'
+                  return (
+                    <td
+                      key={col.key}
+                      className="py-2.5 px-2"
+                      style={{
+                        textAlign: col.align ?? 'left',
+                        fontFamily: numeric ? MONO : t.descFont,
+                        fontVariantNumeric: numeric ? 'tabular-nums' : undefined,
+                        color: t.ink,
+                      }}
+                    >
+                      {col.render(row)}
+                    </td>
+                  )
+                })}
               </tr>
             ))
           )}

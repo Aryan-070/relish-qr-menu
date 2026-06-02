@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { LqipImage } from './LqipImage'
 import { acquire, release } from '../../lib/videoPlayback'
 import { pickRendition, type Rendition } from '../../lib/pickRendition'
+import { useTheme } from '../../theme/ThemeContext'
 
 interface LqipVideoProps {
   /** Single resolved source (legacy / fixed-quality). Prefer `renditions`. */
@@ -59,6 +60,10 @@ export function LqipVideo({
   rootMargin = '200px',
   onError,
 }: LqipVideoProps) {
+  // Theme-driven media grade — e.g. editorial warms all footage into the cream
+  // palette. Undefined for the other themes → no filter cost.
+  const { tokens: theme } = useTheme()
+  const grade = theme.videoFilter
   // Pick the network-appropriate rendition ONCE at mount (no runtime swaps for a
   // decorative loop). null → poster-only (saveData / reduced-data).
   const [chosenSrc] = useState<string | null>(() =>
@@ -138,7 +143,7 @@ export function LqipVideo({
         src={poster}
         alt={alt}
         wrapperClassName={wrapperClassName}
-        wrapperStyle={wrapperStyle}
+        wrapperStyle={{ ...wrapperStyle, filter: grade }}
         imgClassName={videoClassName}
         placeholder={placeholder}
         onError={onError}
@@ -153,7 +158,7 @@ export function LqipVideo({
       /* position via inline style so a caller's `absolute inset-0` (passed as
          wrapperStyle) wins — a `relative` utility class would otherwise beat
          `absolute` on CSS source order and collapse the box to 0 height. */
-      style={{ position: 'relative', ...wrapperStyle }}
+      style={{ position: 'relative', ...wrapperStyle, filter: grade }}
     >
       {/* Poster layer — always underneath; carries the blur-up + gradient placeholder. */}
       <LqipImage

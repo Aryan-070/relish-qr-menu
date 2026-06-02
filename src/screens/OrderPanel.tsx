@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Trash2, Plus, Minus, MessageSquare, CheckCircle2 } from 'lucide-react'
 import { type OrderItem } from '../hooks/useOrder'
 import { Price } from '../components/atoms/Price'
+import { AnimatedNumber } from '../components/ui/animated-number'
 import { formatMoney } from '../lib/money'
 import { useT } from '../i18n'
 import { btnPrimary, btnIcon, btnStep } from '../animations/variants'
@@ -209,7 +210,7 @@ export function OrderPanel({
                                   value={orderItem.note ?? ''}
                                   onChange={e => onUpdateNote(key, e.target.value)}
                                   rows={2}
-                                  className="w-full font-inter text-[12px] resize-none rounded-lg px-3 py-2 outline-none"
+                                  className="w-full font-inter text-[12px] resize-none rounded-[8px] px-3 py-2 outline-none"
                                   style={{
                                     background: 'rgba(217,160,58,0.08)',
                                     border: '1px solid rgba(217,160,58,0.3)',
@@ -256,7 +257,7 @@ export function OrderPanel({
                       {tr('order.total')}
                     </p>
                     <p className="font-playfair font-bold text-[22px]" style={{ color: 'var(--maroon)' }}>
-                      {formatMoney(total)}
+                      <AnimatedNumber value={total} format={formatMoney} />
                     </p>
                   </div>
                   <p className="font-inter text-[11px]" style={{ color: 'var(--mute)' }}>

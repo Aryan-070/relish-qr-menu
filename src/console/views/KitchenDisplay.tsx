@@ -86,7 +86,7 @@ function Ticket({ order, table, now, stationFilter, onAdvance }: TicketProps) {
             <span className="text-[15px] font-semibold truncate" style={{ color: t.ink, fontFamily: t.descFont }}>
               {table?.label ?? order.tableId}
             </span>
-            <span className="text-[11px]" style={{ color: t.descColor, fontFamily: t.descFont }}>
+            <span className="text-[11px] tabular-nums" style={{ color: t.descColor, fontFamily: "'Geist Mono','JetBrains Mono',monospace" }}>
               {order.id}
             </span>
             {order.source === 'guest' && (
@@ -99,8 +99,8 @@ function Ticket({ order, table, now, stationFilter, onAdvance }: TicketProps) {
             )}
           </div>
           <span
-            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 shrink-0"
-            style={{ background: age.tint, color: age.fg, borderRadius: isHard(t) ? 0 : 999, fontFamily: t.descFont }}
+            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 shrink-0 tabular-nums"
+            style={{ background: age.tint, color: age.fg, borderRadius: isHard(t) ? 0 : 999, fontFamily: "'Geist Mono','JetBrains Mono',monospace" }}
           >
             <Clock size={11} /> {minutes}m
           </span>
@@ -114,7 +114,7 @@ function Ticket({ order, table, now, stationFilter, onAdvance }: TicketProps) {
             return (
               <div key={`${line.itemId}-${idx}`} style={{ opacity: dim ? 0.32 : 1 }}>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-[13px] font-semibold tabular-nums" style={{ color: age.fg, fontFamily: t.descFont }}>
+                  <span className="text-[13px] font-semibold tabular-nums" style={{ color: age.fg, fontFamily: "'Geist Mono','JetBrains Mono',monospace" }}>
                     {line.qty}×
                   </span>
                   <span className="text-[13px] font-medium" style={{ color: t.ink, fontFamily: t.descFont }}>

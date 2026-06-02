@@ -268,6 +268,7 @@ export const en = {
   'reco.picksTitle': 'Your Relish Picks',
   'reco.picksSubtitle': 'Based on your preferences',
   'reco.topPick': 'Top Pick for You',
+  'reco.chefsPicks': "Chef's Picks",
   'reco.selectToContinue': 'Select at least one option to continue',
   'reco.everythingWorthTrying': 'Everything on our menu is worth trying!',
   'reco.notSureWhat': 'Not sure what to order?',

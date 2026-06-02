@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
 import { THEME_ORDER, THEMES } from '../../theme/themes'
+import { useComponentStyle, COMPONENT_STYLES } from '../../theme/ComponentStyleContext'
 
 type ScreenKind = 'cover' | 'menu' | 'recommend'
 
@@ -23,6 +24,7 @@ interface ThemeSwitcherProps {
  */
 export function ThemeSwitcher({ screen = 'menu' }: ThemeSwitcherProps) {
   const { theme, setTheme } = useTheme()
+  const { style: engine, setStyle } = useComponentStyle()
   const [open, setOpen] = useState(false)
 
   // Safe anchor per screen so the collapsed gear never sits in a tappable band.
@@ -85,45 +87,84 @@ export function ThemeSwitcher({ screen = 'menu' }: ThemeSwitcherProps) {
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.9, x: openLeft ? -8 : 8 }}
               transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-              className="flex items-center gap-1"
-              style={{ order: 1 }}
+              className="flex flex-col gap-1.5 rounded-2xl p-2"
+              style={{
+                order: 1,
+                maxWidth: 188,
+                background: 'rgba(252,250,245,0.95)',
+                border: '1px solid rgba(0,0,0,0.08)',
+                backdropFilter: 'blur(14px)',
+                WebkitBackdropFilter: 'blur(14px)',
+                boxShadow: '0 6px 22px rgba(0,0,0,0.16)',
+              }}
             >
-              <span
-                className="font-inter uppercase mr-0.5"
-                style={{ fontSize: 7, letterSpacing: '0.18em', color: 'rgba(0,0,0,0.4)' }}
-                aria-hidden
-              >
-                UI
-              </span>
-              {THEME_ORDER.map(t => {
-                const active = theme === t
-                return (
-                  <motion.button
-                    key={t}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setTheme(t)}
-                    aria-pressed={active}
-                    aria-label={`${THEMES[t].label} theme`}
-                    className="px-2.5 py-1 rounded-full font-inter uppercase tracking-widest"
-                    style={{
-                      fontSize: 8,
-                      minHeight: 28,
-                      background: active ? 'rgba(139,16,36,0.92)' : 'rgba(255,255,255,0.82)',
-                      border: active ? '1px solid #8B1024' : '1px solid rgba(0,0,0,0.12)',
-                      color: active ? '#FFF8EA' : 'rgba(0,0,0,0.55)',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
-                      boxShadow: active ? '0 2px 8px rgba(139,16,36,0.3)' : '0 1px 4px rgba(0,0,0,0.08)',
-                    }}
-                  >
+              {/* Row 1 — colour theme */}
+              <PillRow label="UI">
+                {THEME_ORDER.map(t => (
+                  <Pill key={t} active={theme === t} onClick={() => setTheme(t)} ariaLabel={`${THEMES[t].label} theme`}>
                     {THEMES[t].label}
-                  </motion.button>
-                )
-              })}
+                  </Pill>
+                ))}
+              </PillRow>
+              {/* Row 2 — component engine (classic / motion / spectacle) */}
+              <PillRow label="FX">
+                {COMPONENT_STYLES.map(s => (
+                  <Pill key={s.id} active={engine === s.id} onClick={() => setStyle(s.id)} ariaLabel={`${s.label} components`}>
+                    {s.label}
+                  </Pill>
+                ))}
+              </PillRow>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
     </>
+  )
+}
+
+function PillRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      <span
+        className="font-inter uppercase mr-0.5 w-4 shrink-0"
+        style={{ fontSize: 7, letterSpacing: '0.16em', color: 'rgba(0,0,0,0.4)' }}
+        aria-hidden
+      >
+        {label}
+      </span>
+      {children}
+    </div>
+  )
+}
+
+function Pill({
+  active,
+  onClick,
+  ariaLabel,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  ariaLabel: string
+  children: React.ReactNode
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.9 }}
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={ariaLabel}
+      className="px-2.5 py-1 rounded-full font-inter uppercase tracking-widest"
+      style={{
+        fontSize: 8,
+        minHeight: 28,
+        background: active ? 'rgba(139,16,36,0.92)' : 'rgba(255,255,255,0.82)',
+        border: active ? '1px solid #8B1024' : '1px solid rgba(0,0,0,0.12)',
+        color: active ? '#FFF8EA' : 'rgba(0,0,0,0.55)',
+        boxShadow: active ? '0 2px 8px rgba(139,16,36,0.3)' : '0 1px 4px rgba(0,0,0,0.08)',
+      }}
+    >
+      {children}
+    </motion.button>
   )
 }
