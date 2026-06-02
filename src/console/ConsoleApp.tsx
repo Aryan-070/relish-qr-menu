@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ToastProvider } from './components/Toast'
 import { ConsoleShell } from './components/ConsoleShell'
+import { CommandPalette } from './components/CommandPalette'
 import { ViewProvider, type ViewContextValue } from './ViewContext'
 import { defaultViewFor, type ConsoleView } from './nav'
 import { DATE_RANGES, type DateRange, type Role } from './lib/types'
@@ -151,6 +152,12 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
             {renderView(activeView)}
           </motion.div>
         </ConsoleShell>
+        <CommandPalette
+          onExit={handleExit}
+          showRoleSwitcher={auth.mode === 'demo'}
+          onRole={handleRole}
+          onDateRange={(days) => setDateRange(DATE_RANGES.find(r => r.days === days)!)}
+        />
       </ViewProvider>
     </ToastProvider>
   )
