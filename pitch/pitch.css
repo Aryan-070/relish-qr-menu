@@ -176,5 +176,25 @@ ul.ticks li::before { content:'→'; position:absolute; left:0; color: var(--ora
 .timeline .t::before { content:''; position:absolute; left:-22pt; top:3pt; width:11px; height:11px; border-radius:50%; background: var(--grad); }
 .timeline .t .ph { font-family:'Clash Display'; font-weight:600; color: var(--purple-deep); font-size: 11pt; }
 
+/* ── Presenter helper notes (a coaching layer, not client copy) ── */
+.note { break-inside: avoid; margin-top: 11pt; border-radius: 11px; background: #FFF6EF; border: 1px solid #FFD7BD; border-left: 4px solid var(--orange); padding: 9pt 12pt; }
+.note .lab { font-family: 'Satoshi'; font-weight: 800; font-size: 7pt; letter-spacing: .15em; text-transform: uppercase; color: var(--orange-deep); margin: 0 0 2pt; }
+.note p { margin: 0 0 4pt; font-size: 8.8pt; line-height: 1.45; color: var(--ink-soft); }
+.note p:last-child { margin-bottom: 0; }
+.note .say { font-family: 'Clash Display'; font-weight: 500; font-size: 9.8pt; color: var(--ink); line-height: 1.35; }
+.note b { color: var(--ink); font-weight: 700; }
+.note.purple { background: #F6F1FF; border-color: #DDCFFA; border-left-color: var(--purple-bright); }
+.note.purple .lab { color: var(--purple-deep); }
+
+/* Playbook page */
+.pb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt; margin-top: 6pt; }
+.pb-card { border: 1px solid var(--line); border-radius: 12px; padding: 12pt 13pt; break-inside: avoid; }
+.pb-card h4 { margin: 0 0 5pt; color: var(--purple-deep); }
+table.obj { width: 100%; border-collapse: collapse; font-size: 8.6pt; }
+table.obj td { padding: 5pt 7pt; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.obj td:first-child { font-weight: 700; color: var(--orange-deep); width: 42%; }
+.numline { display:flex; gap: 10pt; flex-wrap: wrap; margin-top: 4pt; }
+.numline .n { font-family:'Clash Display'; font-weight:600; font-size: 11pt; color: var(--purple-deep); background: var(--purple-tint); border-radius: 8px; padding: 4pt 9pt; }
+
 .section-head { margin-bottom: 12pt; }
 .foot-note { font-size: 7.8pt; color: var(--mute); border-top:1px solid var(--line); padding-top:6pt; margin-top: 12pt; }
