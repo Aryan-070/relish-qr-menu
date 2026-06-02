@@ -8,6 +8,8 @@ import { LqipVideo } from '../atoms/LqipVideo'
 import { useMediaMode } from '../../theme/MediaModeContext'
 import { resolveDishVideo } from '../../data/videoManifest'
 import { DietBadge, TagLabel, SpiceLevel, ChefSpecial } from '../atoms/DietaryBadges'
+import { formatMoney } from '../../lib/money'
+import { useT } from '../../i18n'
 
 const CATEGORY_BG: Record<string, string> = {
   beverages:  'linear-gradient(135deg,rgba(217,160,58,0.18),rgba(244,208,63,0.28))',
@@ -23,6 +25,7 @@ interface MenuCardProps {
 }
 
 export function MenuCard({ item, onTap }: MenuCardProps) {
+  const tr = useT()
   const { tokens: t } = useTheme()
   const { posterOnly } = useMediaMode()
   const catId = getCategoryForItem(item.id)
@@ -117,8 +120,8 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
         <div className="flex items-center justify-between gap-2" style={{ marginTop: 'auto', paddingTop: 8 }}>
           <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
             {item.chefsSpecial && <ChefSpecial theme={t} compact />}
-            {item.isJain && <DietBadge label="Jain" theme={t} />}
-            {item.canBeJain && !item.isJain && <DietBadge label="Jain-able" theme={t} />}
+            {item.isJain && <DietBadge label={tr('item.jain')} theme={t} />}
+            {item.canBeJain && !item.isJain && <DietBadge label={tr('item.jainable')} theme={t} />}
             <SpiceLevel level={item.spiceLevel} theme={t} />
             {!item.chefsSpecial && item.tags[0] && <TagLabel label={item.tags[0]} theme={t} />}
           </div>
@@ -132,7 +135,7 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
                 color: t.priceColor,
               }}
             >
-              ₹{item.price}
+              {formatMoney(item.price)}
             </span>
             <AddButton theme={t} onClick={addTap} />
           </div>
@@ -146,12 +149,13 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
 type Tokens = ReturnType<typeof useTheme>['tokens']
 
 function AddButton({ theme: t, onClick }: { theme: Tokens; onClick: (e: React.MouseEvent) => void }) {
+  const tr = useT()
   if (t.addShape === 'square') {
     return (
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={onClick}
-        aria-label="Add to order"
+        aria-label={tr('action.addToOrder')}
         className="flex items-center gap-1"
         style={{
           fontFamily: t.descFont,
@@ -168,7 +172,7 @@ function AddButton({ theme: t, onClick }: { theme: Tokens; onClick: (e: React.Mo
         }}
       >
         <Plus size={13} strokeWidth={2.75} />
-        ADD
+        {tr('item.addShort')}
       </motion.button>
     )
   }
@@ -176,7 +180,7 @@ function AddButton({ theme: t, onClick }: { theme: Tokens; onClick: (e: React.Mo
     <motion.button
       whileTap={{ scale: 0.88 }}
       onClick={onClick}
-      aria-label="Add to order"
+      aria-label={tr('action.addToOrder')}
       className="flex items-center justify-center"
       style={{
         width: 34,

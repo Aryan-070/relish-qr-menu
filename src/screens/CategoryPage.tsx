@@ -13,6 +13,7 @@ import { PlateAnim } from '../components/animations/PlateAnim'
 import { Button } from '../components/atoms/Button'
 import { stagger, fadeUp } from '../animations/variants'
 import { useTheme } from '../theme/ThemeContext'
+import { useT } from '../i18n'
 
 interface CategoryPageProps {
   category: Category
@@ -40,6 +41,7 @@ function AnimationForCategory({ type }: { type: Category['backgroundAnimation'] 
 
 export function CategoryPage({ category, onItemTap, onRecommend }: CategoryPageProps) {
   const { tokens: t } = useTheme()
+  const tr = useT()
   const { posterOnly } = useMediaMode()
   const [bannerErr, setBannerErr] = useState(false)
   const categoryVideo = resolveCategoryVideo(category.id)
@@ -160,10 +162,10 @@ export function CategoryPage({ category, onItemTap, onRecommend }: CategoryPageP
             className="font-cormorant italic text-[13px]"
             style={{ color: 'var(--ink-soft)' }}
           >
-            Not sure what to order?
+            {tr('reco.notSureWhat')}
           </p>
           <Button variant="gold" onClick={onRecommend}>
-            ✦ Ask for a Recommendation
+            ✦ {tr('action.askForRecommendation')}
           </Button>
         </motion.div>
       </div>

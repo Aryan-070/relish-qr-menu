@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Receipt, Printer, Users, Check, Download, CreditCard, Banknote, Smartphone } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Receipt, Printer, Users, Check, Download, CreditCard, Banknote, Smartphone, Plus, X } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
 import { useViewCtx } from '../ViewContext'
 import { useOpsStore } from '../store/useOpsStore'
@@ -14,6 +14,17 @@ import { inr } from '../lib/format'
 import { consolidateLines, computeTotals, billNumber, withTip } from './waiter/billing'
 import { Receipt as ReceiptBody } from './waiter/Receipt'
 import { downloadCsv } from './manager/csv'
+import {
+  splitEvenly,
+  splitByItems,
+  amountPaid,
+  remainingBalance,
+  isSettled,
+  distributeRoundingResidual,
+  type SplitLine,
+  type SplitShare,
+  type Payment,
+} from '../../lib/split'
 import type { OrderRecord, Table } from '../lib/types'
 
 type PaymentMethod = 'Cash' | 'Card' | 'UPI'
@@ -37,12 +48,38 @@ function seqFromOrderId(id: string): number {
   return digits.length > 0 ? Number(digits) : 0
 }
 
-type SplitMode = 'none' | 'even' | 'by-guest'
+type SplitMode = 'none' | 'even' | 'by-guest' | 'by-item'
 const SPLIT_OPTIONS: { value: SplitMode; label: string }[] = [
   { value: 'none', label: 'None' },
   { value: 'even', label: 'Even' },
   { value: 'by-guest', label: 'By guest' },
+  { value: 'by-item', label: 'By item' },
 ]
+
+/**
+ * Allocate `extra` rupees (non-item charges: service charge + tax + tip) across
+ * guests in proportion to each guest's item subtotal, with exact-sum rounding so
+ * the result always reconciles to `extra` (no stranded rupee). Returns one entry
+ * per input share in the same order. When the item subtotals are all zero (e.g.
+ * an empty bill or everything unassigned with no items), the extra is spread
+ * evenly via the residual distributor.
+ */
+function allocateProportional(
+  shares: readonly SplitShare[],
+  extra: number,
+): number[] {
+  const n = shares.length
+  if (n === 0) return []
+  const base = shares.reduce((sum, s) => sum + s.amount, 0)
+  // Seed each guest's floor share of `extra` proportional to their item subtotal.
+  const seeded: SplitShare[] = shares.map(s => ({
+    id: s.id,
+    label: s.label,
+    amount: base > 0 ? Math.floor((extra * s.amount) / base) : 0,
+  }))
+  // The residual distributor reconciles the floor-loss to hit `extra` exactly.
+  return distributeRoundingResidual(seeded, extra).map(s => s.amount)
+}
 
 interface DeskRowProps {
   table: Table
@@ -125,8 +162,17 @@ export function Billing() {
   const [discountPct, setDiscountPct] = useState(0)
   const [splitMode, setSplitMode] = useState<SplitMode>('none')
   const [evenWays, setEvenWays] = useState(2)
+  const [itemWays, setItemWays] = useState(0)
+  // By-item assignment: lineId → guest indices (0-based). Empty/missing ⇒ pooled.
+  const [itemAssign, setItemAssign] = useState<Record<string, number[]>>({})
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Card')
   const [tipPct, setTipPct] = useState(0)
+  // Partial / multi-tender payments. Component-local — no store entity.
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [payAmount, setPayAmount] = useState<number | null>(null)
+  // Monotonic id source — deriving ids from array length regenerates a stale id
+  // after a remove+add (duplicate React keys), so use an ever-incrementing seq.
+  const paySeq = useRef(0)
 
   // Re-focus when the caller jumps in pointing at a fresh table.
   useEffect(() => {
@@ -168,9 +214,112 @@ export function Billing() {
 
   const deskLabel = selectedTables.map(tb => tb.label).join(' + ')
 
+  // Default the by-item guest count to the table's guest count (min 2) the first
+  // time it's needed, but let the waiter override it via the shared "Ways" field.
+  const itemPeople = itemWays > 0 ? itemWays : Math.max(2, totalGuests)
+
   const ways = splitMode === 'by-guest' ? Math.max(1, totalGuests) : Math.max(1, Math.round(evenWays))
-  const perHead = splitMode === 'none' ? null : Math.round(grandTotal / ways)
-  const splitLabel = perHead != null ? `Per head (${ways} ${ways === 1 ? 'way' : 'ways'}) · ${inr(perHead)}` : null
+
+  // Even / by-guest: exact-sum even split — shares always add back to grandTotal.
+  const evenResult = useMemo(
+    () => (splitMode === 'even' || splitMode === 'by-guest' ? splitEvenly(grandTotal, ways) : null),
+    [splitMode, grandTotal, ways],
+  )
+
+  // By-item: split the SUBTOTAL by line assignment, then allocate the non-item
+  // charges (grandTotal − subtotal) proportionally so per-guest shares sum EXACTLY
+  // to grandTotal. Unassigned lines pool across all guests (splitByItems default).
+  const itemShares = useMemo<SplitShare[]>(() => {
+    if (splitMode !== 'by-item') return []
+    const guestIds = Array.from({ length: itemPeople }, (_, i) => `guest-${i + 1}`)
+    const splitLines: SplitLine[] = lines.map(l => ({
+      id: l.itemId,
+      name: l.name,
+      amount: l.price * l.qty,
+      qty: l.qty,
+    }))
+    // Map stored guest indices → ids; seed every guest so the roster is complete
+    // even when a guest has no items assigned yet.
+    const assignment: Record<string, string[]> = {}
+    for (const l of splitLines) {
+      const idxs = itemAssign[l.id]
+      if (idxs && idxs.length > 0) {
+        assignment[l.id] = idxs.filter(i => i < itemPeople).map(i => guestIds[i])
+      }
+    }
+    // Ensure the full guest roster is present (splitByItems derives it from the
+    // assignment values), by pinning an empty-but-present anchor line.
+    assignment['__roster__'] = guestIds
+    const linesWithAnchor: SplitLine[] = [
+      ...splitLines,
+      { id: '__roster__', name: '', amount: 0, qty: 0 },
+    ]
+    const itemResult = splitByItems(linesWithAnchor, assignment)
+    // itemResult shares carry the per-guest ITEM subtotal (sums to `subtotal`).
+    const itemSubtotals: SplitShare[] = guestIds.map(id => {
+      const s = itemResult.shares.find(sh => sh.id === id)
+      return { id, label: id, amount: s ? s.amount : 0 }
+    })
+    const itemSubtotalSum = itemSubtotals.reduce((acc, s) => acc + s.amount, 0)
+    const extra = grandTotal - itemSubtotalSum
+    const extras = allocateProportional(itemSubtotals, extra)
+    return itemSubtotals.map((s, i) => ({
+      id: s.id,
+      label: `Guest ${i + 1}`,
+      amount: s.amount + extras[i],
+    }))
+  }, [splitMode, itemPeople, lines, itemAssign, grandTotal])
+
+  const splitResult = splitMode === 'by-item' ? null : evenResult
+  const shareAmounts = splitResult?.shares.map(s => s.amount) ?? []
+  const minShare = shareAmounts.length ? Math.min(...shareAmounts) : 0
+  const maxShare = shareAmounts.length ? Math.max(...shareAmounts) : 0
+  const splitEven = minShare === maxShare
+  const splitLabel =
+    splitMode === 'by-item'
+      ? `By item · ${itemPeople} ${itemPeople === 1 ? 'guest' : 'guests'}`
+      : splitResult
+        ? splitEven
+          ? `Per head (${ways} ${ways === 1 ? 'way' : 'ways'}) · ${inr(minShare)}`
+          : `${ways} ways · ${inr(minShare)}–${inr(maxShare)}`
+        : null
+
+  // Per-guest shares passed to the receipt (by-item lists each guest explicitly).
+  const receiptShares: SplitShare[] | null =
+    splitMode === 'by-item'
+      ? itemShares
+      : splitResult
+        ? splitResult.shares.map((s, i) => ({ ...s, label: `Guest ${i + 1}` }))
+        : null
+
+  // Toggle a guest on/off for a given line (by-item assignment).
+  const toggleAssign = (lineId: string, guestIdx: number) => {
+    setItemAssign(prev => {
+      const cur = prev[lineId] ?? []
+      const next = cur.includes(guestIdx)
+        ? cur.filter(i => i !== guestIdx)
+        : [...cur, guestIdx].sort((a, b) => a - b)
+      return { ...prev, [lineId]: next }
+    })
+  }
+
+  // ── Payments ──────────────────────────────────────────────────────────────
+  const paid = amountPaid(payments)
+  const remaining = remainingBalance(grandTotal, payments)
+  const settled = isSettled(grandTotal, payments)
+  const hasPartials = payments.length > 0
+
+  const addPayment = () => {
+    const amt = payAmount == null || !Number.isFinite(payAmount) ? remaining : Math.round(payAmount)
+    const clamped = Math.max(1, Math.min(amt, remaining))
+    if (clamped <= 0) return
+    setPayments(prev => [...prev, { id: `pay-${(paySeq.current += 1)}`, amount: clamped, method: paymentMethod }])
+    setPayAmount(null)
+  }
+
+  const removePayment = (id: string) => {
+    setPayments(prev => prev.filter(p => p.id !== id))
+  }
 
   // Stable receipt timestamp: the earliest selected order's placedAt. Avoids
   // Date.now() churn so the bill number/date stay fixed while the bill is open.
@@ -194,13 +343,23 @@ export function Billing() {
 
   const markPaid = () => {
     if (selected.size === 0) return
+    // With a remaining balance and prior partial tenders, settling closes out
+    // the outstanding amount as the final tender and marks the whole bill paid.
+    if (hasPartials && remaining > 0) {
+      push(`Settled remaining ${inr(remaining)} · ${paymentMethod}`, 'success')
+    } else {
+      push(`Bill settled · ${paymentMethod}`, 'success')
+    }
     ops.payTables([...selected])
-    push(`Bill settled · ${paymentMethod}`, 'success')
     setSelected(new Set())
     setDiscountPct(0)
     setSplitMode('none')
     setTipPct(0)
     setPaymentMethod('Card')
+    setItemWays(0)
+    setItemAssign({})
+    setPayments([])
+    setPayAmount(null)
   }
 
   const exportBill = () => {
@@ -224,6 +383,26 @@ export function Billing() {
     if (tip > 0) summaryRows.push([`Tip (${tipPct}%)`, '', '', inr(tip)])
     summaryRows.push(['Total', '', '', inr(grandTotal)])
     summaryRows.push(['Payment', '', '', paymentMethod])
+
+    // Split breakdown (per-guest shares), when a split is active.
+    if (receiptShares && receiptShares.length > 0) {
+      summaryRows.push(['', '', '', ''])
+      summaryRows.push([`Split · ${splitMode}`, '', '', ''])
+      for (const s of receiptShares) {
+        summaryRows.push([s.label, '', '', inr(s.amount)])
+      }
+    }
+
+    // Recorded tenders (partial / multi-tender payments), when any exist.
+    if (payments.length > 0) {
+      summaryRows.push(['', '', '', ''])
+      summaryRows.push(['Payments', '', '', ''])
+      for (const p of payments) {
+        summaryRows.push([p.method ?? 'Payment', '', '', inr(p.amount)])
+      }
+      summaryRows.push(['Paid', '', '', inr(paid)])
+      summaryRows.push(['Remaining', '', '', inr(remaining)])
+    }
 
     const d = new Date(placedAt)
     const stamp = `${d.getFullYear()}${(d.getMonth() + 1).toString().padStart(2, '0')}${d
@@ -379,21 +558,200 @@ export function Billing() {
                       <NumberField label="Ways" value={evenWays} min={1} onChange={v => setEvenWays(Math.max(1, Math.round(v)))} />
                     </div>
                   )}
-                  {perHead != null && (
+                  {splitMode === 'by-item' && (
+                    <div className="max-w-[180px]">
+                      <NumberField
+                        label="Ways"
+                        value={itemPeople}
+                        min={1}
+                        onChange={v => setItemWays(Math.max(1, Math.round(v)))}
+                        hint="Guests to split items between"
+                      />
+                    </div>
+                  )}
+
+                  {/* By-item: assign each line to one or more guests. Unassigned
+                      lines pool across everyone (matches splitByItems). */}
+                  {splitMode === 'by-item' && (
                     <div
-                      className="flex items-center justify-between px-3.5 py-3"
+                      className="flex flex-col"
+                      style={{ border: `1px solid ${t.ruleColor}`, borderRadius: cardRadius }}
+                    >
+                      {lines.length === 0 ? (
+                        <p className="px-3 py-3 text-[12px]" style={{ color: t.descColor, fontFamily: t.descFont }}>
+                          No items to assign.
+                        </p>
+                      ) : (
+                        lines.map((line, li) => {
+                          const assigned = itemAssign[line.itemId] ?? []
+                          const pooled = assigned.length === 0
+                          return (
+                            <div
+                              key={line.itemId}
+                              className="flex flex-col gap-2 px-3 py-2.5"
+                              style={{ borderTop: li === 0 ? 'none' : `1px solid ${t.ruleColor}` }}
+                            >
+                              <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-[13px] min-w-0 truncate" style={{ color: t.ink, fontFamily: t.descFont }}>
+                                  <span className="font-semibold">{line.name}</span>
+                                  <span style={{ color: t.descColor }}> × {line.qty}</span>
+                                </span>
+                                <span className="text-[12px] shrink-0 tabular-nums" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+                                  {inr(line.price * line.qty)}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {Array.from({ length: itemPeople }, (_, gi) => {
+                                  const on = assigned.includes(gi)
+                                  return (
+                                    <button
+                                      key={gi}
+                                      type="button"
+                                      onClick={() => toggleAssign(line.itemId, gi)}
+                                      aria-pressed={on}
+                                      aria-label={`Assign ${line.name} to Guest ${gi + 1}`}
+                                      className="px-2 py-1 text-[11px] font-semibold cursor-pointer transition-colors"
+                                      style={{
+                                        borderRadius: isHard(t) ? 0 : 8,
+                                        border: `1.5px solid ${on ? t.accent : t.ruleColor}`,
+                                        background: on ? t.accent : 'transparent',
+                                        color: on ? '#fff' : t.inkSoft,
+                                        fontFamily: t.descFont,
+                                      }}
+                                    >
+                                      G{gi + 1}
+                                    </button>
+                                  )
+                                })}
+                                {pooled && (
+                                  <span className="text-[11px] ml-0.5" style={{ color: t.descColor, fontFamily: t.descFont }}>
+                                    shared by all
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
+
+                  {/* By-item: per-guest totals (sum exactly to grand total). */}
+                  {splitMode === 'by-item' && itemShares.length > 0 && (
+                    <div
+                      className="flex flex-col gap-1.5 px-3.5 py-3"
                       style={{
                         background: 'rgba(217,160,58,0.16)',
                         border: '1px solid rgba(217,160,58,0.55)',
                         borderRadius: cardRadius,
                       }}
                     >
-                      <span className="text-[13px] font-semibold" style={{ color: '#8a6212', fontFamily: t.descFont }}>
-                        Per head ({ways} {ways === 1 ? 'way' : 'ways'})
+                      {itemShares.map(s => (
+                        <div key={s.id} className="flex items-center justify-between">
+                          <span className="text-[13px] font-semibold" style={{ color: '#8a6212', fontFamily: t.descFont }}>
+                            {s.label}
+                          </span>
+                          <span className="text-[14px] font-bold tabular-nums" style={{ color: '#8a6212', fontFamily: t.descFont }}>
+                            {inr(s.amount)}
+                          </span>
+                        </div>
+                      ))}
+                      <span className="text-[11px] pt-0.5" style={{ color: '#8a6212', fontFamily: t.descFont, opacity: 0.85 }}>
+                        Includes each guest's share of charges &amp; tip — sums exactly to {inr(grandTotal)}
                       </span>
-                      <span className="text-[16px] font-bold tabular-nums" style={{ color: '#8a6212', fontFamily: t.descFont }}>
-                        {inr(perHead)}
-                      </span>
+                    </div>
+                  )}
+
+                  {splitResult != null && (
+                    <div
+                      className="flex flex-col gap-1 px-3.5 py-3"
+                      style={{
+                        background: 'rgba(217,160,58,0.16)',
+                        border: '1px solid rgba(217,160,58,0.55)',
+                        borderRadius: cardRadius,
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[13px] font-semibold" style={{ color: '#8a6212', fontFamily: t.descFont }}>
+                          Per head ({ways} {ways === 1 ? 'way' : 'ways'})
+                        </span>
+                        <span className="text-[16px] font-bold tabular-nums" style={{ color: '#8a6212', fontFamily: t.descFont }}>
+                          {splitEven ? inr(minShare) : `${inr(minShare)}–${inr(maxShare)}`}
+                        </span>
+                      </div>
+                      {!splitEven && (
+                        <span className="text-[11px]" style={{ color: '#8a6212', fontFamily: t.descFont, opacity: 0.85 }}>
+                          {shareAmounts.filter(a => a === maxShare).length} pay {inr(maxShare)}, the rest {inr(minShare)} — sums exactly to {inr(grandTotal)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Partial / multi-tender payments */}
+                <div className="flex flex-col gap-2.5">
+                  <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+                    Partial payments
+                  </span>
+                  <div className="flex flex-wrap items-end gap-2.5">
+                    <div className="max-w-[160px]">
+                      <NumberField
+                        label="Amount"
+                        value={payAmount == null ? remaining : payAmount}
+                        min={0}
+                        prefix="₹"
+                        onChange={v => setPayAmount(Math.max(0, Math.round(v)))}
+                      />
+                    </div>
+                    <Button variant="subtle" size="sm" onClick={addPayment} aria-label="Add payment" disabled={remaining <= 0}>
+                      <Plus size={14} aria-hidden /> Add payment
+                    </Button>
+                  </div>
+
+                  {payments.length > 0 && (
+                    <div
+                      className="flex flex-col"
+                      style={{ border: `1px solid ${t.ruleColor}`, borderRadius: cardRadius }}
+                    >
+                      {payments.map((p, pi) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between gap-3 px-3 py-2"
+                          style={{ borderTop: pi === 0 ? 'none' : `1px solid ${t.ruleColor}` }}
+                        >
+                          <span className="text-[13px]" style={{ color: t.ink, fontFamily: t.descFont }}>
+                            {p.method ?? 'Payment'}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <span className="text-[13px] font-semibold tabular-nums" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+                              {inr(p.amount)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removePayment(p.id)}
+                              aria-label={`Remove ${p.method ?? 'payment'} of ${inr(p.amount)}`}
+                              className="inline-flex items-center justify-center w-5 h-5 cursor-pointer"
+                              style={{ color: t.descColor }}
+                            >
+                              <X size={14} aria-hidden />
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                      <div
+                        className="flex items-center justify-between gap-3 px-3 py-2"
+                        style={{ borderTop: `1px solid ${t.ruleColor}` }}
+                      >
+                        <span className="text-[12px] font-semibold" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+                          Paid {inr(paid)}
+                        </span>
+                        <span
+                          className="text-[12px] font-bold tabular-nums"
+                          style={{ color: settled ? '#2e7d32' : t.accent, fontFamily: t.descFont }}
+                        >
+                          {settled ? 'Settled' : `Remaining ${inr(remaining)}`}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -405,7 +763,9 @@ export function Billing() {
                       const Icon = PAYMENT_ICON[paymentMethod]
                       return <Icon size={16} aria-hidden />
                     })()}{' '}
-                    Mark paid · {paymentMethod}
+                    {hasPartials && remaining > 0
+                      ? `Settle remaining ${inr(remaining)} · ${paymentMethod}`
+                      : `Mark paid · ${paymentMethod}`}
                   </Button>
                   <Button variant="subtle" size="md" onClick={printReceipt} aria-label="Print receipt">
                     <Printer size={15} aria-hidden /> Print
@@ -431,6 +791,10 @@ export function Billing() {
                 grandTotal={grandTotal}
                 paymentMethod={paymentMethod}
                 splitLabel={splitLabel}
+                splitShares={receiptShares}
+                payments={payments}
+                amountPaid={paid}
+                remaining={remaining}
               />
             </Panel>
           </div>

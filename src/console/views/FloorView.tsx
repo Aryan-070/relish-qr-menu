@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Users } from 'lucide-react'
+import { CalendarClock, Users } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
 import { useOpsStore } from '../store/useOpsStore'
 import { useToast } from '../components/Toast'
@@ -15,9 +15,9 @@ import { SelectField } from '../components/Field'
 import { EmptyState } from '../components/EmptyState'
 import { TABLE_STATUS } from '../lib/statusColors'
 import { fadeUp, stagger } from '../../animations/variants'
-import { panelStyle } from '../lib/skin'
-import { cn } from '../lib/format'
-import type { Staff, Table, TableStatus, Zone } from '../lib/types'
+import { panelStyle, isHard } from '../lib/skin'
+import { cn, clockTime } from '../lib/format'
+import type { Reservation, Staff, Table, TableStatus, Zone } from '../lib/types'
 
 type ZoneFilter = 'All' | Zone
 
@@ -40,6 +40,10 @@ const STATUS_ORDER: TableStatus[] = [
 // Statuses a manager can set directly from the card (Seat / Clear handled separately).
 const QUICK_STATUSES: TableStatus[] = ['seated', 'ordering', 'bill-requested', 'needs-attention']
 
+// How many upcoming bookings to surface, and the window for the "booked soon" hint.
+const UPCOMING_LIMIT = 6
+const SOON_WINDOW_MS = 90 * 60 * 1000
+
 export function FloorView() {
   const { tokens: t } = useTheme()
   const ops = useOpsStore()
@@ -51,6 +55,21 @@ export function FloorView() {
 
   const tables = ops.state.tables
   const staff = ops.state.staff
+  const reservations = ops.state.reservations
+
+  // Upcoming, still-booked reservations from now onward — soonest first.
+  const now = Date.now()
+  const upcoming = useMemo(() => {
+    return reservations
+      .filter(r => r.status === 'booked' && r.at >= now)
+      .sort((a, b) => a.at - b.at)
+  }, [reservations, now])
+
+  const upcomingTop = useMemo(() => upcoming.slice(0, UPCOMING_LIMIT), [upcoming])
+  const bookedSoon = useMemo(
+    () => upcoming.filter(r => r.at - now <= SOON_WINDOW_MS).length,
+    [upcoming, now],
+  )
 
   const waiters = useMemo(() => staff.filter(s => s.role === 'waiter'), [staff])
   const staffById = useMemo(() => {
@@ -159,10 +178,27 @@ export function FloorView() {
       {/* Zone filter */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2
-          className="text-[15px]"
+          className="text-[15px] flex items-center gap-2"
           style={{ fontFamily: t.titleFont, color: t.ink, fontWeight: t.titleWeight }}
         >
-          Live floor · {filtered.length} {filtered.length === 1 ? 'table' : 'tables'}
+          <span>
+            Live floor · {filtered.length} {filtered.length === 1 ? 'table' : 'tables'}
+          </span>
+          {bookedSoon > 0 && (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 tabular-nums"
+              style={{
+                borderRadius: isHard(t) ? 0 : 999,
+                border: `1px solid ${t.accent}`,
+                color: t.accent,
+                fontFamily: t.descFont,
+              }}
+              title={`${bookedSoon} booked within the next 90 minutes`}
+            >
+              <CalendarClock size={11} aria-hidden />
+              {bookedSoon} booked soon
+            </span>
+          )}
         </h2>
         <SegmentedControl
           options={ZONE_OPTIONS}
@@ -173,33 +209,43 @@ export function FloorView() {
         />
       </div>
 
-      {/* Table grid */}
-      {filtered.length === 0 ? (
-        <Panel>
-          <EmptyState title="No tables in this zone" description="Try a different zone filter." />
-        </Panel>
-      ) : (
-        <motion.div
-          key={zone}
-          variants={stagger}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
-        >
-          {filtered.map(table => (
-            <TableCard
-              key={table.id}
-              table={table}
-              waiter={table.waiterId ? staffById.get(table.waiterId) : undefined}
-              waiterOptions={waiterOptions}
-              onAssign={handleAssign}
-              onStatus={handleStatus}
-              onSeat={openSeat}
-              onClear={setClearTarget}
-            />
-          ))}
-        </motion.div>
-      )}
+      {/* Floor grid + upcoming reservations */}
+      <div className="flex flex-col xl:flex-row gap-4 items-start">
+        <div className="flex-1 min-w-0 w-full">
+          {filtered.length === 0 ? (
+            <Panel>
+              <EmptyState title="No tables in this zone" description="Try a different zone filter." />
+            </Panel>
+          ) : (
+            <motion.div
+              key={zone}
+              variants={stagger}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            >
+              {filtered.map(table => (
+                <TableCard
+                  key={table.id}
+                  table={table}
+                  waiter={table.waiterId ? staffById.get(table.waiterId) : undefined}
+                  waiterOptions={waiterOptions}
+                  onAssign={handleAssign}
+                  onStatus={handleStatus}
+                  onSeat={openSeat}
+                  onClear={setClearTarget}
+                />
+              ))}
+            </motion.div>
+          )}
+        </div>
+
+        <UpcomingReservations
+          reservations={upcomingTop}
+          total={upcoming.length}
+          now={now}
+        />
+      </div>
 
       {/* Seat modal */}
       <Modal
@@ -272,6 +318,115 @@ export function FloorView() {
         onCancel={() => setClearTarget(null)}
       />
     </div>
+  )
+}
+
+/** "in 5m" / "in 2h" / "in 1h 20m" lead time from now to a future booking. */
+function leadTime(at: number, now: number): string {
+  const mins = Math.max(0, Math.round((at - now) / 60_000))
+  if (mins < 1) return 'now'
+  if (mins < 60) return `in ${mins}m`
+  const hrs = Math.floor(mins / 60)
+  const rem = mins % 60
+  return rem ? `in ${hrs}h ${rem}m` : `in ${hrs}h`
+}
+
+interface UpcomingReservationsProps {
+  reservations: Reservation[]
+  total: number
+  now: number
+}
+
+function UpcomingReservations({ reservations, total, now }: UpcomingReservationsProps) {
+  const { tokens: t } = useTheme()
+  const hard = isHard(t)
+
+  return (
+    <motion.aside
+      variants={fadeUp}
+      initial="hidden"
+      animate="visible"
+      style={panelStyle(t)}
+      className="w-full xl:w-[300px] xl:shrink-0 p-4 flex flex-col gap-3"
+      aria-label="Upcoming reservations"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h3
+          className="text-[14px] flex items-center gap-1.5"
+          style={{ fontFamily: t.titleFont, color: t.ink, fontWeight: t.titleWeight }}
+        >
+          <CalendarClock size={15} aria-hidden style={{ color: t.accent }} />
+          Upcoming
+        </h3>
+        <span
+          className="text-[11px] uppercase tracking-wider tabular-nums"
+          style={{ color: t.descColor, fontFamily: t.descFont }}
+        >
+          {total} {total === 1 ? 'booking' : 'bookings'}
+        </span>
+      </div>
+
+      {reservations.length === 0 ? (
+        <p
+          className="text-[13px] italic py-2"
+          style={{ fontFamily: t.descFont, color: t.descColor }}
+        >
+          No upcoming reservations
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {reservations.map(r => (
+            <li
+              key={r.id}
+              className="flex flex-col gap-1 px-3 py-2.5"
+              style={{
+                borderRadius: hard ? 0 : 10,
+                border: `1px solid ${t.ruleColor}`,
+                background: 'transparent',
+              }}
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <span
+                  className="text-[14px] tabular-nums"
+                  style={{ fontFamily: t.headerFont, color: t.ink, fontWeight: 700 }}
+                >
+                  {clockTime(r.at)}
+                </span>
+                <span
+                  className="text-[11px] tabular-nums shrink-0"
+                  style={{ color: t.accent, fontFamily: t.descFont, fontWeight: 600 }}
+                >
+                  {leadTime(r.at, now)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <span
+                  className="text-[13px] truncate"
+                  style={{ fontFamily: t.descFont, color: t.ink }}
+                >
+                  {r.name}
+                </span>
+                <span
+                  className="text-[12px] tabular-nums shrink-0 inline-flex items-center gap-1"
+                  style={{ fontFamily: t.descFont, color: t.descColor }}
+                >
+                  <Users size={11} aria-hidden />
+                  party of {r.partySize}
+                </span>
+              </div>
+              {r.notes && (
+                <p
+                  className="text-[12px] leading-snug"
+                  style={{ fontFamily: t.descFont, color: t.descColor }}
+                >
+                  {r.notes}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </motion.aside>
   )
 }
 

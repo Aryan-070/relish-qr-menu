@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useT } from '../i18n'
 
 interface Props {
   onOpenMenu: () => void
@@ -56,6 +57,7 @@ function Rule({ thick, mx }: { thick?: boolean; mx?: boolean }) {
 }
 
 export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const tr = useT()
   return (
     <div
       className="relative flex flex-col min-h-full overflow-hidden"
@@ -79,13 +81,13 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
         style={{ borderBottom: '1px solid rgba(42,30,30,0.5)' }}
       >
         <span className="font-inter text-[8.5px] uppercase tracking-[0.2em]" style={{ color: '#2A1E1E' }}>
-          Est. 2024
+          {tr('landing.est')}
         </span>
         <span className="font-inter text-[8.5px] uppercase tracking-[0.2em] font-semibold" style={{ color: '#2A1E1E' }}>
-          Relish Dining
+          {tr('landing.editorialDining')}
         </span>
         <span className="font-inter text-[8.5px] uppercase tracking-[0.2em]" style={{ color: '#2A1E1E' }}>
-          Vol. I
+          {tr('landing.editorialVol')}
         </span>
       </motion.div>
 
@@ -159,26 +161,26 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
             className="font-cormorant italic"
             style={{ fontSize: 'clamp(18px, 2vw, 26px)', color: 'var(--ink-soft)', lineHeight: 1.38 }}
           >
-            A Journey Through The World's Finest Vegetarian Cuisine
+            {tr('landing.editorialTagline')}
           </p>
           <p
             className="font-inter text-[10.5px] mt-2.5 leading-relaxed"
             style={{ color: 'var(--mute)' }}
           >
-            Five categories. Sixty dishes crafted with care. One unforgettable dining experience.
+            {tr('landing.editorialBlurb')}
           </p>
         </div>
 
         {/* Right col — facts */}
         <div className="pl-4 flex flex-col gap-2 justify-center shrink-0">
-          {['100% Veg', 'Jain Options', 'Fresh Daily', 'Curated Pairings'].map((fact) => (
-            <div key={fact} className="flex items-center gap-1.5">
+          {(['landing.badgeVeg', 'landing.badgeJain', 'landing.badgeFresh', 'landing.badgePairings'] as const).map((factKey) => (
+            <div key={factKey} className="flex items-center gap-1.5">
               <span style={{ color: 'var(--gold)', fontSize: 7 }}>✦</span>
               <span
                 className="font-inter text-[9.5px] uppercase tracking-wide"
                 style={{ color: 'var(--ink)', whiteSpace: 'nowrap' }}
               >
-                {fact}
+                {tr(factKey)}
               </span>
             </div>
           ))}
@@ -205,7 +207,7 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
           className="font-cormorant italic"
           style={{ fontSize: 13.5, color: 'var(--ink-soft)', lineHeight: 1.5 }}
         >
-          Where every plate tells a story of culture, craft, and pure vegetarian joy.
+          {tr('landing.editorialQuote')}
         </p>
       </motion.div>
 
@@ -218,14 +220,14 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
       >
         <div className="flex gap-2">
           <EditorialBtn onClick={onOpenMenu} filled>
-            Open Menu
+            {tr('action.openMenu')}
           </EditorialBtn>
           <EditorialBtn onClick={onRecommend} outlined>
-            ✦ Recommend
+            ✦ {tr('landing.recommendShort')}
           </EditorialBtn>
         </div>
         <EditorialBtn onClick={onWaiter} ghost fullWidth>
-          Call Waiter
+          {tr('landing.callWaiter')}
         </EditorialBtn>
       </motion.div>
 
@@ -240,7 +242,7 @@ export function LandingEditorial({ onOpenMenu, onRecommend, onWaiter }: Props) {
             className="font-inter text-[8px] uppercase tracking-[0.22em] text-center"
             style={{ color: '#2A1E1E' }}
           >
-            International Veg Cuisine &nbsp;•&nbsp; Scan to Browse &nbsp;•&nbsp; Est. 2024
+            {tr('landing.editorialFooter')}
           </span>
         </div>
       </div>

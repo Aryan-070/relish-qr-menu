@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useT } from '../i18n'
 
 interface Props {
   onOpenMenu: () => void
@@ -61,6 +62,7 @@ function BotanicaBtn({
 }
 
 export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const tr = useT()
   const PLATE = 'min(clamp(178px, 26vw, 360px), 24vh)'
   return (
     <div
@@ -188,7 +190,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           className="font-inter uppercase text-[9.5px] tracking-[0.22em] mb-4"
           style={{ color: SAGE }}
         >
-          International Veg Cuisine
+          {tr('brand.tagline')}
         </motion.p>
 
         {/* Caveat handwritten tagline */}
@@ -199,7 +201,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           className="font-caveat text-center mb-6"
           style={{ fontSize: 'clamp(20px, 2.2vw, 30px)', color: `rgba(42,72,32,0.7)`, lineHeight: 1.4 }}
         >
-          Farm fresh · seasonal · crafted with love
+          {tr('landing.botanicaTagline')}
         </motion.p>
 
         {/* Trust badges — botanical style */}
@@ -209,18 +211,18 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           transition={{ delay: 1.18, duration: 0.5 }}
           className="flex items-center gap-3 mb-7 flex-wrap justify-center"
         >
-          {[
-            { icon: '🌿', text: '100% Veg' },
-            { icon: '✦', text: 'Jain Options' },
-            { icon: '🌱', text: 'Fresh Daily' },
-          ].map(({ icon, text }) => (
-            <div key={text} className="flex items-center gap-1.5">
+          {([
+            { icon: '🌿', textKey: 'landing.badgeVeg' },
+            { icon: '✦', textKey: 'landing.badgeJain' },
+            { icon: '🌱', textKey: 'landing.badgeFresh' },
+          ] as const).map(({ icon, textKey }) => (
+            <div key={textKey} className="flex items-center gap-1.5">
               <span style={{ fontSize: 11 }}>{icon}</span>
               <span
                 className="font-inter text-[10px] uppercase tracking-wide"
                 style={{ color: `rgba(42,72,32,0.65)` }}
               >
-                {text}
+                {tr(textKey)}
               </span>
             </div>
           ))}
@@ -234,13 +236,13 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
           className="flex flex-col gap-2.5 w-full max-w-[280px]"
         >
           <BotanicaBtn onClick={onOpenMenu} variant="solid" fullWidth>
-            Open Menu
+            {tr('action.openMenu')}
           </BotanicaBtn>
           <BotanicaBtn onClick={onRecommend} variant="outline" fullWidth>
-            ✦ Recommend Something
+            ✦ {tr('action.recommend')}
           </BotanicaBtn>
           <BotanicaBtn onClick={onWaiter} variant="ghost" fullWidth>
-            Call Waiter
+            {tr('landing.callWaiter')}
           </BotanicaBtn>
         </motion.div>
 
@@ -258,7 +260,7 @@ export function LandingBotanica({ onOpenMenu, onRecommend, onWaiter }: Props) {
               className="font-inter text-[8px] uppercase tracking-[0.2em]"
               style={{ color: `rgba(107,143,94,0.7)` }}
             >
-              Farm to Table
+              {tr('landing.botanicaFarmToTable')}
             </span>
             <span style={{ color: SAGE, fontSize: 9 }}>✿</span>
             <div style={{ width: 40, height: 1, background: `rgba(107,143,94,0.4)` }} />

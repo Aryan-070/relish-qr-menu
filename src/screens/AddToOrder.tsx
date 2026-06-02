@@ -3,15 +3,18 @@ import { type MenuItem } from '../data/menu'
 import { Price } from '../components/atoms/Price'
 import { Button } from '../components/atoms/Button'
 import { orderSlip, checkmark } from '../animations/variants'
+import { useT } from '../i18n'
 
 interface AddToOrderProps {
   item: MenuItem | null
-  customization?: string
+  label?: string
+  unitPrice?: number
   onContinue: () => void
   onShowWaiter: () => void
 }
 
-export function AddToOrder({ item, customization = 'Regular', onContinue, onShowWaiter }: AddToOrderProps) {
+export function AddToOrder({ item, label = '', unitPrice, onContinue, onShowWaiter }: AddToOrderProps) {
+  const tr = useT()
   return (
     <AnimatePresence>
       {item && (
@@ -80,7 +83,7 @@ export function AddToOrder({ item, customization = 'Regular', onContinue, onShow
                   className="text-center font-inter text-[11px] uppercase tracking-widest mb-3"
                   style={{ color: 'var(--olive)' }}
                 >
-                  Added to your order
+                  {tr('action.addedToOrder')}
                 </p>
 
                 {/* Torn-edge divider */}
@@ -101,22 +104,24 @@ export function AddToOrder({ item, customization = 'Regular', onContinue, onShow
                     >
                       {item.name}
                     </p>
-                    <p
-                      className="font-inter text-[11px] mt-0.5"
-                      style={{ color: 'var(--mute)' }}
-                    >
-                      {customization}
-                    </p>
+                    {label && (
+                      <p
+                        className="font-inter text-[11px] mt-0.5"
+                        style={{ color: 'var(--mute)' }}
+                      >
+                        {label}
+                      </p>
+                    )}
                   </div>
-                  <Price amount={item.price} size="md" />
+                  <Price amount={unitPrice ?? item.price} size="md" />
                 </div>
 
                 <div className="flex gap-3">
                   <Button variant="maroon" fullWidth onClick={onShowWaiter}>
-                    Show to Waiter
+                    {tr('action.showToWaiter')}
                   </Button>
                   <Button variant="ghost" fullWidth onClick={onContinue}>
-                    Continue
+                    {tr('action.continue')}
                   </Button>
                 </div>
               </div>

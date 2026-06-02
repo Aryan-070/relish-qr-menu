@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { OpsProvider } from './store/useOpsStore'
+import { motion } from 'framer-motion'
 import { ToastProvider } from './components/Toast'
 import { ConsoleShell } from './components/ConsoleShell'
 import { ViewProvider, type ViewContextValue } from './ViewContext'
@@ -17,7 +16,13 @@ import { WaiterTables } from './views/WaiterTables'
 import { ServiceQueue } from './views/ServiceQueue'
 import { Billing } from './views/Billing'
 import { OrderHistory } from './views/OrderHistory'
-import { AuthProvider, useAuth } from './auth/AuthContext'
+import { KitchenDisplay } from './views/KitchenDisplay'
+import { QrCodes } from './views/QrCodes'
+import { Reservations } from './views/Reservations'
+import { LoyaltyCrm } from './views/LoyaltyCrm'
+import { FeedbackInbox } from './views/FeedbackInbox'
+import { Campaigns } from './views/Campaigns'
+import { useAuth } from './auth/AuthContext'
 import { SignIn } from './auth/SignIn'
 
 // The waiter whose perspective the waiter-role screens take.
@@ -45,6 +50,18 @@ function renderView(view: ConsoleView) {
       return <Billing />
     case 'records':
       return <OrderHistory />
+    case 'kds':
+      return <KitchenDisplay />
+    case 'table-qr':
+      return <QrCodes />
+    case 'reservations':
+      return <Reservations />
+    case 'loyalty':
+      return <LoyaltyCrm />
+    case 'feedback':
+      return <FeedbackInbox />
+    case 'campaigns':
+      return <Campaigns />
     default:
       return null
   }
@@ -55,11 +72,9 @@ interface ConsoleAppProps {
 }
 
 export function ConsoleApp({ onExit }: ConsoleAppProps) {
-  return (
-    <AuthProvider>
-      <ConsoleBody onExit={onExit} />
-    </AuthProvider>
-  )
+  // AuthProvider is hoisted to App.tsx (above OpsProvider) so the ops store can
+  // read the signed-in user's restaurantId for Supabase sync; here we just render.
+  return <ConsoleBody onExit={onExit} />
 }
 
 function ConsoleBody({ onExit }: ConsoleAppProps) {
@@ -117,27 +132,26 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
   }
 
   return (
-    <OpsProvider>
-      <ToastProvider>
-        <ViewProvider value={viewCtx}>
-          <ConsoleShell
-            role={role}
-            onRole={handleRole}
-            showRoleSwitcher={auth.mode === 'demo'}
-            activeView={activeView}
-            onNavigate={navigate}
-            dateRange={dateRange}
-            onDateRange={setDateRange}
-            onExit={handleExit}
-          >
-            <AnimatePresence mode="wait">
-              <motion.div key={activeView} variants={fadeIn} initial="hidden" animate="visible" exit="exit">
-                {renderView(activeView)}
-              </motion.div>
-            </AnimatePresence>
-          </ConsoleShell>
-        </ViewProvider>
-      </ToastProvider>
-    </OpsProvider>
+    <ToastProvider>
+      <ViewProvider value={viewCtx}>
+        <ConsoleShell
+          role={role}
+          onRole={handleRole}
+          showRoleSwitcher={auth.mode === 'demo'}
+          activeView={activeView}
+          onNavigate={navigate}
+          dateRange={dateRange}
+          onDateRange={setDateRange}
+          onExit={handleExit}
+        >
+          {/* No AnimatePresence/mode="wait": waiting on the outgoing view's exit
+              made fast navbar clicks drop a blank/stale frame. Keying the div on
+              activeView remounts + fades in the new view immediately, glitch-free. */}
+          <motion.div key={activeView} variants={fadeIn} initial="hidden" animate="visible">
+            {renderView(activeView)}
+          </motion.div>
+        </ConsoleShell>
+      </ViewProvider>
+    </ToastProvider>
   )
 }

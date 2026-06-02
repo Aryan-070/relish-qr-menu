@@ -70,9 +70,15 @@ alter table public.invoices      enable row level security;
 alter table public.video_screens enable row level security;
 
 -- Helper: the caller's restaurant id.
+-- SECURITY DEFINER so it reads app_users WITHOUT triggering app_users' own RLS
+-- policy — otherwise the policy calls this function which reads app_users which
+-- evaluates the policy again → infinite recursion ("stack depth limit exceeded").
 create or replace function public.current_restaurant_id()
 returns uuid
-language sql stable
+language sql
+stable
+security definer
+set search_path = public
 as $$
   select restaurant_id from public.app_users where user_id = auth.uid()
 $$;
@@ -85,8 +91,10 @@ create policy "own restaurant" on public.restaurants
 create policy "create restaurant" on public.restaurants
   for insert with check (auth.uid() is not null);
 
+-- Read your OWN membership row directly (user_id = auth.uid()), NOT via
+-- current_restaurant_id() — that would recurse through this very policy.
 create policy "own membership" on public.app_users
-  for select using (restaurant_id = public.current_restaurant_id());
+  for select using (user_id = auth.uid());
 
 create policy "enrol self" on public.app_users
   for insert with check (user_id = auth.uid());

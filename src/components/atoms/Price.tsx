@@ -1,7 +1,10 @@
+import { formatMoney, type CurrencyCode } from '../../lib/money'
+
 interface PriceProps {
   amount: number
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  currency?: CurrencyCode
 }
 
 const sizes = {
@@ -10,7 +13,7 @@ const sizes = {
   lg: 'text-base',
 }
 
-export function Price({ amount, size = 'md', className = '' }: PriceProps) {
+export function Price({ amount, size = 'md', className = '', currency }: PriceProps) {
   return (
     <span
       className={[
@@ -21,7 +24,7 @@ export function Price({ amount, size = 'md', className = '' }: PriceProps) {
         .filter(Boolean)
         .join(' ')}
     >
-      ₹{amount}
+      {formatMoney(amount, currency)}
     </span>
   )
 }

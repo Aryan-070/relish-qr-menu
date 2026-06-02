@@ -4,6 +4,7 @@ import { Play } from 'lucide-react'
 import { LqipVideo } from '../components/atoms/LqipVideo'
 import { useMediaMode } from '../theme/MediaModeContext'
 import { videoRenditions } from '../data/videoManifest'
+import { useT } from '../i18n'
 
 interface Props {
   onOpenMenu: () => void
@@ -84,6 +85,7 @@ function CTA({ label, onClick, variant, delay }: { label: string; onClick: () =>
 
 // ── Reel landing — a cycling reel of distinct clips fills the screen ──────────
 export function LandingReel({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const tr = useT()
   const { posterOnly } = useMediaMode()
   const [idx, setIdx] = useState(0)
   const current = REEL[idx]
@@ -194,13 +196,13 @@ export function LandingReel({ onOpenMenu, onRecommend, onWaiter }: Props) {
             className="font-cormorant italic mt-1 mb-5 text-center"
             style={{ fontSize: 'clamp(15px, 2vw, 21px)', color: 'rgba(255,248,234,0.74)' }}
           >
-            Every dish, in motion
+            {tr('landing.reelTagline')}
           </motion.p>
 
           <div className="flex flex-col gap-2.5 w-full">
-            <CTA label="Open Menu" onClick={onOpenMenu} variant="primary" delay={0.7} />
-            <CTA label="✦ Recommend Something" onClick={onRecommend} variant="gold" delay={0.8} />
-            <CTA label="Call Waiter" onClick={onWaiter} variant="ghost" delay={0.9} />
+            <CTA label={tr('action.openMenu')} onClick={onOpenMenu} variant="primary" delay={0.7} />
+            <CTA label={`✦ ${tr('action.recommend')}`} onClick={onRecommend} variant="gold" delay={0.8} />
+            <CTA label={tr('landing.callWaiter')} onClick={onWaiter} variant="ghost" delay={0.9} />
           </div>
         </div>
       </motion.div>

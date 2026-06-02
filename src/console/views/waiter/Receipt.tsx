@@ -5,7 +5,9 @@
 
 import { useTheme } from '../../../theme/ThemeContext'
 import { inr, clockTime } from '../../lib/format'
-import type { ComputedTotals } from './billing'
+import { splitGst } from '../../../lib/tax'
+import { TAX_RATE, type ComputedTotals } from './billing'
+import type { SplitShare, Payment } from '../../../lib/split'
 
 interface ReceiptLine {
   itemId: string
@@ -26,6 +28,14 @@ interface ReceiptProps {
   grandTotal: number
   paymentMethod: string
   splitLabel?: string | null
+  /** Per-guest split shares (sum exactly to grandTotal). Null when no split. */
+  splitShares?: SplitShare[] | null
+  /** Recorded partial / multi-tender payments. */
+  payments?: Payment[]
+  /** Total tendered across `payments`. */
+  amountPaid?: number
+  /** Outstanding balance after `payments` (0 when fully settled). */
+  remaining?: number
 }
 
 /** "2 Jun 2026" from an epoch-ms timestamp. */
@@ -92,10 +102,20 @@ export function Receipt({
   grandTotal,
   paymentMethod,
   splitLabel,
+  splitShares,
+  payments,
+  amountPaid,
+  remaining,
 }: ReceiptProps) {
   const { tokens: t } = useTheme()
   const rule = `1px solid ${t.ruleColor}`
   const dashed = `1px dashed ${t.ruleColor}`
+  const hasShares = !!splitShares && splitShares.length > 0
+  const hasPayments = !!payments && payments.length > 0
+  const paidTotal = amountPaid ?? 0
+  const due = remaining ?? Math.max(0, grandTotal - paidTotal)
+  // Change is over-tender beyond the bill (e.g. cash rounded up).
+  const change = Math.max(0, paidTotal - grandTotal)
 
   return (
     <div className="flex flex-col gap-4" style={{ fontFamily: t.descFont, color: t.ink }}>
@@ -172,7 +192,18 @@ export function Receipt({
           <SummaryRow label="Discount" value={`− ${inr(totals.discountAmount)}`} muted />
         )}
         <SummaryRow label="Service charge (5%)" value={inr(totals.serviceCharge)} muted />
-        <SummaryRow label="GST (5%)" value={inr(totals.tax)} muted />
+        {(() => {
+          // Present GST as its CGST + SGST components (intra-state), summing
+          // exactly to the computed tax — the standard Indian invoice format.
+          const components = splitGst(totals.tax, TAX_RATE * 100, false)
+          return components.length > 0 ? (
+            components.map(c => (
+              <SummaryRow key={c.label} label={`${c.label} (${c.pct}%)`} value={inr(c.amount)} muted />
+            ))
+          ) : (
+            <SummaryRow label="GST (5%)" value={inr(totals.tax)} muted />
+          )
+        })()}
         {tip > 0 && <SummaryRow label="Tip" value={inr(tip)} muted />}
         <div className="my-1" style={{ borderTop: dashed }} />
         <SummaryRow label="Total" value={inr(grandTotal)} strong />
@@ -182,6 +213,34 @@ export function Receipt({
           </div>
         )}
       </div>
+
+      {/* Split — per-guest shares (sum exactly to total) */}
+      {hasShares && (
+        <div className="flex flex-col gap-1.5 pt-3" style={{ borderTop: rule }}>
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: t.descColor }}>
+            Split
+          </span>
+          {splitShares!.map(s => (
+            <SummaryRow key={s.id} label={s.label} value={inr(s.amount)} muted />
+          ))}
+        </div>
+      )}
+
+      {/* Payments — recorded tenders, plus change / outstanding balance */}
+      {hasPayments && (
+        <div className="flex flex-col gap-1.5 pt-3" style={{ borderTop: rule }}>
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: t.descColor }}>
+            Payments
+          </span>
+          {payments!.map(p => (
+            <SummaryRow key={p.id} label={p.method ?? 'Payment'} value={inr(p.amount)} muted />
+          ))}
+          <div className="my-1" style={{ borderTop: dashed }} />
+          <SummaryRow label="Paid" value={inr(paidTotal)} />
+          {due > 0 && <SummaryRow label="Balance due" value={inr(due)} strong />}
+          {change > 0 && <SummaryRow label="Change" value={inr(change)} muted />}
+        </div>
+      )}
 
       {/* Payment + footer */}
       <div className="flex items-center justify-between pt-3 text-[13px]" style={{ borderTop: rule }}>

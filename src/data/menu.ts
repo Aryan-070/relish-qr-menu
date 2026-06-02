@@ -12,6 +12,17 @@ export interface MenuItem {
   chefsSpecial?: boolean
   /** Heat level 0–3 (0/undefined = not spicy) — surfaces flame indicators. */
   spiceLevel?: 0 | 1 | 2 | 3
+  /** Optional operator override for positive dietary claims. Falls back to
+   *  keyword derivation in {@link ./dietary}. */
+  dietary?: import('./dietary').DietaryTag[]
+  /** Optional operator override for contained allergens. Falls back to
+   *  keyword derivation in {@link ./dietary}. */
+  allergens?: import('./dietary').Allergen[]
+  /** Optional per-serving nutrition info. */
+  nutrition?: import('./dietary').NutritionInfo
+  /** Optional priced modifier groups. When absent, groups are derived from
+   *  `customizations` — see {@link ./modifiers}. */
+  modifierGroups?: import('./modifiers').ModifierGroup[]
 }
 
 export interface Category {

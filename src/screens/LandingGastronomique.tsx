@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useT } from '../i18n'
 
 interface Props {
   onOpenMenu: () => void
@@ -66,6 +67,7 @@ function DecoBtn({
 }
 
 export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Props) {
+  const tr = useT()
   return (
     <div
       className="relative flex flex-col min-h-full overflow-hidden"
@@ -193,13 +195,13 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
             className="font-inter text-[8px] uppercase tracking-[0.24em]"
             style={{ color: DECO_INK, opacity: 0.65 }}
           >
-            Est. 2024
+            {tr('landing.est')}
           </span>
           <span
             className="font-inter text-[8px] uppercase tracking-[0.24em] font-semibold"
             style={{ color: DECO_INK }}
           >
-            Fine Dining · Vol. I
+            {tr('landing.gastronomiqueVol')}
           </span>
           <span
             className="font-inter text-[8px] uppercase tracking-[0.24em]"
@@ -267,7 +269,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
             style={{ background: 'linear-gradient(to top, rgba(20,8,2,0.75) 0%, transparent 100%)' }}>
             <div style={{ flex: 1, height: 1, background: `rgba(200,168,48,0.5)` }} />
             <span className="font-inter text-[8px] uppercase tracking-[0.28em]" style={{ color: 'rgba(220,185,80,0.85)', whiteSpace: 'nowrap' }}>
-              Chef's Signature
+              {tr('landing.gastronomiqueChefSignature')}
             </span>
             <div style={{ flex: 1, height: 1, background: `rgba(200,168,48,0.5)` }} />
           </div>
@@ -319,7 +321,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
               className="font-inter text-[9.5px] uppercase tracking-[0.22em] font-semibold"
               style={{ color: DECO_GOLD, whiteSpace: 'nowrap' }}
             >
-              International Veg Cuisine
+              {tr('brand.tagline')}
             </span>
             <div style={{ flex: 1, height: 1, background: `rgba(26,18,8,0.25)` }} />
           </div>
@@ -328,7 +330,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
             className="font-cormorant italic text-center"
             style={{ fontSize: 14, color: `rgba(26,18,8,0.55)`, lineHeight: 1.5 }}
           >
-            Where each plate tells a story of craft and culture
+            {tr('landing.gastronomiqueTagline')}
           </p>
         </motion.div>
 
@@ -354,14 +356,14 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
         >
           <div className="flex gap-2.5">
             <DecoBtn onClick={onOpenMenu} primary>
-              Open Menu
+              {tr('action.openMenu')}
             </DecoBtn>
             <DecoBtn onClick={onRecommend}>
-              ✦ Recommend
+              ✦ {tr('landing.recommendShort')}
             </DecoBtn>
           </div>
           <DecoBtn onClick={onWaiter} fullWidth>
-            Call Waiter
+            {tr('landing.callWaiter')}
           </DecoBtn>
         </motion.div>
 
@@ -373,7 +375,7 @@ export function LandingGastronomique({ onOpenMenu, onRecommend, onWaiter }: Prop
               className="font-inter text-[7.5px] uppercase tracking-[0.26em] text-center"
               style={{ color: `rgba(26,18,8,0.5)` }}
             >
-              International Veg Cuisine &nbsp;·&nbsp; Est. 2024 &nbsp;·&nbsp; Crafted With Care
+              {tr('landing.gastronomiqueFooter')}
             </span>
           </div>
         </div>

@@ -1,10 +1,13 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Sparkles, ArrowRight } from 'lucide-react'
+import { ChevronLeft, Sparkles, ArrowRight, ShoppingBag } from 'lucide-react'
 import { Chip } from '../components/atoms/Chip'
 import { Button } from '../components/atoms/Button'
 import { Price } from '../components/atoms/Price'
 import { getItemById } from '../data/menu'
+import { buildCombo, type Combo } from '../data/combos'
+import { formatMoney } from '../lib/money'
+import { useT } from '../i18n'
 import { useRecommendation, type RecommendationAnswers } from '../hooks/useRecommendation'
 import { questionReveal, stagger, scaleIn } from '../animations/variants'
 
@@ -23,9 +26,11 @@ interface RecommendationFlowProps {
   onBack: () => void
   onOpenMenu: () => void
   onWaiter?: () => void
+  onAddCombo?: (combo: Combo) => void
 }
 
-export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: RecommendationFlowProps) {
+export function RecommendationFlow({ onBack, onOpenMenu, onWaiter, onAddCombo }: RecommendationFlowProps) {
+  const tr = useT()
   const [step, setStep] = useState(0)
   const [selections, setSelections] = useState<{ moods: string[]; partySizes: string[] }>({
     moods: [],
@@ -86,10 +91,10 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
         </motion.button>
         <div className="flex-1 min-w-0">
           <h2 className="font-playfair font-bold text-[17px] leading-tight" style={{ color: 'var(--maroon)' }}>
-            Ask Relish AI
+            {tr('reco.title')}
           </h2>
           <p className="font-inter text-[10px] uppercase tracking-wider" style={{ color: 'var(--mute)' }}>
-            Personalised recommendations
+            {tr('reco.subtitle')}
           </p>
         </div>
         <Sparkles size={18} style={{ color: 'var(--gold)' }} className="flex-shrink-0" />
@@ -133,10 +138,10 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
                     Step {step + 1} of {QUESTIONS.length}
                   </p>
                   <h3 className="font-playfair font-semibold text-[20px] leading-snug" style={{ color: 'var(--maroon)' }}>
-                    {QUESTIONS[step].label}
+                    {currentKey === 'moods' ? tr('reco.moodQuestion') : tr('reco.partyQuestion')}
                   </h3>
                   <p className="font-inter text-[12px] mt-1" style={{ color: 'var(--mute)' }}>
-                    {QUESTIONS[step].hint}
+                    {currentKey === 'moods' ? tr('reco.moodHint') : tr('reco.partyHint')}
                   </p>
                 </div>
 
@@ -192,10 +197,10 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
                     <Sparkles size={22} style={{ color: 'var(--gold)' }} />
                   </motion.div>
                   <h3 className="font-playfair font-bold text-[22px]" style={{ color: 'var(--maroon)' }}>
-                    Your Relish Picks
+                    {tr('reco.picksTitle')}
                   </h3>
                   <p className="font-inter text-[12px] mt-1" style={{ color: 'var(--ink-soft)' }}>
-                    Based on your preferences
+                    {tr('reco.picksSubtitle')}
                   </p>
 
                   {/* Selection summary pills */}
@@ -213,7 +218,9 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
                 </div>
 
                 {/* Result cards */}
-                {results.map((path, i) => (
+                {results.map((path, i) => {
+                  const combo = buildCombo(path)
+                  return (
                   <motion.div
                     key={path.id}
                     initial={{ opacity: 0, y: 40 }}
@@ -230,7 +237,7 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
                         className="px-4 py-1.5 text-center font-inter text-[10px] font-semibold uppercase tracking-widest text-white"
                         style={{ background: 'var(--gold)' }}
                       >
-                        ✦ Top Pick for You
+                        ✦ {tr('reco.topPick')}
                       </div>
                     )}
                     <div className="p-4 paper-bg">
@@ -259,31 +266,58 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
                         })}
                       </div>
 
-                      <p className="font-inter text-[11px] mb-4 leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+                      <p className="font-inter text-[11px] mb-3 leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
                         {path.reason}
                       </p>
 
+                      {/* Combo bundle pricing */}
+                      {onAddCombo && combo.savings > 0 && (
+                        <div
+                          className="flex items-center justify-between mb-3 px-3 py-2 rounded-xl"
+                          style={{ background: 'rgba(79,122,60,0.10)', border: '1px solid rgba(79,122,60,0.25)' }}
+                        >
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-inter font-bold text-[15px]" style={{ color: 'var(--olive)' }}>
+                              {formatMoney(combo.comboPrice)}
+                            </span>
+                            <span className="font-inter text-[12px] line-through" style={{ color: 'var(--mute)' }}>
+                              {formatMoney(combo.originalPrice)}
+                            </span>
+                          </div>
+                          <span className="font-inter text-[11px] font-semibold" style={{ color: 'var(--olive)' }}>
+                            Save {formatMoney(combo.savings)} as a combo
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
-                        <Button variant="maroon" onClick={onOpenMenu} className="flex-1 text-xs py-2">
-                          Explore Menu
-                        </Button>
+                        {onAddCombo && combo.itemIds.length > 1 ? (
+                          <Button variant="primary" onClick={() => onAddCombo(combo)} className="flex-1 text-xs py-2">
+                            <ShoppingBag size={13} /> {tr('action.addCombo')} · {formatMoney(combo.comboPrice)}
+                          </Button>
+                        ) : (
+                          <Button variant="maroon" onClick={onOpenMenu} className="flex-1 text-xs py-2">
+                            {tr('action.exploreMenu')}
+                          </Button>
+                        )}
                         {onWaiter && (
                           <Button variant="ghost" onClick={onWaiter} className="flex-1 text-xs py-2">
-                            Ask Waiter
+                            {tr('action.askWaiter')}
                           </Button>
                         )}
                       </div>
                     </div>
                   </motion.div>
-                ))}
+                  )
+                })}
 
                 {results.length === 0 && (
                   <div className="text-center py-8">
                     <p className="font-inter text-[14px]" style={{ color: 'var(--ink-soft)' }}>
-                      Everything on our menu is worth trying!
+                      {tr('reco.everythingWorthTrying')}
                     </p>
                     <Button variant="maroon" onClick={onOpenMenu} className="mt-4">
-                      Browse Menu
+                      {tr('action.browseMenu')}
                     </Button>
                   </div>
                 )}
@@ -293,7 +327,7 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
                   className="mx-auto font-inter text-[12px] underline underline-offset-2 pb-4"
                   style={{ color: 'var(--mute)' }}
                 >
-                  Start over
+                  {tr('action.startOver')}
                 </button>
               </motion.div>
             )}
@@ -326,14 +360,14 @@ export function RecommendationFlow({ onBack, onOpenMenu, onWaiter }: Recommendat
               }}
             >
               {step < QUESTIONS.length - 1 ? (
-                <>Next <ArrowRight size={16} /></>
+                <>{tr('action.next')} <ArrowRight size={16} /></>
               ) : (
-                <>Show my picks <Sparkles size={14} /></>
+                <>{tr('action.showMyPicks')} <Sparkles size={14} /></>
               )}
             </motion.button>
             {!hasSelection && (
               <p className="text-center font-inter text-[11px] mt-2" style={{ color: 'var(--mute)' }}>
-                Select at least one option to continue
+                {tr('reco.selectToContinue')}
               </p>
             )}
           </motion.div>

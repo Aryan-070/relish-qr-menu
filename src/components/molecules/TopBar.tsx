@@ -1,14 +1,18 @@
+import { Search } from 'lucide-react'
 import { getCategoryById } from '../../data/menu'
 import { BellRipple } from '../animations/BellRipple'
 import { useTheme } from '../../theme/ThemeContext'
+import { useT } from '../../i18n'
 
 interface TopBarProps {
   activeCategoryId: string
   onWaiter: () => void
+  onSearch?: () => void
 }
 
-export function TopBar({ activeCategoryId, onWaiter }: TopBarProps) {
+export function TopBar({ activeCategoryId, onWaiter, onSearch }: TopBarProps) {
   const { tokens: t } = useTheme()
+  const tr = useT()
   const category = getCategoryById(activeCategoryId)
   const hard = t.navStyle === 'underline'
 
@@ -45,7 +49,7 @@ export function TopBar({ activeCategoryId, onWaiter }: TopBarProps) {
             opacity: 0.7,
           }}
         >
-          International Veg Cuisine
+          {tr('brand.tagline')}
         </span>
       </div>
 
@@ -65,18 +69,38 @@ export function TopBar({ activeCategoryId, onWaiter }: TopBarProps) {
         </span>
       )}
 
-      {/* Waiter bell */}
-      <div
-        className="relative flex items-center justify-center overflow-visible"
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: t.addShape === 'square' ? 0 : 9999,
-          background: hard ? 'transparent' : 'rgba(217,160,58,0.12)',
-          border: hard ? `1.5px solid ${t.ruleColor}` : '1px solid rgba(217,160,58,0.3)',
-        }}
-      >
-        <BellRipple size={16} color={hard ? t.accent : '#D9A03A'} onClick={onWaiter} />
+      {/* Actions: search + waiter bell */}
+      <div className="flex items-center gap-2">
+        {onSearch && (
+          <button
+            onClick={onSearch}
+            aria-label="Search the menu"
+            className="relative flex items-center justify-center"
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: t.addShape === 'square' ? 0 : 9999,
+              background: hard ? 'transparent' : 'rgba(217,160,58,0.12)',
+              border: hard ? `1.5px solid ${t.ruleColor}` : '1px solid rgba(217,160,58,0.3)',
+              color: hard ? t.accent : '#D9A03A',
+              cursor: 'pointer',
+            }}
+          >
+            <Search size={16} strokeWidth={2.25} />
+          </button>
+        )}
+        <div
+          className="relative flex items-center justify-center overflow-visible"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: t.addShape === 'square' ? 0 : 9999,
+            background: hard ? 'transparent' : 'rgba(217,160,58,0.12)',
+            border: hard ? `1.5px solid ${t.ruleColor}` : '1px solid rgba(217,160,58,0.3)',
+          }}
+        >
+          <BellRipple size={16} color={hard ? t.accent : '#D9A03A'} onClick={onWaiter} />
+        </div>
       </div>
     </div>
     </div>
