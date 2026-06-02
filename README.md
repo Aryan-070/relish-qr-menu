@@ -1,6 +1,10 @@
 # Relish — International Veg Cuisine · QR Menu
 
-A premium digital QR menu built as a mobile-first React SPA. Customers scan a table QR code and get a cinematic, luxury booklet experience rather than a static PDF.
+A premium digital QR menu built as a mobile-first React SPA. Customers scan a table QR code and get a cinematic, luxury booklet experience rather than a static PDF. Now also ships a role-based **Staff Console** with a **Billing & Subscription** dashboard and an optional **Supabase auth + Razorpay** backend (the app runs as a no-backend demo until those keys are set).
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FAryan-070%2Frelish-qr-menu&env=VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY&envDescription=Optional%20%E2%80%94%20leave%20blank%20to%20run%20the%20no-backend%20demo&project-name=relish-qr-menu&repository-name=relish-qr-menu)
+
+> One click deploys the full demo (no secrets). Open the deployed `/#staff` for the Staff Console. To enable real auth/billing, add the env vars — see [`docs/DEPLOY-STEPS.md`](./docs/DEPLOY-STEPS.md).
 
 ---
 
@@ -40,7 +44,8 @@ Open Chrome DevTools → Device toolbar → iPhone 14 Pro (393 × 852) for the i
 | Animations | Framer Motion v11 + GSAP 3.14.2 (HyperFrames composition) |
 | Styling | Tailwind CSS v3 + CSS custom properties |
 | Fonts | Playfair Display · Inter · Cormorant Garamond · Caveat |
-| Data | Static TypeScript (no backend, no API) |
+| Data | Static TypeScript demo by default; optional Supabase (auth + Postgres) and Razorpay (billing) backend |
+| Back-office | Role-based Staff Console (`src/console/`) — dashboards, floor, menu CRUD, Billing & Subscription |
 
 ---
 
@@ -50,17 +55,23 @@ Open Chrome DevTools → Device toolbar → iPhone 14 Pro (393 × 852) for the i
 |------|---------------|
 | [`TEAM_GUIDE.md`](./TEAM_GUIDE.md) | **Start here.** Complete guide — vision, every file explained, what we tried and failed, known issues, full roadmap, media production workflow |
 | [`HANDOFF.md`](./HANDOFF.md) | Session-level handoff — current state snapshot, files actively edited, immediate next steps |
+| [`docs/DEPLOY-STEPS.md`](./docs/DEPLOY-STEPS.md) | Click-by-click: deploy to Vercel, connect Supabase + Razorpay |
+| [`docs/`](./docs) | Deployment guide + commercial kit (brochure, pricing, comparison) |
 
 ---
 
 ## Build & Deploy
 
 ```bash
-npm run build     # → dist/
+npm run build     # → dist/  (runs tsc -b && vite build)
 npm run preview   # serve dist/ locally
 ```
 
-Deploy by dragging `dist/` into [Netlify](https://netlify.com), running `vercel deploy`, or setting up GitHub Pages via Actions.
+Recommended host is **Vercel** (config in [`vercel.json`](./vercel.json)). Fastest path: the **Deploy with Vercel** button above, or import the repo at vercel.com. It ships as a no-backend demo with zero secrets; add `VITE_SUPABASE_*` to turn on real auth/billing.
+
+- **Step-by-step runbook:** [`docs/DEPLOY-STEPS.md`](./docs/DEPLOY-STEPS.md)
+- **How the backend gate works:** [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)
+- CI builds every push/PR via [`.github/workflows/ci.yml`](./.github/workflows/ci.yml).
 
 ---
 
