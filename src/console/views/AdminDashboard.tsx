@@ -102,14 +102,15 @@ export function AdminDashboard() {
       >
         <KpiCard
           label="Revenue"
-          value={inr(kpis.revenue)}
+          value={kpis.revenue}
+          format={inr}
           delta={kpis.revenueDelta}
           spark={kpis.revenueSpark}
         />
-        <KpiCard label="Orders" value={String(kpis.orders)} delta={kpis.ordersDelta} />
-        <KpiCard label="Avg order value" value={inr(kpis.aov)} delta={kpis.aovDelta} />
-        <KpiCard label="Covers" value={String(kpis.covers)} delta={kpis.coversDelta} />
-        <KpiCard label="Table turnover" value={`${kpis.turnover.toFixed(1)}×`} />
+        <KpiCard label="Orders" value={kpis.orders} delta={kpis.ordersDelta} />
+        <KpiCard label="Avg order value" value={kpis.aov} format={inr} delta={kpis.aovDelta} />
+        <KpiCard label="Covers" value={kpis.covers} delta={kpis.coversDelta} />
+        <KpiCard label="Table turnover" value={kpis.turnover} precision={1} format={(n) => `${n.toFixed(1)}×`} />
       </motion.div>
 
       {/* 2 — Revenue trend */}

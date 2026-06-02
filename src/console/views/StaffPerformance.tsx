@@ -107,8 +107,8 @@ export function StaffPerformance() {
           label="Top performer"
           value={summary.top ? summary.top.name : '—'}
         />
-        <KpiCard label="Total covers" value={String(summary.totalCovers)} />
-        <KpiCard label="Team avg ticket" value={inr(summary.avgTicket)} />
+        <KpiCard label="Total covers" value={summary.totalCovers} />
+        <KpiCard label="Team avg ticket" value={summary.avgTicket} format={inr} />
       </motion.div>
 
       {/* Revenue by waiter */}

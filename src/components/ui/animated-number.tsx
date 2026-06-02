@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { motion, type MotionValue, useSpring, useTransform } from "framer-motion"
+import { motion, type MotionValue, useSpring, useTransform, useReducedMotion } from "framer-motion"
 
 interface AnimatedNumberProps {
   value: number
@@ -22,6 +22,7 @@ export function AnimatedNumber({
   onAnimationStart,
   onAnimationComplete,
 }: AnimatedNumberProps) {
+  const reduce = useReducedMotion()
   const spring = useSpring(value, { mass, stiffness, damping })
   const display: MotionValue<string> = useTransform(spring, (current) =>
     format(parseFloat(current.toFixed(precision)))
@@ -35,6 +36,9 @@ export function AnimatedNumber({
     })
     return () => unsubscribe()
   }, [spring, value, onAnimationStart, onAnimationComplete])
+
+  // Honour reduced-motion: render the final value statically (no spring).
+  if (reduce) return <span>{format(parseFloat(value.toFixed(precision)))}</span>
 
   return <motion.span>{display}</motion.span>
 }

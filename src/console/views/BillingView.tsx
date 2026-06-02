@@ -147,9 +147,9 @@ export function BillingView() {
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
       >
         <KpiCard label="Current package" value={pkg.name} />
-        <KpiCard label="Annual renewal" value={inr(pkg.renewalYr)} />
+        <KpiCard label="Annual renewal" value={pkg.renewalYr} format={inr} />
         <KpiCard label="Next renewal" value={renewalDays >= 0 ? `${renewalDays}d` : 'Overdue'} />
-        <KpiCard label="Lifetime billed" value={inr(lifetimeBilled)} />
+        <KpiCard label="Lifetime billed" value={lifetimeBilled} format={inr} />
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

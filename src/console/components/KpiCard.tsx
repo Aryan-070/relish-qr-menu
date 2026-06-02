@@ -1,13 +1,19 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useTheme } from '../../theme/ThemeContext'
 import { panelStyle } from '../lib/skin'
 import { cn, pct } from '../lib/format'
 import { fadeUp } from '../../animations/variants'
 import { Sparkline } from '../charts/Sparkline'
+import { AnimatedNumber } from '@/components/ui/animated-number'
 
 interface KpiCardProps {
   label: string
-  value: string
+  /** A number animates (roll-up via AnimatedNumber); a string renders static. */
+  value: string | number
+  /** Formatter for numeric values (e.g. `inr`); defaults to locale grouping. */
+  format?: (n: number) => string
+  /** Decimal places to preserve while rolling (default 0). */
+  precision?: number
   delta?: number
   spark?: number[]
   /** Higher-is-better metrics flip the delta colour when false. */
@@ -15,8 +21,16 @@ interface KpiCardProps {
   className?: string
 }
 
-export function KpiCard({ label, value, delta, spark, goodWhenUp = true, className = '' }: KpiCardProps) {
+export function KpiCard({ label, value, format, precision = 0, delta, spark, goodWhenUp = true, className = '' }: KpiCardProps) {
   const { tokens: t } = useTheme()
+  const reduce = useReducedMotion()
+  const fmt = format ?? ((n: number) => n.toLocaleString())
+  const valueNode =
+    typeof value === 'number'
+      ? reduce
+        ? fmt(value)
+        : <AnimatedNumber value={value} format={fmt} precision={precision} />
+      : value
   const hasDelta = typeof delta === 'number'
   const positive = (delta ?? 0) >= 0
   const good = positive === goodWhenUp
@@ -34,7 +48,7 @@ export function KpiCard({ label, value, delta, spark, goodWhenUp = true, classNa
           className="text-[26px] leading-none tabular-nums"
           style={{ fontFamily: "'Geist Mono','JetBrains Mono',monospace", color: t.ink, fontWeight: 600, letterSpacing: '-0.02em' }}
         >
-          {value}
+          {valueNode}
         </span>
         {spark && spark.length > 1 && <Sparkline data={spark} width={84} height={28} />}
       </div>
