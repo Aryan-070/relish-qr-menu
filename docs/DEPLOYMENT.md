@@ -50,3 +50,44 @@ Redeploy after setting them. The console now shows a sign-in screen; "Exit to me
 ## What's done vs. next (Phase 6)
 - **Done (6.1 foundation):** Supabase client, auth context, sign-in screen, console auth gate, SQL schema + RLS, Vercel config.
 - **Next:** wire the Billing dashboard (`src/console/views/BillingView.tsx`) to the `subscriptions`/`invoices` tables, map `app_users.role` to console role, add Razorpay Subscriptions (6.2), and video-egress metering (6.4). See [`/commercial/PLAN.md`](../commercial/PLAN.md) Phase 6.
+
+## 3. Connect Razorpay (optional — real payments)
+
+Razorpay powers the subscription-renewal payment flow. It is **completely inert until keys are set** — with no keys, the Billing dashboard falls back to the demo "mark paid" action, the app still builds and deploys, and no Razorpay code path runs.
+
+Because Razorpay needs a secret key, the secret-bearing work lives in **Vercel serverless functions** under [`api/razorpay/`](../api/razorpay), not in the browser bundle. Only the publishable key id is exposed to the client.
+
+### a. Set env vars
+
+| Var | Scope | Where to find it |
+|---|---|---|
+| `VITE_RAZORPAY_KEY_ID` | **Frontend** (client-exposed) | Razorpay → Settings → API Keys → Key Id |
+| `RAZORPAY_KEY_ID` | Serverless function (`api/`) | same Key Id (server copy) |
+| `RAZORPAY_KEY_SECRET` | Serverless function (`api/`) | Razorpay → Settings → API Keys → Key Secret |
+| `RAZORPAY_WEBHOOK_SECRET` | Serverless function (`api/`) | Razorpay → Settings → Webhooks → the secret you set when creating the webhook |
+
+`VITE_RAZORPAY_KEY_ID` is the **only** variable shipped to the client (anything prefixed `VITE_` is inlined into the bundle). Never prefix the secret or webhook vars with `VITE_`. Set all four in **Vercel → Project → Settings → Environment Variables** (and in `.env.local` for local dev — see [`.env.example`](../.env.example)).
+
+### b. Run the functions locally
+
+The functions in `api/` do **not** run under the plain Vite dev server. Use the Vercel CLI so `/api/razorpay/*` is served:
+
+```bash
+npm i -g vercel
+vercel dev   # serves the Vite app AND the api/ functions together
+```
+
+### c. Register the webhook
+
+In **Razorpay → Settings → Webhooks → Add New Webhook**:
+
+- **URL:** `https://<your-deployment>.vercel.app/api/razorpay/webhook`
+- **Secret:** the value you set as `RAZORPAY_WEBHOOK_SECRET`
+- **Active events:** `payment.captured` and `order.paid`
+
+The webhook handler verifies the `x-razorpay-signature` header (HMAC-SHA256 over the raw body) and returns `200` on a valid signature, `400` on an invalid one. Marking the matching invoice paid in Supabase is left as a clearly-commented `TODO` in [`api/razorpay/webhook.ts`](../api/razorpay/webhook.ts) — it needs the server-only `SUPABASE_SERVICE_ROLE_KEY`.
+
+### How the flow works
+- [`src/console/lib/razorpay.ts`](../src/console/lib/razorpay.ts) — `isRazorpayConfigured` gates the UI; `startRenewalPayment(...)` creates an order via the function, lazy-loads Razorpay Checkout, and opens the modal.
+- [`api/razorpay/create-order.ts`](../api/razorpay/create-order.ts) — creates the Razorpay order with Basic auth (`501` if env missing).
+- [`api/razorpay/webhook.ts`](../api/razorpay/webhook.ts) — verifies signatures and (TODO) marks invoices paid.

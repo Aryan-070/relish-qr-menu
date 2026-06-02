@@ -79,8 +79,16 @@ $$;
 create policy "own restaurant" on public.restaurants
   for select using (id = public.current_restaurant_id());
 
+-- Sign-up bootstrap: a signed-in user may create a restaurant and enrol *itself*.
+-- (For stricter control, replace these with a SECURITY DEFINER signup RPC.)
+create policy "create restaurant" on public.restaurants
+  for insert with check (auth.uid() is not null);
+
 create policy "own membership" on public.app_users
   for select using (restaurant_id = public.current_restaurant_id());
+
+create policy "enrol self" on public.app_users
+  for insert with check (user_id = auth.uid());
 
 create policy "own subscription" on public.subscriptions
   for all using (restaurant_id = public.current_restaurant_id())

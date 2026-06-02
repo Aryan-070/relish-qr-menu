@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useOpsStore } from '../store/useOpsStore'
 import { useToast } from '../components/Toast'
 import { useTheme } from '../../theme/ThemeContext'
+import { useAuth } from '../auth/AuthContext'
 import { Panel } from '../components/Panel'
 import { KpiCard } from '../components/KpiCard'
 import { DataTable, type Column } from '../components/DataTable'
@@ -11,6 +11,8 @@ import { Badge } from '../components/Badge'
 import { Modal } from '../components/Modal'
 import { fadeUp, stagger } from '../../animations/variants'
 import { inr } from '../lib/format'
+import { useBilling } from '../lib/useBilling'
+import { isRazorpayConfigured, startRenewalPayment } from '../lib/razorpay'
 import {
   PACKAGES,
   packageById,
@@ -24,21 +26,23 @@ import {
 } from '../lib/billing'
 
 export function BillingView() {
-  const ops = useOpsStore()
   const toast = useToast()
   const { tokens: t } = useTheme()
-  const { subscription: sub, invoices } = ops.state.billing
-  const pkg = packageById(sub.packageId)
+  const auth = useAuth()
+  const { billing, loading, error, setPackage, renewNow, toggleAutoRenew } = useBilling()
 
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [choice, setChoice] = useState<PackageId>(sub.packageId)
+  const [choice, setChoice] = useState<PackageId>('cinematic')
+  const [busy, setBusy] = useState(false)
+
+  const sub = billing?.subscription ?? null
+  const invoices = billing?.invoices ?? []
+  const pkg = sub ? packageById(sub.packageId) : null
 
   const lifetimeBilled = useMemo(
     () => invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0),
     [invoices],
   )
-  const renewalDays = daysUntil(sub.renewalAt)
-  const renewalGst = gstOf(pkg.renewalYr)
 
   const columns: Column<Invoice>[] = useMemo(
     () => [
@@ -53,25 +57,81 @@ export function BillingView() {
     [],
   )
 
+  // Loading / error states (only ever hit in Supabase mode; demo is synchronous).
+  if (loading || !sub || !pkg) {
+    return (
+      <Panel>
+        <p className="text-[13px] py-8 text-center" style={{ color: t.descColor, fontFamily: t.descFont }}>
+          {error ? `Couldn't load billing: ${error}` : 'Loading billing…'}
+        </p>
+      </Panel>
+    )
+  }
+
+  const renewalDays = daysUntil(sub.renewalAt)
+  const renewalGst = gstOf(pkg.renewalYr)
+  const dueInvoice = invoices.find(i => i.status === 'due')
+
   function openPicker() {
-    setChoice(sub.packageId)
+    setChoice(sub!.packageId)
     setPickerOpen(true)
   }
-  function applyChange() {
-    if (choice !== sub.packageId) {
-      ops.billingSetPackage(choice)
-      toast.push(`Switched to ${packageById(choice).name}`, 'success')
-    }
+
+  async function applyChange() {
+    const current = sub!.packageId
     setPickerOpen(false)
+    if (choice === current) return
+    setBusy(true)
+    try {
+      await setPackage(choice)
+      toast.push(`Switched to ${packageById(choice).name}`, 'success')
+    } catch (e) {
+      toast.push(e instanceof Error ? e.message : 'Could not change plan', 'warn')
+    } finally {
+      setBusy(false)
+    }
   }
-  function renewNow() {
-    ops.billingRenewNow()
-    toast.push('Renewal paid — thank you', 'success')
+
+  async function confirmRenewal() {
+    setBusy(true)
+    try {
+      await renewNow()
+      toast.push('Renewal paid — thank you', 'success')
+    } catch (e) {
+      toast.push(e instanceof Error ? e.message : 'Could not record renewal', 'warn')
+    } finally {
+      setBusy(false)
+    }
   }
-  function toggleAuto() {
-    const next = !sub.autoRenew
-    ops.billingToggleAutoRenew()
-    toast.push(next ? 'Auto-renew turned on' : 'Auto-renew turned off', 'info')
+
+  async function handleRenew() {
+    if (isRazorpayConfigured) {
+      try {
+        await startRenewalPayment({
+          amountPaise: withGst(pkg!.renewalYr) * 100,
+          invoiceId: dueInvoice?.id ?? `renew-${pkg!.id}`,
+          description: `Annual renewal — ${pkg!.name}`,
+          customerEmail: auth.user?.email ?? undefined,
+          onSuccess: confirmRenewal,
+          onDismiss: () => toast.push('Payment cancelled', 'info'),
+        })
+      } catch (e) {
+        toast.push(e instanceof Error ? e.message : 'Payment failed to start', 'warn')
+      }
+      return
+    }
+    await confirmRenewal()
+  }
+
+  async function toggleAuto() {
+    const next = !sub!.autoRenew
+    setBusy(true)
+    try {
+      await toggleAutoRenew()
+      toast.push(next ? 'Auto-renew turned on' : 'Auto-renew turned off', 'info')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const label = { color: t.descColor, fontFamily: t.descFont }
@@ -79,7 +139,6 @@ export function BillingView() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* KPI summary */}
       <motion.div
         variants={stagger}
         initial="hidden"
@@ -93,12 +152,11 @@ export function BillingView() {
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Subscription detail */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="lg:col-span-2">
           <Panel
             title="Subscription"
             subtitle={pkg.summary}
-            action={<Button size="sm" variant="ghost" onClick={openPicker}>Change plan</Button>}
+            action={<Button size="sm" variant="ghost" onClick={openPicker} disabled={busy}>Change plan</Button>}
           >
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-[13px]">
               <div className="flex justify-between gap-3"><dt style={label}>Package</dt><dd style={value}>{pkg.name}</dd></div>
@@ -113,14 +171,13 @@ export function BillingView() {
               <span className="text-[13px]" style={label}>
                 Auto-renew is <span style={{ color: sub.autoRenew ? '#3d6130' : '#b3141b', fontWeight: 600 }}>{sub.autoRenew ? 'on' : 'off'}</span>
               </span>
-              <Button size="sm" variant="subtle" onClick={toggleAuto}>
+              <Button size="sm" variant="subtle" onClick={toggleAuto} disabled={busy}>
                 {sub.autoRenew ? 'Turn off' : 'Turn on'}
               </Button>
             </div>
           </Panel>
         </motion.div>
 
-        {/* Next charge / renew */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
           <Panel title="Next charge">
             <dl className="text-[13px] flex flex-col gap-2.5">
@@ -132,15 +189,18 @@ export function BillingView() {
               </div>
               <div className="flex justify-between gap-3"><dt style={label}>Due on</dt><dd style={value}>{formatDate(sub.renewalAt)}</dd></div>
             </dl>
-            <Button size="sm" variant="primary" fullWidth className="mt-4" onClick={renewNow}>Renew now</Button>
+            <Button size="sm" variant="primary" fullWidth className="mt-4" onClick={handleRenew} disabled={busy}>
+              {isRazorpayConfigured ? 'Pay & renew' : 'Renew now'}
+            </Button>
             <p className="text-[11px] mt-3 leading-snug" style={{ color: t.descColor, fontFamily: t.descFont }}>
-              Demo billing — charges simulate locally. Razorpay subscriptions &amp; GST invoicing connect in the next release.
+              {isRazorpayConfigured
+                ? 'Secure payment via Razorpay.'
+                : 'Demo billing — charges simulate locally. Set the Razorpay keys to take real payments.'}
             </p>
           </Panel>
         </motion.div>
       </div>
 
-      {/* Invoice history */}
       <motion.div variants={fadeUp} initial="hidden" animate="visible">
         <Panel title="Invoice history" subtitle={`${invoices.length} invoices`}>
           <DataTable
@@ -155,7 +215,6 @@ export function BillingView() {
         </Panel>
       </motion.div>
 
-      {/* Change-plan picker */}
       <Modal
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -164,7 +223,7 @@ export function BillingView() {
         footer={
           <>
             <Button size="sm" variant="subtle" onClick={() => setPickerOpen(false)}>Cancel</Button>
-            <Button size="sm" variant="primary" onClick={applyChange} disabled={choice === sub.packageId}>Confirm change</Button>
+            <Button size="sm" variant="primary" onClick={applyChange} disabled={choice === sub.packageId || busy}>Confirm change</Button>
           </>
         }
       >
