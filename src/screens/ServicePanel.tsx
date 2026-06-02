@@ -40,6 +40,8 @@ interface ServicePanelProps {
   /** Loyalty customer linked to this session (drives the Rewards card). */
   activeCustomerId?: string | null
   onLinkCustomer?: (customerId: string) => void
+  /** View to land on when the panel opens (e.g. 'feedback' after pay-at-table). */
+  initialView?: PanelView
 }
 
 // ─── Static data ─────────────────────────────────────────────────────────────
@@ -97,7 +99,7 @@ const TOAST_MESSAGE_KEYS: Record<string, TranslationKey> = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrder, orderCount, total, activeCustomerId = null, onLinkCustomer }: ServicePanelProps) {
+export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrder, orderCount, total, activeCustomerId = null, onLinkCustomer, initialView }: ServicePanelProps) {
   const tr = useT()
   const { posterOnly } = useMediaMode()
   const [view, setView] = useState<PanelView>('home')
@@ -121,11 +123,12 @@ export function ServicePanel({ open, onClose, onRecommend, onOpenMenu, onViewOrd
   const waiterArrivedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const waiterCallIdRef = useRef<string | null>(null)
 
-  // Reset on open/close — also resets view on close so next open starts at home
+  // Reset on open/close — opens at `initialView` (default home) so callers can
+  // route straight to e.g. feedback after a pay-at-table settle; resets on close.
   useEffect(() => {
-    setView('home')
+    setView(open ? (initialView ?? 'home') : 'home')
     if (open) setToastVisible(false)
-  }, [open])
+  }, [open, initialView])
 
   // Cleanup all pending timers on unmount
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Upload, Video, X } from 'lucide-react'
+import { ChevronDown, Image as ImageIcon, Plus, Upload, Video, X } from 'lucide-react'
 import {
   NumberField,
   SelectField,
@@ -14,6 +14,8 @@ import { LqipImage } from '../../../components/atoms/LqipImage'
 import { categories } from '../../../data/menu'
 import { MENU_BADGES } from '../../lib/types'
 import type { EditableMenuItem } from '../../lib/types'
+import type { ModifierGroup, ModifierOption } from '../../../data/modifiers'
+import { GST_RATES, DEFAULT_GST_RATE_PCT } from '../../../lib/tax'
 import { fileToDataUrl } from './readFile'
 
 /** Local draft shape: arrays are edited as comma-separated strings. */
@@ -21,6 +23,7 @@ interface Draft {
   name: string
   price: number
   categoryId: string
+  taxRatePct: number
   description: string
   tagsText: string
   customizationsText: string
@@ -33,6 +36,7 @@ interface Draft {
   imageUrl: string
   videoUrl: string
   badges: string[]
+  modifierGroups: ModifierGroup[]
 }
 
 interface MenuItemFormProps {
@@ -55,6 +59,9 @@ const SPICE_OPTIONS: Array<{ value: '0' | '1' | '2' | '3'; label: string }> = [
 
 const CATEGORY_OPTIONS = categories.map(c => ({ value: c.id, label: c.name }))
 
+/** GST slab options, keyed by percentage as a string for the Select. */
+const TAX_RATE_OPTIONS = GST_RATES.map(r => ({ value: String(r.pct), label: r.label }))
+
 function toCsv(values: string[]): string {
   return values.join(', ')
 }
@@ -71,6 +78,7 @@ function seedDraft(item: EditableMenuItem): Draft {
     name: item.name,
     price: item.price,
     categoryId: item.categoryId,
+    taxRatePct: item.taxRatePct ?? DEFAULT_GST_RATE_PCT,
     description: item.description,
     tagsText: toCsv(item.tags),
     customizationsText: toCsv(item.customizations),
@@ -83,7 +91,22 @@ function seedDraft(item: EditableMenuItem): Draft {
     imageUrl: item.imageUrl ?? '',
     videoUrl: item.videoUrl ?? '',
     badges: item.badges ?? [],
+    modifierGroups: cloneGroups(item.modifierGroups),
   }
+}
+
+/** Deep-clone groups so editing the draft never mutates the source item. */
+function cloneGroups(groups: ModifierGroup[] | undefined): ModifierGroup[] {
+  return (groups ?? []).map(g => ({
+    ...g,
+    options: g.options.map(o => ({ ...o })),
+  }))
+}
+
+let modifierSeq = 0
+function newId(prefix: string): string {
+  modifierSeq += 1
+  return `${prefix}-${Date.now().toString(36)}-${modifierSeq}`
 }
 
 /** Controlled menu item form for the create/edit Drawer. Commits only on Save. */
@@ -92,6 +115,7 @@ export function MenuItemForm({ item, mode, onCommit, registerSubmit }: MenuItemF
   const [draft, setDraft] = useState<Draft>(() => seedDraft(item))
   const [touched, setTouched] = useState(false)
   const [mediaError, setMediaError] = useState<string | null>(null)
+  const [modifiersOpen, setModifiersOpen] = useState(() => (item.modifierGroups?.length ?? 0) > 0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const videoInputRef = useRef<HTMLInputElement | null>(null)
   const radius = controlRadius(t)
@@ -101,6 +125,7 @@ export function MenuItemForm({ item, mode, onCommit, registerSubmit }: MenuItemF
   useEffect(() => {
     setDraft(seedDraft(item))
     setTouched(false)
+    setModifiersOpen((item.modifierGroups?.length ?? 0) > 0)
   }, [item])
 
   const nameError = draft.name.trim().length === 0
@@ -111,11 +136,17 @@ export function MenuItemForm({ item, mode, onCommit, registerSubmit }: MenuItemF
       setTouched(true)
       if (draft.name.trim().length === 0) return
       if (!Number.isFinite(draft.price) || draft.price < 0) return
+      // Keep only groups that have a name and at least one option; omit the
+      // field entirely when empty so the guest flow falls back to showcase/derived.
+      const cleanedGroups = draft.modifierGroups
+        .map(g => ({ ...g, name: g.name.trim(), options: g.options.filter(o => o.label.trim().length > 0) }))
+        .filter(g => g.name.length > 0 && g.options.length > 0)
       onCommit({
         ...item,
         name: draft.name.trim(),
         price: Math.round(draft.price),
         categoryId: draft.categoryId,
+        taxRatePct: draft.taxRatePct,
         description: draft.description.trim(),
         tags: fromCsv(draft.tagsText),
         customizations: fromCsv(draft.customizationsText),
@@ -128,6 +159,7 @@ export function MenuItemForm({ item, mode, onCommit, registerSubmit }: MenuItemF
         imageUrl: draft.imageUrl.trim() || undefined,
         videoUrl: draft.videoUrl.trim() || undefined,
         badges: draft.badges,
+        modifierGroups: cleanedGroups.length > 0 ? cleanedGroups : undefined,
       })
     }
     registerSubmit(submit)
@@ -142,6 +174,56 @@ export function MenuItemForm({ item, mode, onCommit, registerSubmit }: MenuItemF
       badges: prev.badges.includes(badge)
         ? prev.badges.filter(b => b !== badge)
         : [...prev.badges, badge],
+    }))
+
+  // ── Modifier group editing (all immutable updates) ────────────────────────
+  const addGroup = () =>
+    setDraft(prev => ({
+      ...prev,
+      modifierGroups: [
+        ...prev.modifierGroups,
+        { id: newId('grp'), name: 'New group', min: 1, max: 1, options: [] },
+      ],
+    }))
+
+  const removeGroup = (groupId: string) =>
+    setDraft(prev => ({
+      ...prev,
+      modifierGroups: prev.modifierGroups.filter(g => g.id !== groupId),
+    }))
+
+  const patchGroup = (groupId: string, patch: Partial<Omit<ModifierGroup, 'id' | 'options'>>) =>
+    setDraft(prev => ({
+      ...prev,
+      modifierGroups: prev.modifierGroups.map(g => (g.id === groupId ? { ...g, ...patch } : g)),
+    }))
+
+  const addOption = (groupId: string) =>
+    setDraft(prev => ({
+      ...prev,
+      modifierGroups: prev.modifierGroups.map(g =>
+        g.id === groupId
+          ? { ...g, options: [...g.options, { id: newId('opt'), label: '', priceDelta: 0 }] }
+          : g,
+      ),
+    }))
+
+  const removeOption = (groupId: string, optionId: string) =>
+    setDraft(prev => ({
+      ...prev,
+      modifierGroups: prev.modifierGroups.map(g =>
+        g.id === groupId ? { ...g, options: g.options.filter(o => o.id !== optionId) } : g,
+      ),
+    }))
+
+  const patchOption = (groupId: string, optionId: string, patch: Partial<Omit<ModifierOption, 'id'>>) =>
+    setDraft(prev => ({
+      ...prev,
+      modifierGroups: prev.modifierGroups.map(g =>
+        g.id === groupId
+          ? { ...g, options: g.options.map(o => (o.id === optionId ? { ...o, ...patch } : o)) }
+          : g,
+      ),
     }))
 
   const handlePhotoFile = async (file: File | undefined) => {
@@ -205,6 +287,13 @@ export function MenuItemForm({ item, mode, onCommit, registerSubmit }: MenuItemF
           options={CATEGORY_OPTIONS}
         />
       </div>
+
+      <SelectField
+        label="Tax rate (GST)"
+        value={String(draft.taxRatePct)}
+        onChange={v => set('taxRatePct', Number(v))}
+        options={TAX_RATE_OPTIONS}
+      />
 
       <TextAreaField
         label="Description"
@@ -434,6 +523,156 @@ export function MenuItemForm({ item, mode, onCommit, registerSubmit }: MenuItemF
             )
           })}
         </div>
+      </div>
+
+      {/* Modifiers (collapsible) */}
+      <div className="flex flex-col gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => setModifiersOpen(o => !o)}
+          aria-expanded={modifiersOpen}
+          className="flex items-center justify-between w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-maroon"
+          style={{ borderRadius: radius }}
+        >
+          <span
+            className="text-[12px] font-semibold uppercase tracking-wider"
+            style={{ color: t.inkSoft, fontFamily: t.descFont }}
+          >
+            Modifiers{draft.modifierGroups.length > 0 ? ` (${draft.modifierGroups.length})` : ''}
+          </span>
+          <ChevronDown
+            size={16}
+            aria-hidden
+            style={{
+              color: t.descColor,
+              transition: 'transform 160ms ease',
+              transform: modifiersOpen ? 'rotate(180deg)' : 'none',
+            }}
+          />
+        </button>
+
+        {modifiersOpen && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[11px]" style={{ color: t.descColor, fontFamily: t.descFont }}>
+              Add-on groups with per-option ₹ upcharges. Each group has a min/max number of
+              selectable options. These override the auto-derived options on the live menu.
+            </p>
+
+            {draft.modifierGroups.map(group => (
+              <div
+                key={group.id}
+                className="flex flex-col gap-3 p-3"
+                style={{
+                  borderRadius: radius,
+                  border: `1px solid ${t.ruleColor}`,
+                  background: 'rgba(0,0,0,0.015)',
+                }}
+              >
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <TextField
+                      label="Group name"
+                      value={group.name}
+                      onChange={v => patchGroup(group.id, { name: v })}
+                      placeholder="e.g. Choose your crust"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={uploadBtnClass}
+                    style={uploadBtnStyle}
+                    onClick={() => removeGroup(group.id)}
+                    aria-label={`Remove group ${group.name || 'group'}`}
+                  >
+                    <X size={14} aria-hidden /> Remove
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <NumberField
+                    label="Min select"
+                    value={group.min}
+                    onChange={v => patchGroup(group.id, { min: Math.max(0, Math.round(v) || 0) })}
+                    min={0}
+                  />
+                  <NumberField
+                    label="Max select"
+                    value={group.max}
+                    onChange={v => patchGroup(group.id, { max: Math.max(1, Math.round(v) || 1) })}
+                    min={1}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <span
+                    className="text-[11px] font-semibold uppercase tracking-wider"
+                    style={{ color: t.inkSoft, fontFamily: t.descFont }}
+                  >
+                    Options
+                  </span>
+                  {group.options.length === 0 && (
+                    <p className="text-[11px]" style={{ color: t.descColor, fontFamily: t.descFont }}>
+                      No options yet — add one below.
+                    </p>
+                  )}
+                  {group.options.map(option => (
+                    <div key={option.id} className="flex items-end gap-2">
+                      <div className="flex-1 min-w-0">
+                        <TextField
+                          label="Label"
+                          value={option.label}
+                          onChange={v => patchOption(group.id, option.id, { label: v })}
+                          placeholder="e.g. Extra cheese"
+                        />
+                      </div>
+                      <div className="w-[110px] shrink-0">
+                        <NumberField
+                          label="₹ delta"
+                          value={option.priceDelta}
+                          onChange={v => patchOption(group.id, option.id, { priceDelta: Math.round(v) || 0 })}
+                          prefix="₹"
+                          min={0}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className={uploadBtnClass}
+                        style={uploadBtnStyle}
+                        onClick={() => removeOption(group.id, option.id)}
+                        aria-label={`Remove option ${option.label || 'option'}`}
+                      >
+                        <X size={14} aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                  <div>
+                    <button
+                      type="button"
+                      className={uploadBtnClass}
+                      style={uploadBtnStyle}
+                      onClick={() => addOption(group.id)}
+                      aria-label={`Add option to ${group.name || 'group'}`}
+                    >
+                      <Plus size={14} aria-hidden /> Add option
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div>
+              <button
+                type="button"
+                className={uploadBtnClass}
+                style={uploadBtnStyle}
+                onClick={addGroup}
+                aria-label="Add modifier group"
+              >
+                <Plus size={14} aria-hidden /> Add modifier group
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 pt-1">

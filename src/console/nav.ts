@@ -14,6 +14,12 @@ import {
   Gift,
   MessageSquare,
   Megaphone,
+  Boxes,
+  Tags,
+  ReceiptText,
+  ShieldCheck,
+  CalendarClock,
+  Building2,
   type LucideIcon,
 } from 'lucide-react'
 import type { Role } from './lib/types'
@@ -35,6 +41,12 @@ export type ConsoleView =
   | 'loyalty'
   | 'feedback'
   | 'campaigns'
+  | 'inventory'
+  | 'promotions'
+  | 'cash-loss'
+  | 'staff-admin'
+  | 'roster'
+  | 'group'
 
 export interface NavItem {
   view: ConsoleView
@@ -57,11 +69,17 @@ export const NAV: Record<Role, NavItem[]> = {
     { view: 'records', label: 'Records', icon: History },
     { view: 'manager-menu', label: 'Menu', icon: UtensilsCrossed },
     { view: 'manager-staff', label: 'Staff', icon: Users },
+    { view: 'staff-admin', label: 'Staff Admin', icon: ShieldCheck },
+    { view: 'roster', label: 'Roster', icon: CalendarClock },
+    { view: 'group', label: 'Group', icon: Building2 },
+    { view: 'inventory', label: 'Inventory', icon: Boxes },
     { view: 'reservations', label: 'Reservations', icon: CalendarCheck },
     { view: 'loyalty', label: 'Loyalty', icon: Gift },
     { view: 'feedback', label: 'Feedback', icon: MessageSquare },
     { view: 'campaigns', label: 'Campaigns', icon: Megaphone },
+    { view: 'promotions', label: 'Promotions', icon: Tags },
     { view: 'table-qr', label: 'QR Codes', icon: QrCode },
+    { view: 'cash-loss', label: 'Cash & Loss', icon: ReceiptText },
     { view: 'admin-billing', label: 'Billing', icon: CreditCard },
   ],
   manager: [
@@ -70,9 +88,12 @@ export const NAV: Record<Role, NavItem[]> = {
     { view: 'reservations', label: 'Reservations', icon: CalendarCheck },
     { view: 'manager-menu', label: 'Menu', icon: UtensilsCrossed },
     { view: 'manager-staff', label: 'Staff', icon: Users },
+    { view: 'roster', label: 'Roster', icon: CalendarClock },
+    { view: 'inventory', label: 'Inventory', icon: Boxes },
     { view: 'loyalty', label: 'Loyalty', icon: Gift },
     { view: 'feedback', label: 'Feedback', icon: MessageSquare },
     { view: 'campaigns', label: 'Campaigns', icon: Megaphone },
+    { view: 'promotions', label: 'Promotions', icon: Tags },
     { view: 'table-qr', label: 'QR Codes', icon: QrCode },
     { view: 'reports', label: 'Reports', icon: BarChart3 },
     { view: 'records', label: 'Records', icon: History },

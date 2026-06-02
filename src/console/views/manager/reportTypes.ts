@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Clock,
   PieChart,
+  Receipt,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -13,6 +14,7 @@ export type ReportId =
   | 'peak-hours'
   | 'waiter-productivity'
   | 'category-mix'
+  | 'gst'
 
 export interface ReportMeta {
   id: ReportId
@@ -58,5 +60,12 @@ export const REPORTS: ReportMeta[] = [
     description: 'Revenue share across menu categories.',
     icon: PieChart,
     slug: 'category-mix',
+  },
+  {
+    id: 'gst',
+    title: 'GST',
+    description: 'CGST / SGST liability grouped by tax slab.',
+    icon: Receipt,
+    slug: 'gst',
   },
 ]

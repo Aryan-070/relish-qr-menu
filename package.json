@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "key-ingredients": "node scripts/key-ingredients.mjs",
     "optimize-images": "node scripts/optimize-images.mjs",
-    "fetch:videos": "node scripts/fetch-videos.mjs"
+    "fetch:videos": "node scripts/fetch-videos.mjs",
+    "pitch:capture": "node scripts/pitch/capture.mjs && node scripts/pitch/capture2.mjs",
+    "pitch:pdf": "node scripts/pitch/render.mjs Relish-Pitch-by-TheShahStack.pdf pitch/index.html && node scripts/pitch/render.mjs Relish-Sales-Deck.pdf pitch/sales.html",
+    "pitch:pdf:client": "PITCH_CLEAN=1 node scripts/pitch/render.mjs Relish-Pitch-Client.pdf pitch/index.html && PITCH_CLEAN=1 node scripts/pitch/render.mjs Relish-Sales-Deck-Client.pdf pitch/sales.html"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -36,9 +40,11 @@
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.60.0",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.3.0",
     "typescript": "^5.7.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.1.8"
   }
 }

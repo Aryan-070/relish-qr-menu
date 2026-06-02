@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Receipt, Armchair } from 'lucide-react'
+import { Users, Receipt, Armchair, Plus, Minus, ClipboardList, Merge, ArrowRightLeft, Search } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
 import { useViewCtx } from '../ViewContext'
 import { useOpsStore } from '../store/useOpsStore'
@@ -8,16 +8,17 @@ import { Panel } from '../components/Panel'
 import { Button } from '../components/Button'
 import { Badge } from '../components/Badge'
 import { Modal } from '../components/Modal'
+import { Drawer } from '../components/Drawer'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { NumberField } from '../components/Field'
+import { NumberField, SelectField, TextField } from '../components/Field'
 import { SegmentedControl } from '../components/SegmentedControl'
 import { EmptyState } from '../components/EmptyState'
 import { useToast } from '../components/Toast'
 import { TABLE_STATUS } from '../lib/statusColors'
 import { sectionTitleStyle, isHard } from '../lib/skin'
-import { ago } from '../lib/format'
+import { ago, inr } from '../lib/format'
 import { fadeUp, stagger } from '../../animations/variants'
-import type { Table, TableStatus } from '../lib/types'
+import type { Table, TableStatus, OrderLine, OrderRecord } from '../lib/types'
 
 // Status sub-states a waiter can flip an occupied table between.
 type QuickStatus = 'seated' | 'ordering' | 'bill-requested'
@@ -77,9 +78,21 @@ interface TableCardProps {
   onStatus: (table: Table, status: TableStatus) => void
   onOpenBill: (table: Table) => void
   onClear: (table: Table) => void
+  onTakeOrder: (table: Table) => void
+  onMerge: (table: Table) => void
+  onTransfer: (table: Table) => void
 }
 
-function TableCard({ table, onSeat, onStatus, onOpenBill, onClear }: TableCardProps) {
+function TableCard({
+  table,
+  onSeat,
+  onStatus,
+  onOpenBill,
+  onClear,
+  onTakeOrder,
+  onMerge,
+  onTransfer,
+}: TableCardProps) {
   const { tokens: t } = useTheme()
   const available = table.status === 'available'
   const quickValue: QuickStatus =
@@ -125,12 +138,23 @@ function TableCard({ table, onSeat, onStatus, onOpenBill, onClear }: TableCardPr
               size="sm"
               className="w-full"
             />
+            <Button variant="primary" size="sm" fullWidth onClick={() => onTakeOrder(table)}>
+              <ClipboardList size={14} aria-hidden /> Take order
+            </Button>
             <div className="flex gap-2">
               <Button variant="gold" size="sm" onClick={() => onOpenBill(table)} className="flex-1">
                 <Receipt size={14} aria-hidden /> Open bill
               </Button>
               <Button variant="subtle" size="sm" onClick={() => onClear(table)} aria-label={`Clear ${table.label}`}>
                 Clear
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="subtle" size="sm" onClick={() => onMerge(table)} className="flex-1">
+                <Merge size={14} aria-hidden /> Merge
+              </Button>
+              <Button variant="subtle" size="sm" onClick={() => onTransfer(table)} className="flex-1">
+                <ArrowRightLeft size={14} aria-hidden /> Transfer
               </Button>
             </div>
           </div>
@@ -160,6 +184,18 @@ export function WaiterTables() {
   const [guestCount, setGuestCount] = useState(2)
   const [clearTarget, setClearTarget] = useState<Table | null>(null)
 
+  // Take-order drawer: target table + a cart keyed by menu item id → qty.
+  const [orderTarget, setOrderTarget] = useState<Table | null>(null)
+  const [cart, setCart] = useState<Record<string, number>>({})
+  const [menuQuery, setMenuQuery] = useState('')
+
+  // Merge / transfer modals.
+  const [mergeTarget, setMergeTarget] = useState<Table | null>(null)
+  const [mergeInto, setMergeInto] = useState('')
+  const [transferTarget, setTransferTarget] = useState<Table | null>(null)
+  const [transferOrderId, setTransferOrderId] = useState('')
+  const [transferToTable, setTransferToTable] = useState('')
+
   const openSeat = (table: Table) => {
     setGuestCount(2)
     setSeatTarget(table)
@@ -184,6 +220,135 @@ export function WaiterTables() {
     ops.clearTable(clearTarget.id)
     push(`${clearTarget.label} cleared`, 'success')
     setClearTarget(null)
+  }
+
+  // ── Take order ────────────────────────────────────────────────────────────
+  const openOrder = (table: Table) => {
+    setCart({})
+    setMenuQuery('')
+    setOrderTarget(table)
+  }
+
+  // Orderable menu: in-stock, available items only — mirrors what a guest sees.
+  const orderableMenu = useMemo(
+    () => ops.state.menu.filter(m => m.available && !m.soldOut),
+    [ops.state.menu],
+  )
+  const filteredMenu = useMemo(() => {
+    const q = menuQuery.trim().toLowerCase()
+    if (!q) return orderableMenu
+    return orderableMenu.filter(m => m.name.toLowerCase().includes(q))
+  }, [orderableMenu, menuQuery])
+
+  const addLine = (itemId: string) =>
+    setCart(prev => ({ ...prev, [itemId]: (prev[itemId] ?? 0) + 1 }))
+  const removeLine = (itemId: string) =>
+    setCart(prev => {
+      const next = (prev[itemId] ?? 0) - 1
+      if (next <= 0) {
+        const { [itemId]: _drop, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [itemId]: next }
+    })
+
+  const cartLines = useMemo<OrderLine[]>(() => {
+    const lines: OrderLine[] = []
+    for (const [itemId, qty] of Object.entries(cart)) {
+      if (qty <= 0) continue
+      const item = ops.state.menu.find(m => m.id === itemId)
+      if (!item) continue
+      lines.push({
+        itemId: item.id,
+        name: item.name,
+        price: item.price,
+        qty,
+        categoryId: item.categoryId,
+      })
+    }
+    return lines
+  }, [cart, ops.state.menu])
+
+  const cartTotal = useMemo(
+    () => cartLines.reduce((sum, l) => sum + l.price * l.qty, 0),
+    [cartLines],
+  )
+  const cartCount = useMemo(
+    () => cartLines.reduce((sum, l) => sum + l.qty, 0),
+    [cartLines],
+  )
+
+  const confirmOrder = () => {
+    if (!orderTarget || cartLines.length === 0) return
+    const order: OrderRecord = {
+      id: `ORD-${String(Date.now()).slice(-6)}`,
+      tableId: orderTarget.id,
+      waiterId: orderTarget.waiterId ?? currentWaiterId,
+      placedAt: Date.now(),
+      lines: cartLines,
+      total: cartTotal,
+      paid: false,
+      status: 'new',
+      source: 'staff',
+    }
+    ops.placeOrder(order)
+    push(`Order sent · ${orderTarget.label} · ${inr(cartTotal)}`, 'success')
+    setOrderTarget(null)
+    setCart({})
+  }
+
+  // ── Merge ─────────────────────────────────────────────────────────────────
+  const openMerge = (table: Table) => {
+    setMergeInto('')
+    setMergeTarget(table)
+  }
+  // Candidate targets: any other table (not the source itself).
+  const mergeOptions = useMemo(
+    () =>
+      mergeTarget
+        ? ops.state.tables
+            .filter(tb => tb.id !== mergeTarget.id)
+            .map(tb => ({ value: tb.id, label: `${tb.label} · ${tb.zone}` }))
+        : [],
+    [mergeTarget, ops.state.tables],
+  )
+  const confirmMerge = () => {
+    if (!mergeTarget || !mergeInto) return
+    const into = ops.state.tables.find(tb => tb.id === mergeInto)
+    ops.mergeTables(mergeTarget.id, mergeInto)
+    push(`${mergeTarget.label} merged into ${into?.label ?? mergeInto}`, 'success')
+    setMergeTarget(null)
+  }
+
+  // ── Transfer ───────────────────────────────────────────────────────────────
+  const openTransfer = (table: Table) => {
+    const open = ops.state.orders.filter(o => o.tableId === table.id && !o.paid)
+    setTransferOrderId(open[0]?.id ?? '')
+    setTransferToTable('')
+    setTransferTarget(table)
+  }
+  const transferableOrders = useMemo(
+    () =>
+      transferTarget
+        ? ops.state.orders.filter(o => o.tableId === transferTarget.id && !o.paid)
+        : [],
+    [transferTarget, ops.state.orders],
+  )
+  const transferTableOptions = useMemo(
+    () =>
+      transferTarget
+        ? ops.state.tables
+            .filter(tb => tb.id !== transferTarget.id)
+            .map(tb => ({ value: tb.id, label: `${tb.label} · ${tb.zone}` }))
+        : [],
+    [transferTarget, ops.state.tables],
+  )
+  const confirmTransfer = () => {
+    if (!transferTarget || !transferOrderId || !transferToTable) return
+    const into = ops.state.tables.find(tb => tb.id === transferToTable)
+    ops.transferOrder(transferOrderId, transferToTable)
+    push(`${transferOrderId} moved to ${into?.label ?? transferToTable}`, 'success')
+    setTransferTarget(null)
   }
 
   return (
@@ -224,6 +389,9 @@ export function WaiterTables() {
               onStatus={changeStatus}
               onOpenBill={tb => focusBilling(tb.id)}
               onClear={tb => setClearTarget(tb)}
+              onTakeOrder={openOrder}
+              onMerge={openMerge}
+              onTransfer={openTransfer}
             />
           ))}
         </motion.div>
@@ -269,6 +437,189 @@ export function WaiterTables() {
         onConfirm={confirmClear}
         onCancel={() => setClearTarget(null)}
       />
+
+      <Drawer
+        open={orderTarget != null}
+        onClose={() => setOrderTarget(null)}
+        title={orderTarget ? `Take order · ${orderTarget.label}` : 'Take order'}
+        width={460}
+        footer={
+          <>
+            <Button variant="subtle" size="sm" onClick={() => setOrderTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={confirmOrder}
+              disabled={cartLines.length === 0}
+            >
+              Send order · {inr(cartTotal)}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <TextField
+            label="Find an item"
+            value={menuQuery}
+            onChange={setMenuQuery}
+            placeholder="Search the menu…"
+          />
+          <p className="text-[12px]" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+            <Search size={12} className="inline -mt-0.5 mr-1" aria-hidden />
+            {cartCount > 0
+              ? `${cartCount} ${cartCount === 1 ? 'item' : 'items'} · ${inr(cartTotal)}`
+              : 'Tap an item to add it to the order'}
+          </p>
+
+          <div className="flex flex-col gap-1.5">
+            {filteredMenu.length === 0 ? (
+              <EmptyState
+                icon={<ClipboardList size={26} />}
+                title="Nothing matches"
+                description="No available menu items match your search."
+              />
+            ) : (
+              filteredMenu.map(item => {
+                const qty = cart[item.id] ?? 0
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2"
+                    style={{
+                      border: `1px solid ${t.ruleColor}`,
+                      borderRadius: isHard(t) ? 0 : 10,
+                      background: qty > 0 ? TABLE_STATUS.ordering.tint : 'transparent',
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <p
+                        className="text-[13px] font-semibold truncate"
+                        style={{ color: t.ink, fontFamily: t.descFont }}
+                      >
+                        {item.name}
+                      </p>
+                      <p className="text-[12px]" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+                        {inr(item.price)}
+                      </p>
+                    </div>
+                    {qty > 0 ? (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="subtle"
+                          size="sm"
+                          onClick={() => removeLine(item.id)}
+                          aria-label={`Remove one ${item.name}`}
+                        >
+                          <Minus size={14} aria-hidden />
+                        </Button>
+                        <span
+                          className="w-6 text-center text-[14px] font-bold"
+                          style={{ color: t.ink, fontFamily: t.headerFont }}
+                        >
+                          {qty}
+                        </span>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => addLine(item.id)}
+                          aria-label={`Add one ${item.name}`}
+                        >
+                          <Plus size={14} aria-hidden />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="subtle"
+                        size="sm"
+                        onClick={() => addLine(item.id)}
+                        className="shrink-0"
+                      >
+                        <Plus size={14} aria-hidden /> Add
+                      </Button>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      </Drawer>
+
+      <Modal
+        open={mergeTarget != null}
+        onClose={() => setMergeTarget(null)}
+        title={mergeTarget ? `Merge ${mergeTarget.label}` : 'Merge table'}
+        footer={
+          <>
+            <Button variant="subtle" size="sm" onClick={() => setMergeTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={confirmMerge} disabled={!mergeInto}>
+              Merge tables
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p className="text-[13px]" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+            Moves {mergeTarget?.label}&rsquo;s unpaid orders onto the target table and frees{' '}
+            {mergeTarget?.label}.
+          </p>
+          <SelectField
+            label="Merge into"
+            value={mergeInto}
+            onChange={setMergeInto}
+            options={mergeOptions}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={transferTarget != null}
+        onClose={() => setTransferTarget(null)}
+        title={transferTarget ? `Transfer from ${transferTarget.label}` : 'Transfer order'}
+        footer={
+          <>
+            <Button variant="subtle" size="sm" onClick={() => setTransferTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={confirmTransfer}
+              disabled={!transferOrderId || !transferToTable}
+            >
+              Transfer order
+            </Button>
+          </>
+        }
+      >
+        {transferableOrders.length === 0 ? (
+          <p className="text-[13px]" style={{ color: t.inkSoft, fontFamily: t.descFont }}>
+            No unpaid orders on {transferTarget?.label} to transfer.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <SelectField
+              label="Order"
+              value={transferOrderId}
+              onChange={setTransferOrderId}
+              options={transferableOrders.map(o => ({
+                value: o.id,
+                label: `${o.id} · ${inr(o.total)}`,
+              }))}
+            />
+            <SelectField
+              label="Move to table"
+              value={transferToTable}
+              onChange={setTransferToTable}
+              options={transferTableOptions}
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

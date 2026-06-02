@@ -18,6 +18,8 @@ interface OrderPanelProps {
   onUpdateNote: (lineId: string, note: string) => void
   /** Commit the cart to the kitchen (scan-to-order). */
   onPlaceOrder?: () => void
+  /** Open the pay-at-table checkout for the current bill. */
+  onCheckout?: () => void
   onWaiter: () => void
 }
 
@@ -30,6 +32,7 @@ export function OrderPanel({
   onUpdateQty,
   onUpdateNote,
   onPlaceOrder,
+  onCheckout,
   onWaiter,
 }: OrderPanelProps) {
   const [noteOpen, setNoteOpen] = useState<string | null>(null)
@@ -314,6 +317,20 @@ export function OrderPanel({
                     </AnimatePresence>
                   </motion.button>
                 </div>
+                {onCheckout && (
+                  <motion.button
+                    whileTap={btnIcon.tap}
+                    onClick={onCheckout}
+                    className="w-full mt-2.5 py-2.5 rounded-full font-inter font-semibold text-[12.5px]"
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--maroon)',
+                      border: '1.5px solid var(--maroon)',
+                    }}
+                  >
+                    {tr('order.payBill')}
+                  </motion.button>
+                )}
                 <p className="font-inter text-center text-[10px] mt-2" style={{ color: 'var(--mute)' }}>
                   {tr('order.handToWaiter')}
                 </p>

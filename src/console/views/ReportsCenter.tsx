@@ -20,18 +20,102 @@ import {
   staffPerformance,
   topItems,
 } from '../lib/analytics'
+import {
+  ordersInRange,
+} from '../lib/analytics'
 import { fadeUp, stagger } from '../../animations/variants'
 import { cn, inr, inrCompact } from '../lib/format'
 import { panelStyle } from '../lib/skin'
 import { downloadCsv } from './manager/csv'
 import { managerCategoryColor } from './manager/categoryColors'
 import { REPORTS, type ReportId } from './manager/reportTypes'
-import type { CategorySlice, StaffPerf, TopItem, TrendPoint } from '../lib/types'
+import {
+  computeLineItemsTax,
+  DEFAULT_GST_RATE_PCT,
+  DEFAULT_TAX_CONFIG,
+  type TaxLineItem,
+} from '../../lib/tax'
+import type {
+  CategorySlice,
+  EditableMenuItem,
+  OrderRecord,
+  StaffPerf,
+  TopItem,
+  TrendPoint,
+} from '../lib/types'
 
 /** Tabular payload for the active report — drives both the table and CSV export. */
 interface ReportTable {
   columns: string[]
   rows: Array<Array<string | number>>
+}
+
+/** One row of the GST report: a single tax slab with its split liability. */
+interface GstSlabRow {
+  /** Full GST rate for this slab, e.g. 5 or 18. */
+  ratePct: number
+  /** Net (pre-tax) sales taxed at this slab, in whole rupees. */
+  taxable: number
+  /** CGST liability (half the GST for intra-state), in whole rupees. */
+  cgst: number
+  /** SGST liability (the other half), in whole rupees. */
+  sgst: number
+  /** Total GST (cgst + sgst), in whole rupees. */
+  tax: number
+}
+
+/**
+ * Group sold line items by their per-item GST slab and compute the CGST/SGST
+ * split + taxable base for each, reusing the pure {@link computeLineItemsTax}
+ * engine. Only revenue-bearing orders (paid, not voided, not comped) contribute.
+ *
+ * The per-item rate falls back to {@link DEFAULT_GST_RATE_PCT} (5%) when the
+ * menu item has no explicit `taxRatePct` — matching the engine's own fallback.
+ */
+function gstByRate(
+  orders: readonly OrderRecord[],
+  menu: readonly EditableMenuItem[],
+): GstSlabRow[] {
+  const rateById = new Map<string, number>()
+  for (const item of menu) {
+    rateById.set(item.id, item.taxRatePct ?? DEFAULT_GST_RATE_PCT)
+  }
+
+  // Collect line amounts bucketed by their effective GST rate.
+  const linesByRate = new Map<number, TaxLineItem[]>()
+  for (const order of orders) {
+    if (order.voided || order.comp || !order.paid) continue
+    for (const line of order.lines) {
+      const ratePct = rateById.get(line.itemId) ?? DEFAULT_GST_RATE_PCT
+      const amount = line.price * line.qty
+      const bucket = linesByRate.get(ratePct)
+      if (bucket) {
+        bucket.push({ amount, ratePct })
+      } else {
+        linesByRate.set(ratePct, [{ amount, ratePct }])
+      }
+    }
+  }
+
+  const rows: GstSlabRow[] = []
+  for (const [ratePct, items] of linesByRate) {
+    const breakdown = computeLineItemsTax(items, DEFAULT_TAX_CONFIG)
+    const cgst = breakdown.components
+      .filter(c => c.label === 'CGST')
+      .reduce((s, c) => s + c.amount, 0)
+    const sgst = breakdown.components
+      .filter(c => c.label === 'SGST')
+      .reduce((s, c) => s + c.amount, 0)
+    rows.push({
+      ratePct,
+      taxable: breakdown.taxableBase,
+      cgst,
+      sgst,
+      tax: breakdown.taxTotal,
+    })
+  }
+
+  return rows.sort((a, b) => a.ratePct - b.ratePct)
 }
 
 export function ReportsCenter() {
@@ -40,6 +124,7 @@ export function ReportsCenter() {
   const ops = useOpsStore()
   const orders = ops.state.orders
   const staff = ops.state.staff
+  const menu = ops.state.menu
 
   const [selected, setSelected] = useState<ReportId>(REPORTS[0].id)
 
@@ -52,6 +137,25 @@ export function ReportsCenter() {
   )
   const mix = useMemo(() => categoryMix(orders, dateRange.days), [orders, dateRange.days])
   const mixTotal = useMemo(() => mix.reduce((s, c) => s + c.revenue, 0), [mix])
+
+  // GST liability by slab over sold (paid, non-voided/comp) line items in range.
+  const gstRows = useMemo(
+    () => gstByRate(ordersInRange(orders, dateRange.days), menu),
+    [orders, menu, dateRange.days],
+  )
+  const gstTotals = useMemo(
+    () =>
+      gstRows.reduce(
+        (acc, r) => ({
+          taxable: acc.taxable + r.taxable,
+          cgst: acc.cgst + r.cgst,
+          sgst: acc.sgst + r.sgst,
+          tax: acc.tax + r.tax,
+        }),
+        { taxable: 0, cgst: 0, sgst: 0, tax: 0 },
+      ),
+    [gstRows],
+  )
 
   // Busiest weekday / hour for the Peak Hours caption.
   const busiest = useMemo(() => {
@@ -109,10 +213,26 @@ export function ReportsCenter() {
             mixTotal ? `${((c.revenue / mixTotal) * 100).toFixed(1)}%` : '0%',
           ]),
         }
+      case 'gst':
+        return {
+          columns: ['GST slab', 'Taxable', 'CGST', 'SGST', 'Total GST'],
+          rows: [
+            ...gstRows.map((r: GstSlabRow) => [
+              `${r.ratePct}%`,
+              r.taxable,
+              r.cgst,
+              r.sgst,
+              r.tax,
+            ]),
+            ...(gstRows.length > 0
+              ? [['Total', gstTotals.taxable, gstTotals.cgst, gstTotals.sgst, gstTotals.tax]]
+              : []),
+          ],
+        }
       default:
         return { columns: [], rows: [] }
     }
-  }, [selected, trend, items, heat, staffRows, mix, mixTotal])
+  }, [selected, trend, items, heat, staffRows, mix, mixTotal, gstRows, gstTotals])
 
   const activeMeta = REPORTS.find(r => r.id === selected) ?? REPORTS[0]
 
@@ -216,6 +336,9 @@ export function ReportsCenter() {
         )}
         {selected === 'category-mix' && (
           <CategoryMix mix={mix} total={mixTotal} label={dateRange.label} table={reportTable} />
+        )}
+        {selected === 'gst' && (
+          <GstReport rows={gstRows} totals={gstTotals} label={dateRange.label} />
         )}
       </div>
     </div>
@@ -392,5 +515,119 @@ function CategoryMix({
         <GenericTable table={table} caption="Category mix breakdown" />
       </Panel>
     </>
+  )
+}
+
+function GstReport({
+  rows,
+  totals,
+  label,
+}: {
+  rows: GstSlabRow[]
+  totals: { taxable: number; cgst: number; sgst: number; tax: number }
+  label: string
+}) {
+  const columns = useMemo<Column<GstSlabRow>[]>(
+    () => [
+      {
+        key: 'slab',
+        header: 'GST slab',
+        align: 'left',
+        render: (r: GstSlabRow) => <span className="font-semibold">{r.ratePct}%</span>,
+        sortValue: (r: GstSlabRow) => r.ratePct,
+      },
+      {
+        key: 'taxable',
+        header: 'Taxable',
+        align: 'right',
+        render: (r: GstSlabRow) => <span className="tabular-nums">{inr(r.taxable)}</span>,
+        sortValue: (r: GstSlabRow) => r.taxable,
+      },
+      {
+        key: 'cgst',
+        header: 'CGST',
+        align: 'right',
+        render: (r: GstSlabRow) => <span className="tabular-nums">{inr(r.cgst)}</span>,
+        sortValue: (r: GstSlabRow) => r.cgst,
+      },
+      {
+        key: 'sgst',
+        header: 'SGST',
+        align: 'right',
+        render: (r: GstSlabRow) => <span className="tabular-nums">{inr(r.sgst)}</span>,
+        sortValue: (r: GstSlabRow) => r.sgst,
+      },
+      {
+        key: 'tax',
+        header: 'Total GST',
+        align: 'right',
+        render: (r: GstSlabRow) => <span className="tabular-nums font-semibold">{inr(r.tax)}</span>,
+        sortValue: (r: GstSlabRow) => r.tax,
+      },
+    ],
+    [],
+  )
+
+  return (
+    <>
+      <Panel
+        title="GST summary"
+        subtitle={
+          rows.length > 0
+            ? `CGST + SGST liability by slab · ${label}`
+            : `No taxable sales in this period · ${label}`
+        }
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <GstStat label="Taxable" value={totals.taxable} />
+          <GstStat label="CGST" value={totals.cgst} />
+          <GstStat label="SGST" value={totals.sgst} />
+          <GstStat label="Total GST" value={totals.tax} emphasize />
+        </div>
+      </Panel>
+      <Panel title="GST by slab">
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={r => String(r.ratePct)}
+          caption="GST liability by tax slab"
+          emptyLabel="No taxable sales in this period"
+        />
+      </Panel>
+    </>
+  )
+}
+
+function GstStat({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string
+  value: number
+  emphasize?: boolean
+}) {
+  const { tokens: t } = useTheme()
+  return (
+    <div
+      className="flex flex-col gap-1 p-3"
+      style={{
+        ...panelStyle(t),
+        borderColor: emphasize ? t.accent : undefined,
+      }}
+    >
+      <span
+        className="text-[11px] uppercase tracking-wider"
+        style={{ fontFamily: t.descFont, color: t.descColor }}
+      >
+        {label}
+      </span>
+      <span
+        className="text-[18px] tabular-nums"
+        style={{ fontFamily: t.priceFont, color: emphasize ? t.accent : t.ink, fontWeight: 700 }}
+      >
+        {inr(value)}
+      </span>
+    </div>
   )
 }

@@ -109,9 +109,21 @@ const SHOWCASE_GROUPS: Record<string, ModifierGroup[]> = {
   ],
 }
 
-/** Resolve an item's modifier groups: explicit override → showcase → derived. */
-export function resolveModifierGroups(item: MenuItem): ModifierGroup[] {
-  if (item.modifierGroups?.length) return item.modifierGroups
+/** Minimal shape needed to resolve groups — both MenuItem and EditableMenuItem
+ * satisfy it, so the editor can preview groups without importing the guest model. */
+export interface ModifiableItem {
+  id: string
+  customizations: string[]
+  modifierGroups?: ModifierGroup[]
+}
+
+/** True when an item carries its own explicitly-authored modifier groups. */
+export function hasExplicitModifierGroups(item: Pick<ModifiableItem, 'modifierGroups'>): boolean {
+  return Boolean(item.modifierGroups?.length)
+}
+
+/** Showcase/derived fallback when an item has no explicit groups of its own. */
+function fallbackModifierGroups(item: ModifiableItem): ModifierGroup[] {
   if (SHOWCASE_GROUPS[item.id]) return SHOWCASE_GROUPS[item.id]
   if (!item.customizations.length) return []
   return [
@@ -123,6 +135,14 @@ export function resolveModifierGroups(item: MenuItem): ModifierGroup[] {
       options: item.customizations.map(c => ({ id: slug(c), label: c, priceDelta: deriveUpcharge(c) })),
     },
   ]
+}
+
+/** Resolve an item's modifier groups: explicit override → showcase → derived.
+ * An item's own `modifierGroups` (as authored in the console menu editor) always
+ * win over the SHOWCASE_GROUPS/derived fallback. */
+export function resolveModifierGroups(item: MenuItem): ModifierGroup[] {
+  if (hasExplicitModifierGroups(item)) return item.modifierGroups as ModifierGroup[]
+  return fallbackModifierGroups(item)
 }
 
 /** Initial selection: first option of every required group. */

@@ -8,3 +8,12 @@ import App from './App.tsx'
 // React 18 + framer-motion interaction that does not occur in production.
 // Removing it makes the dev preview behave like the production build.
 createRoot(document.getElementById('root')!).render(<App />)
+
+// PWA: register the hand-rolled service worker for offline support.
+// Guarded to production only so the dev server (HMR) is never disrupted by a
+// stale cache, and wrapped so any failure is a silent no-op.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

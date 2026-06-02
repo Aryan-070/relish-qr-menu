@@ -23,6 +23,12 @@ const VIEW_TITLE: Record<ConsoleView, string> = {
   loyalty: 'Loyalty & CRM',
   feedback: 'Guest Feedback',
   campaigns: 'Marketing Campaigns',
+  inventory: 'Inventory',
+  promotions: 'Promotions',
+  'cash-loss': 'Cash & Loss',
+  'staff-admin': 'Staff Admin',
+  roster: 'Roster',
+  group: 'Group',
 }
 
 const RANGE_VIEWS: ConsoleView[] = ['admin-dashboard', 'reports', 'manager-staff']

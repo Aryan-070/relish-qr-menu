@@ -29,15 +29,27 @@ import * as reservationsRepo from '../lib/reservationsRepo'
 import * as waitlistRepo from '../lib/waitlistRepo'
 import * as feedbackRepo from '../lib/feedbackRepo'
 import type {
+  Attendance,
+  AuditEntry,
   Customer,
   EditableMenuItem,
   Feedback,
+  Ingredient,
   OrderRecord,
   OrderStatus,
+  Permission,
+  Promo,
+  PurchaseOrder,
+  RecipeLine,
   Reservation,
   ReservationStatus,
+  Shift,
+  Staff,
+  StockMovement,
+  Supplier,
   TableStatus,
   WaitlistEntry,
+  WastageEntry,
   WaitStatus,
 } from '../lib/types'
 import { tierForPoints } from '../../data/opsSeed'
@@ -84,6 +96,36 @@ type Action =
   | { type: 'BILLING_TOGGLE_AUTORENEW' }
   | { type: 'BILLING_RENEW_NOW' }
   | { type: 'HYDRATE_REMOTE'; snapshot: Partial<OpsState> }
+  // Governance / audit (Phase 1)
+  | { type: 'ADD_AUDIT'; entry: AuditEntry }
+  | { type: 'VOID_ORDER'; orderId: string; reason: string; staffId?: string }
+  | { type: 'COMP_ORDER'; orderId: string; reason: string; staffId?: string }
+  | { type: 'APPLY_ORDER_DISCOUNT'; orderId: string; pct: number; reason: string; staffId?: string }
+  | { type: 'MERGE_TABLES'; sourceTableId: string; targetTableId: string }
+  | { type: 'TRANSFER_ORDER'; orderId: string; toTableId: string }
+  // Inventory / procurement (Phase 2)
+  | { type: 'ADD_INGREDIENT'; ingredient: Ingredient }
+  | { type: 'UPDATE_INGREDIENT'; id: string; patch: Partial<Ingredient> }
+  | { type: 'SET_RECIPE'; itemId: string; lines: RecipeLine[] }
+  | { type: 'ADD_SUPPLIER'; supplier: Supplier }
+  | { type: 'ADD_PURCHASE_ORDER'; po: PurchaseOrder }
+  | { type: 'RECEIVE_PURCHASE_ORDER'; id: string }
+  | { type: 'LOG_WASTAGE'; ingredientId: string; qty: number; reason: string }
+  // Promotions (Phase 2)
+  | { type: 'ADD_PROMO'; promo: Promo }
+  | { type: 'TOGGLE_PROMO'; id: string }
+  | { type: 'DELETE_PROMO'; id: string }
+  // RBAC / roster / multi-location (Phase 3)
+  | { type: 'ADD_STAFF'; staff: Staff }
+  | { type: 'UPDATE_STAFF'; id: string; patch: Partial<Staff> }
+  | { type: 'REMOVE_STAFF'; id: string }
+  | { type: 'SET_STAFF_PERMISSIONS'; id: string; permissions: Permission[] }
+  | { type: 'ADD_SHIFT'; shift: Shift }
+  | { type: 'UPDATE_SHIFT'; id: string; patch: Partial<Shift> }
+  | { type: 'REMOVE_SHIFT'; id: string }
+  | { type: 'CLOCK_IN'; staffId: string }
+  | { type: 'CLOCK_OUT'; staffId: string }
+  | { type: 'SET_CURRENT_OUTLET'; id: string }
   | { type: 'RESET' }
 
 function reducer(state: OpsState, action: Action): OpsState {
@@ -163,9 +205,68 @@ function reducer(state: OpsState, action: Action): OpsState {
       // A guest scan-to-order: prepend the new ticket and mark the table as
       // ordering so the floor/waiter views reflect it immediately.
       const tableId = action.order.tableId
+
+      // Petpooja-style auto-deduction: walk the order lines, drain the recipe
+      // (bill of materials) from each linked ingredient's stock, and log a
+      // StockMovement per drained ingredient. Defensive: any line without a
+      // recipe, or a recipe line pointing at a missing ingredient, is skipped.
+      const stockByIngredient = new Map<string, number>()
+      const newMovements: StockMovement[] = []
+      for (const line of action.order.lines) {
+        const recipe = state.recipes.find(r => r.itemId === line.itemId)
+        if (!recipe) continue
+        for (const rl of recipe.lines) {
+          const ingredient = state.ingredients.find(i => i.id === rl.ingredientId)
+          if (!ingredient) continue
+          const delta = -(rl.qty * line.qty)
+          const prev = stockByIngredient.get(ingredient.id) ?? ingredient.stock
+          stockByIngredient.set(ingredient.id, prev + delta)
+          newMovements.push({
+            id: `mov-${ingredient.id}-${action.order.id}-${newMovements.length}`,
+            ingredientId: ingredient.id,
+            delta,
+            reason: 'order',
+            refId: action.order.id,
+            createdAt: action.order.placedAt,
+          })
+        }
+      }
+
+      // Apply the new stock levels and detect any ingredient that crossed its
+      // low threshold — those auto-86 every menu item whose recipe uses them.
+      const depletedIngredientIds = new Set<string>()
+      const ingredients = state.ingredients.map(i => {
+        const next = stockByIngredient.get(i.id)
+        if (next === undefined) return i
+        if (next <= i.lowThreshold) depletedIngredientIds.add(i.id)
+        return { ...i, stock: next }
+      })
+
+      const eightySixedItemIds =
+        depletedIngredientIds.size > 0
+          ? new Set(
+              state.recipes
+                .filter(r => r.lines.some(rl => depletedIngredientIds.has(rl.ingredientId)))
+                .map(r => r.itemId),
+            )
+          : new Set<string>()
+
+      const menu =
+        eightySixedItemIds.size > 0
+          ? state.menu.map(m =>
+              eightySixedItemIds.has(m.id) ? { ...m, available: false } : m,
+            )
+          : state.menu
+
       return {
         ...state,
         orders: [action.order, ...state.orders],
+        ingredients,
+        stockMovements:
+          newMovements.length > 0
+            ? [...newMovements, ...state.stockMovements]
+            : state.stockMovements,
+        menu,
         tables: state.tables.map(t =>
           // Advance an idle or seated table into 'ordering'; never downgrade a
           // table already further along (bill-requested, paying, etc.).
@@ -325,6 +426,257 @@ function reducer(state: OpsState, action: Action): OpsState {
         },
       }
     }
+    // ── Governance / audit (Phase 1) ────────────────────────────────────────
+    case 'ADD_AUDIT':
+      return { ...state, auditLog: [action.entry, ...state.auditLog] }
+    case 'VOID_ORDER': {
+      const entry: AuditEntry = {
+        id: `aud-${Date.now().toString(36)}-${action.orderId}`,
+        type: 'void',
+        orderId: action.orderId,
+        reason: action.reason,
+        staffId: action.staffId,
+        createdAt: Date.now(),
+      }
+      return {
+        ...state,
+        orders: state.orders.map(o =>
+          o.id === action.orderId ? { ...o, voided: true } : o,
+        ),
+        auditLog: [entry, ...state.auditLog],
+      }
+    }
+    case 'COMP_ORDER': {
+      const entry: AuditEntry = {
+        id: `aud-${Date.now().toString(36)}-${action.orderId}`,
+        type: 'comp',
+        orderId: action.orderId,
+        reason: action.reason,
+        staffId: action.staffId,
+        createdAt: Date.now(),
+      }
+      return {
+        ...state,
+        orders: state.orders.map(o =>
+          o.id === action.orderId ? { ...o, comp: true } : o,
+        ),
+        auditLog: [entry, ...state.auditLog],
+      }
+    }
+    case 'APPLY_ORDER_DISCOUNT': {
+      const entry: AuditEntry = {
+        id: `aud-${Date.now().toString(36)}-${action.orderId}`,
+        type: 'discount',
+        orderId: action.orderId,
+        amount: action.pct,
+        reason: action.reason,
+        staffId: action.staffId,
+        createdAt: Date.now(),
+      }
+      return {
+        ...state,
+        orders: state.orders.map(o =>
+          o.id === action.orderId ? { ...o, discountPct: action.pct } : o,
+        ),
+        auditLog: [entry, ...state.auditLog],
+      }
+    }
+    case 'MERGE_TABLES': {
+      const entry: AuditEntry = {
+        id: `aud-${Date.now().toString(36)}-merge`,
+        type: 'merge',
+        tableId: action.sourceTableId,
+        reason: `Merged ${action.sourceTableId} → ${action.targetTableId}`,
+        createdAt: Date.now(),
+      }
+      return {
+        ...state,
+        // Reassign the source table's unpaid orders to the target table.
+        orders: state.orders.map(o =>
+          o.tableId === action.sourceTableId && !o.paid
+            ? { ...o, tableId: action.targetTableId }
+            : o,
+        ),
+        // Clear the now-empty source table.
+        tables: state.tables.map(t =>
+          t.id === action.sourceTableId
+            ? { ...t, status: 'available', guests: 0, waiterId: null, seatedAt: null }
+            : t,
+        ),
+        auditLog: [entry, ...state.auditLog],
+      }
+    }
+    case 'TRANSFER_ORDER': {
+      const entry: AuditEntry = {
+        id: `aud-${Date.now().toString(36)}-${action.orderId}`,
+        type: 'transfer',
+        orderId: action.orderId,
+        tableId: action.toTableId,
+        reason: `Transferred order to ${action.toTableId}`,
+        createdAt: Date.now(),
+      }
+      return {
+        ...state,
+        orders: state.orders.map(o =>
+          o.id === action.orderId ? { ...o, tableId: action.toTableId } : o,
+        ),
+        auditLog: [entry, ...state.auditLog],
+      }
+    }
+    // ── Inventory / procurement (Phase 2) ───────────────────────────────────
+    case 'ADD_INGREDIENT':
+      return { ...state, ingredients: [action.ingredient, ...state.ingredients] }
+    case 'UPDATE_INGREDIENT':
+      return {
+        ...state,
+        ingredients: state.ingredients.map(i =>
+          i.id === action.id ? { ...i, ...action.patch } : i,
+        ),
+      }
+    case 'SET_RECIPE': {
+      // Upsert: replace an existing recipe's lines, or append a new one.
+      const exists = state.recipes.some(r => r.itemId === action.itemId)
+      const recipes = exists
+        ? state.recipes.map(r =>
+            r.itemId === action.itemId ? { ...r, lines: action.lines } : r,
+          )
+        : [...state.recipes, { itemId: action.itemId, lines: action.lines }]
+      return { ...state, recipes }
+    }
+    case 'ADD_SUPPLIER':
+      return { ...state, suppliers: [action.supplier, ...state.suppliers] }
+    case 'ADD_PURCHASE_ORDER':
+      return { ...state, purchaseOrders: [action.po, ...state.purchaseOrders] }
+    case 'RECEIVE_PURCHASE_ORDER': {
+      const po = state.purchaseOrders.find(p => p.id === action.id)
+      if (!po || po.status === 'received') return state
+      const receivedAt = Date.now()
+      // Restock each line and log a 'purchase' movement against the ingredient.
+      const restockByIngredient = new Map<string, number>()
+      const newMovements: StockMovement[] = []
+      for (const line of po.lines) {
+        restockByIngredient.set(
+          line.ingredientId,
+          (restockByIngredient.get(line.ingredientId) ?? 0) + line.qty,
+        )
+        newMovements.push({
+          id: `mov-${line.ingredientId}-${po.id}-${newMovements.length}`,
+          ingredientId: line.ingredientId,
+          delta: line.qty,
+          reason: 'purchase',
+          refId: po.id,
+          createdAt: receivedAt,
+        })
+      }
+      return {
+        ...state,
+        purchaseOrders: state.purchaseOrders.map(p =>
+          p.id === action.id ? { ...p, status: 'received', receivedAt } : p,
+        ),
+        ingredients: state.ingredients.map(i => {
+          const add = restockByIngredient.get(i.id)
+          return add === undefined ? i : { ...i, stock: i.stock + add }
+        }),
+        stockMovements: [...newMovements, ...state.stockMovements],
+      }
+    }
+    case 'LOG_WASTAGE': {
+      const createdAt = Date.now()
+      const wastageEntry: WastageEntry = {
+        id: `wst-${createdAt.toString(36)}-${action.ingredientId}`,
+        ingredientId: action.ingredientId,
+        qty: action.qty,
+        reason: action.reason,
+        createdAt,
+      }
+      const movement: StockMovement = {
+        id: `mov-${action.ingredientId}-wst-${createdAt.toString(36)}`,
+        ingredientId: action.ingredientId,
+        delta: -action.qty,
+        reason: 'wastage',
+        refId: wastageEntry.id,
+        createdAt,
+      }
+      return {
+        ...state,
+        ingredients: state.ingredients.map(i =>
+          i.id === action.ingredientId ? { ...i, stock: i.stock - action.qty } : i,
+        ),
+        wastage: [wastageEntry, ...state.wastage],
+        stockMovements: [movement, ...state.stockMovements],
+      }
+    }
+    // ── Promotions (Phase 2) ────────────────────────────────────────────────
+    case 'ADD_PROMO':
+      return { ...state, promos: [action.promo, ...state.promos] }
+    case 'TOGGLE_PROMO':
+      return {
+        ...state,
+        promos: state.promos.map(p =>
+          p.id === action.id ? { ...p, active: !p.active } : p,
+        ),
+      }
+    case 'DELETE_PROMO':
+      return { ...state, promos: state.promos.filter(p => p.id !== action.id) }
+    // ── RBAC / roster / multi-location (Phase 3) ────────────────────────────
+    case 'ADD_STAFF':
+      return { ...state, staff: [action.staff, ...state.staff] }
+    case 'UPDATE_STAFF':
+      return {
+        ...state,
+        staff: state.staff.map(s => (s.id === action.id ? { ...s, ...action.patch } : s)),
+      }
+    case 'REMOVE_STAFF':
+      return { ...state, staff: state.staff.filter(s => s.id !== action.id) }
+    case 'SET_STAFF_PERMISSIONS':
+      return {
+        ...state,
+        staff: state.staff.map(s =>
+          s.id === action.id ? { ...s, permissions: action.permissions } : s,
+        ),
+      }
+    case 'ADD_SHIFT':
+      return {
+        ...state,
+        shifts: [...state.shifts, action.shift].sort((a, b) => a.date - b.date),
+      }
+    case 'UPDATE_SHIFT':
+      return {
+        ...state,
+        shifts: state.shifts.map(s => (s.id === action.id ? { ...s, ...action.patch } : s)),
+      }
+    case 'REMOVE_SHIFT':
+      return { ...state, shifts: state.shifts.filter(s => s.id !== action.id) }
+    case 'CLOCK_IN': {
+      // Ignore if the staff member already has an open (un-clocked-out) record.
+      const open = state.attendance.some(a => a.staffId === action.staffId && a.clockOut == null)
+      if (open) return state
+      const clockIn = Date.now()
+      const entry: Attendance = {
+        id: `att-${clockIn.toString(36)}-${action.staffId}`,
+        staffId: action.staffId,
+        clockIn,
+      }
+      return { ...state, attendance: [entry, ...state.attendance] }
+    }
+    case 'CLOCK_OUT': {
+      // Close the most recent open record for this staff member.
+      const clockOut = Date.now()
+      let closed = false
+      return {
+        ...state,
+        attendance: state.attendance.map(a => {
+          if (closed || a.staffId !== action.staffId || a.clockOut != null) return a
+          closed = true
+          return { ...a, clockOut }
+        }),
+      }
+    }
+    case 'SET_CURRENT_OUTLET':
+      return {
+        ...state,
+        outlets: state.outlets.map(o => ({ ...o, isCurrent: o.id === action.id })),
+      }
     case 'HYDRATE_REMOTE':
       // Replace the synced entity arrays with a fresh Supabase snapshot. Billing
       // (subscriptions/invoices) is owned by billingRepo, so it's left intact.
@@ -349,6 +701,19 @@ function hydrate(): OpsState {
           customers: parsed.customers ?? [],
           reservations: parsed.reservations ?? [],
           waitlist: parsed.waitlist ?? [],
+          // Phase 1/2 arrays — default so older saves don't crash.
+          auditLog: parsed.auditLog ?? [],
+          ingredients: parsed.ingredients ?? [],
+          recipes: parsed.recipes ?? [],
+          suppliers: parsed.suppliers ?? [],
+          purchaseOrders: parsed.purchaseOrders ?? [],
+          wastage: parsed.wastage ?? [],
+          stockMovements: parsed.stockMovements ?? [],
+          promos: parsed.promos ?? [],
+          // Phase 3 arrays — default so older saves don't crash.
+          shifts: parsed.shifts ?? [],
+          attendance: parsed.attendance ?? [],
+          outlets: parsed.outlets ?? [],
         }
       }
     }
@@ -387,6 +752,36 @@ export interface OpsStore {
   billingSetPackage: (packageId: PackageId) => void
   billingToggleAutoRenew: () => void
   billingRenewNow: () => void
+  // Governance / audit (Phase 1) — demo/localStorage only.
+  addAudit: (entry: AuditEntry) => void
+  voidOrder: (orderId: string, reason: string, staffId?: string) => void
+  compOrder: (orderId: string, reason: string, staffId?: string) => void
+  applyOrderDiscount: (orderId: string, pct: number, reason: string, staffId?: string) => void
+  mergeTables: (sourceTableId: string, targetTableId: string) => void
+  transferOrder: (orderId: string, toTableId: string) => void
+  // Inventory / procurement (Phase 2) — demo/localStorage only.
+  addIngredient: (i: Ingredient) => void
+  updateIngredient: (id: string, patch: Partial<Ingredient>) => void
+  setRecipe: (itemId: string, lines: RecipeLine[]) => void
+  addSupplier: (s: Supplier) => void
+  addPurchaseOrder: (po: PurchaseOrder) => void
+  receivePurchaseOrder: (id: string) => void
+  logWastage: (ingredientId: string, qty: number, reason: string) => void
+  // Promotions (Phase 2) — demo/localStorage only.
+  addPromo: (p: Promo) => void
+  togglePromo: (id: string) => void
+  deletePromo: (id: string) => void
+  // RBAC / roster / multi-location (Phase 3) — demo/localStorage only.
+  addStaff: (s: Staff) => void
+  updateStaff: (id: string, patch: Partial<Staff>) => void
+  removeStaff: (id: string) => void
+  setStaffPermissions: (id: string, permissions: Permission[]) => void
+  addShift: (s: Shift) => void
+  updateShift: (id: string, patch: Partial<Shift>) => void
+  removeShift: (id: string) => void
+  clockIn: (staffId: string) => void
+  clockOut: (staffId: string) => void
+  setCurrentOutlet: (id: string) => void
   resetDemoData: () => void
 }
 
@@ -610,6 +1005,43 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       billingSetPackage: packageId => dispatch({ type: 'BILLING_SET_PACKAGE', packageId }),
       billingToggleAutoRenew: () => dispatch({ type: 'BILLING_TOGGLE_AUTORENEW' }),
       billingRenewNow: () => dispatch({ type: 'BILLING_RENEW_NOW' }),
+      // Governance / audit (Phase 1) — demo/localStorage only, not mirrored.
+      addAudit: entry => dispatch({ type: 'ADD_AUDIT', entry }),
+      voidOrder: (orderId, reason, staffId) =>
+        dispatch({ type: 'VOID_ORDER', orderId, reason, staffId }),
+      compOrder: (orderId, reason, staffId) =>
+        dispatch({ type: 'COMP_ORDER', orderId, reason, staffId }),
+      applyOrderDiscount: (orderId, pct, reason, staffId) =>
+        dispatch({ type: 'APPLY_ORDER_DISCOUNT', orderId, pct, reason, staffId }),
+      mergeTables: (sourceTableId, targetTableId) =>
+        dispatch({ type: 'MERGE_TABLES', sourceTableId, targetTableId }),
+      transferOrder: (orderId, toTableId) =>
+        dispatch({ type: 'TRANSFER_ORDER', orderId, toTableId }),
+      // Inventory / procurement (Phase 2) — demo/localStorage only, not mirrored.
+      addIngredient: i => dispatch({ type: 'ADD_INGREDIENT', ingredient: i }),
+      updateIngredient: (id, patch) => dispatch({ type: 'UPDATE_INGREDIENT', id, patch }),
+      setRecipe: (itemId, lines) => dispatch({ type: 'SET_RECIPE', itemId, lines }),
+      addSupplier: s => dispatch({ type: 'ADD_SUPPLIER', supplier: s }),
+      addPurchaseOrder: po => dispatch({ type: 'ADD_PURCHASE_ORDER', po }),
+      receivePurchaseOrder: id => dispatch({ type: 'RECEIVE_PURCHASE_ORDER', id }),
+      logWastage: (ingredientId, qty, reason) =>
+        dispatch({ type: 'LOG_WASTAGE', ingredientId, qty, reason }),
+      // Promotions (Phase 2) — demo/localStorage only, not mirrored.
+      addPromo: p => dispatch({ type: 'ADD_PROMO', promo: p }),
+      togglePromo: id => dispatch({ type: 'TOGGLE_PROMO', id }),
+      deletePromo: id => dispatch({ type: 'DELETE_PROMO', id }),
+      // RBAC / roster / multi-location (Phase 3) — demo/localStorage only, not mirrored.
+      addStaff: s => dispatch({ type: 'ADD_STAFF', staff: s }),
+      updateStaff: (id, patch) => dispatch({ type: 'UPDATE_STAFF', id, patch }),
+      removeStaff: id => dispatch({ type: 'REMOVE_STAFF', id }),
+      setStaffPermissions: (id, permissions) =>
+        dispatch({ type: 'SET_STAFF_PERMISSIONS', id, permissions }),
+      addShift: s => dispatch({ type: 'ADD_SHIFT', shift: s }),
+      updateShift: (id, patch) => dispatch({ type: 'UPDATE_SHIFT', id, patch }),
+      removeShift: id => dispatch({ type: 'REMOVE_SHIFT', id }),
+      clockIn: staffId => dispatch({ type: 'CLOCK_IN', staffId }),
+      clockOut: staffId => dispatch({ type: 'CLOCK_OUT', staffId }),
+      setCurrentOutlet: id => dispatch({ type: 'SET_CURRENT_OUTLET', id }),
       resetDemoData: () => dispatch({ type: 'RESET' }),
     }
   }, [state, syncEnabled, restaurantId])

@@ -1,0 +1,27 @@
+{
+  "name": "Relish — International Veg Cuisine",
+  "short_name": "Relish",
+  "description": "Relish QR menu — signature drinks, soups, quick bites, Italian classics and desserts.",
+  "lang": "en",
+  "dir": "ltr",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "theme_color": "#8B1024",
+  "background_color": "#FFF8EA",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ]
+}
