@@ -10,6 +10,7 @@
 // so we disable it (via the `config` export below) and read the raw stream
 // ourselves.
 import { createHmac } from 'crypto'
+import { createClient } from '@supabase/supabase-js'
 
 export const config = { api: { bodyParser: false } }
 
@@ -61,8 +62,15 @@ export default async function handler(req: any, res: any): Promise<void> {
   let event: {
     event?: string
     payload?: {
-      order?: { entity?: { receipt?: string } }
-      payment?: { entity?: { order_id?: string; notes?: Record<string, string> } }
+      order?: { entity?: { id?: string; receipt?: string } }
+      payment?: {
+        entity?: {
+          id?: string
+          order_id?: string
+          receipt?: string
+          notes?: Record<string, string>
+        }
+      }
     }
   }
 
@@ -74,31 +82,64 @@ export default async function handler(req: any, res: any): Promise<void> {
   }
 
   if (event.event === 'payment.captured' || event.event === 'order.paid') {
-    // The `receipt` we set when creating the order is the invoiceId.
+    // The `receipt` we set in create-order.ts is the invoiceId. Razorpay
+    // delivers it under different paths depending on the event:
+    //   - order.paid       → payload.order.entity.receipt
+    //   - payment.captured → payload.payment.entity.receipt (when present),
+    //                        falling back to a `notes.invoiceId` we may set.
     const invoiceId =
       event.payload?.order?.entity?.receipt ??
+      event.payload?.payment?.entity?.receipt ??
       event.payload?.payment?.entity?.notes?.invoiceId
 
-    // TODO(billing): mark the matching invoice paid.
-    // ----------------------------------------------------------------------
-    // This requires the Supabase SERVICE-ROLE key (SUPABASE_SERVICE_ROLE_KEY),
-    // which must NOT be imported into the browser bundle — so we deliberately
-    // do NOT import `src/lib/supabase.ts` here. Wire this up with a server-only
-    // Supabase client, e.g.:
-    //
-    //   import { createClient } from '@supabase/supabase-js'
-    //   const admin = createClient(
-    //     process.env.SUPABASE_URL!,
-    //     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    //   )
-    //   await admin
-    //     .from('invoices')
-    //     .update({ status: 'paid', paid_at: new Date().toISOString() })
-    //     .eq('id', invoiceId)
-    //
-    // (`invoiceId` resolved above from order.receipt / payment.notes.)
-    // ----------------------------------------------------------------------
-    void invoiceId
+    // Razorpay payment id (e.g. "pay_..."). Only present on payment events.
+    const paymentId = event.payload?.payment?.entity?.id
+
+    // Mark the matching invoice paid using a SERVICE-ROLE Supabase client.
+    // This key must NEVER reach the browser bundle, so we deliberately do NOT
+    // import `src/lib/supabase.ts` here — we build a server-only client.
+    const supabaseUrl = process.env.SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!invoiceId) {
+      // Signature was valid but we couldn't resolve the invoice — log and 200
+      // anyway so Razorpay stops retrying a payload we can't map.
+      console.warn('[razorpay/webhook] no invoiceId resolved from payload', {
+        event: event.event,
+      })
+    } else if (!supabaseUrl || !serviceRoleKey) {
+      // Signature valid but DB not configured — skip the write, still 200.
+      console.warn(
+        '[razorpay/webhook] SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY missing; ' +
+          'skipping invoice update',
+        { invoiceId },
+      )
+    } else {
+      try {
+        const admin = createClient(supabaseUrl, serviceRoleKey)
+        const { error } = await admin
+          .from('invoices')
+          .update({
+            status: 'paid',
+            razorpay_id: paymentId,
+            paid_at: new Date().toISOString(),
+          })
+          .eq('id', invoiceId)
+
+        if (error) {
+          console.error('[razorpay/webhook] invoice update failed', {
+            invoiceId,
+            error: error.message,
+          })
+        }
+      } catch (error) {
+        // Never throw out of the handler — Razorpay only needs a 200/4xx.
+        console.error('[razorpay/webhook] invoice update threw', {
+          invoiceId,
+          detail: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
   }
 
   // Always 200 on a valid signature so Razorpay stops retrying.

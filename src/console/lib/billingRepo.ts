@@ -170,6 +170,14 @@ export async function ensureBillingForUser(userId: string): Promise<string> {
     ])
   if (invErr) throw new Error(invErr.message)
 
+  // 5. Seed the Cinematic package's video screens (active, no egress yet).
+  //    Real metering fills bytes_served via api/usage/track.
+  const screenLabels = ['Hero', 'Beverages', 'Soups', 'Quick Bites', 'Italian', 'Desserts']
+  const { error: scrErr } = await db.from('video_screens').insert(
+    screenLabels.map(label => ({ restaurant_id: restaurantId, label, active: true, bytes_served: 0 })),
+  )
+  if (scrErr) throw new Error(scrErr.message)
+
   return restaurantId
 }
 

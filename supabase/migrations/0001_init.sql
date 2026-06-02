@@ -46,7 +46,8 @@ create table if not exists public.invoices (
   gst            integer not null,
   total          integer not null,                    -- inc-GST
   status         public.invoice_status not null default 'due',
-  razorpay_id    text                                 -- gateway reference (Phase 6.2)
+  razorpay_id    text,                                -- gateway reference (Phase 6.2)
+  paid_at        timestamptz                          -- set by the Razorpay webhook on capture
 );
 create index if not exists invoices_restaurant_idx on public.invoices (restaurant_id, issued_at desc);
 

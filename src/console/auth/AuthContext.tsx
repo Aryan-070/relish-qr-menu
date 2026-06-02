@@ -13,6 +13,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import type { Role } from '../lib/types'
 
 export type AuthMode = 'demo' | 'supabase'
 export type AuthStatus = 'loading' | 'ready'
@@ -21,6 +22,7 @@ export interface AuthValue {
   mode: AuthMode
   status: AuthStatus
   user: User | null
+  appRole: Role | null
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const mode: AuthMode = isSupabaseConfigured ? 'supabase' : 'demo'
   const [status, setStatus] = useState<AuthStatus>(mode === 'supabase' ? 'loading' : 'ready')
   const [user, setUser] = useState<User | null>(null)
+  const [appRole, setAppRole] = useState<Role | null>(null)
 
   useEffect(() => {
     if (!supabase) return
@@ -51,11 +54,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Drive the console role from the signed-in user's app_users row (supabase mode).
+  // Demo mode has no client, so appRole stays null and the demo switcher governs role.
+  useEffect(() => {
+    if (!supabase) return
+    if (!user) {
+      setAppRole(null)
+      return
+    }
+    let active = true
+    supabase
+      .from('app_users')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) {
+          setAppRole(null)
+          return
+        }
+        setAppRole((data?.role as Role | undefined) ?? null)
+      })
+    return () => {
+      active = false
+    }
+  }, [user])
+
   const value = useMemo<AuthValue>(
     () => ({
       mode,
       status,
       user,
+      appRole,
       signIn: async (email, password) => {
         if (!supabase) return { error: 'Auth is not configured.' }
         const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -69,9 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut: async () => {
         if (supabase) await supabase.auth.signOut()
         setUser(null)
+        setAppRole(null)
       },
     }),
-    [mode, status, user],
+    [mode, status, user, appRole],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

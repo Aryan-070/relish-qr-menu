@@ -20,6 +20,8 @@ export interface UseBilling {
   loading: boolean
   error: string | null
   source: 'demo' | 'supabase'
+  /** Supabase restaurant id, or null in demo mode. */
+  restaurantId: string | null
   setPackage: (id: PackageId) => Promise<void>
   renewNow: () => Promise<void>
   toggleAutoRenew: () => Promise<void>
@@ -100,5 +102,5 @@ export function useBilling(): UseBilling {
     await refresh(restaurantId)
   }, [supa, ops, restaurantId, refresh])
 
-  return { billing, loading, error, source: supa ? 'supabase' : 'demo', setPackage, renewNow, toggleAutoRenew }
+  return { billing, loading, error, source: supa ? 'supabase' : 'demo', restaurantId, setPackage, renewNow, toggleAutoRenew }
 }

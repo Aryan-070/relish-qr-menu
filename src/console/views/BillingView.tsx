@@ -12,6 +12,7 @@ import { Modal } from '../components/Modal'
 import { fadeUp, stagger } from '../../animations/variants'
 import { inr } from '../lib/format'
 import { useBilling } from '../lib/useBilling'
+import { VideoUsagePanel } from './VideoUsagePanel'
 import { isRazorpayConfigured, startRenewalPayment } from '../lib/razorpay'
 import {
   PACKAGES,
@@ -29,7 +30,7 @@ export function BillingView() {
   const toast = useToast()
   const { tokens: t } = useTheme()
   const auth = useAuth()
-  const { billing, loading, error, setPackage, renewNow, toggleAutoRenew } = useBilling()
+  const { billing, loading, error, restaurantId, setPackage, renewNow, toggleAutoRenew } = useBilling()
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [choice, setChoice] = useState<PackageId>('cinematic')
@@ -200,6 +201,10 @@ export function BillingView() {
           </Panel>
         </motion.div>
       </div>
+
+      <motion.div variants={fadeUp} initial="hidden" animate="visible">
+        <VideoUsagePanel packageId={pkg.id} restaurantId={restaurantId} />
+      </motion.div>
 
       <motion.div variants={fadeUp} initial="hidden" animate="visible">
         <Panel title="Invoice history" subtitle={`${invoices.length} invoices`}>

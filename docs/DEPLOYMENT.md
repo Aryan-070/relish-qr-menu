@@ -48,8 +48,10 @@ Redeploy after setting them. The console now shows a sign-in screen; "Exit to me
 - [`src/console/ConsoleApp.tsx`](../src/console/ConsoleApp.tsx) — gates the console behind `<SignIn />` in Supabase mode; demo mode falls straight through.
 
 ## What's done vs. next (Phase 6)
-- **Done (6.1 foundation):** Supabase client, auth context, sign-in screen, console auth gate, SQL schema + RLS, Vercel config.
-- **Next:** wire the Billing dashboard (`src/console/views/BillingView.tsx`) to the `subscriptions`/`invoices` tables, map `app_users.role` to console role, add Razorpay Subscriptions (6.2), and video-egress metering (6.4). See [`/commercial/PLAN.md`](../commercial/PLAN.md) Phase 6.
+- **Done (6.1):** Supabase client, auth context, sign-in screen, console auth gate, SQL schema + RLS, Vercel config.
+- **Done (6.2):** Billing dashboard wired to `subscriptions`/`invoices` via `billingRepo` + `useBilling`; Razorpay renewal flow (`api/razorpay/*`) incl. webhook → Supabase invoice update; `app_users.role` drives the console role in Supabase mode.
+- **Done (6.4):** video-egress metering — `api/usage/track` ingestion + Video usage panel reading `video_screens`.
+- **Next:** production hardening — atomic bootstrap/increment via Postgres RPCs, a real CDN→`api/usage/track` feed, and Razorpay live-key testing under `vercel dev`. See [`/commercial/PLAN.md`](../commercial/PLAN.md) Phase 6.
 
 ## 3. Connect Razorpay (optional — real payments)
 
@@ -85,7 +87,18 @@ In **Razorpay → Settings → Webhooks → Add New Webhook**:
 - **Secret:** the value you set as `RAZORPAY_WEBHOOK_SECRET`
 - **Active events:** `payment.captured` and `order.paid`
 
-The webhook handler verifies the `x-razorpay-signature` header (HMAC-SHA256 over the raw body) and returns `200` on a valid signature, `400` on an invalid one. Marking the matching invoice paid in Supabase is left as a clearly-commented `TODO` in [`api/razorpay/webhook.ts`](../api/razorpay/webhook.ts) — it needs the server-only `SUPABASE_SERVICE_ROLE_KEY`.
+The webhook handler verifies the `x-razorpay-signature` header (HMAC-SHA256 over the raw body) and, on a valid `payment.captured` / `order.paid` event, marks the matching invoice paid in Supabase (looked up by the order receipt / `notes.invoiceId`). This DB write uses a **service-role** client, so set these two server-only vars as well (never prefix with `VITE_`):
+
+| Var | Where to find it |
+|---|---|
+| `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → service_role key |
+
+If those are unset the webhook still returns `200` on a valid signature but skips the DB write.
+
+### d. Video-egress metering (Phase 6.4)
+
+[`api/usage/track.ts`](../api/usage/track.ts) is a POST endpoint a CDN worker/cron calls with `{ restaurantId, screenId, bytes }` to increment `video_screens.bytes_served`. It uses the same `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`. The **Video usage** panel on the Billing dashboard reads those rows (demo mode shows a per-package mock).
 
 ### How the flow works
 - [`src/console/lib/razorpay.ts`](../src/console/lib/razorpay.ts) — `isRazorpayConfigured` gates the UI; `startRenewalPayment(...)` creates an order via the function, lazy-loads Razorpay Checkout, and opens the modal.

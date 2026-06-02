@@ -24,6 +24,8 @@ const RANGE_VIEWS: ConsoleView[] = ['admin-dashboard', 'reports', 'manager-staff
 interface ConsoleShellProps {
   role: Role
   onRole: (role: Role) => void
+  /** Show the Admin/Manager/Waiter demo switcher. Hidden in real-auth mode. */
+  showRoleSwitcher?: boolean
   activeView: ConsoleView
   onNavigate: (view: ConsoleView) => void
   dateRange: DateRange
@@ -35,6 +37,7 @@ interface ConsoleShellProps {
 export function ConsoleShell({
   role,
   onRole,
+  showRoleSwitcher = true,
   activeView,
   onNavigate,
   dateRange,
@@ -59,6 +62,7 @@ export function ConsoleShell({
         <TopBar
           role={role}
           onRole={onRole}
+          showRoleSwitcher={showRoleSwitcher}
           dateRange={dateRange}
           onDateRange={onDateRange}
           viewTitle={VIEW_TITLE[activeView]}

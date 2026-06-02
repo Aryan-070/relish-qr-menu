@@ -53,6 +53,9 @@ export default async function handler(req: any, res: any): Promise<void> {
         amount: amountPaise,
         currency: 'INR',
         receipt: invoiceId,
+        // Mirror the invoice id into notes so the webhook can resolve it even
+        // when the event payload omits the order receipt.
+        notes: { invoiceId },
       }),
     })
 

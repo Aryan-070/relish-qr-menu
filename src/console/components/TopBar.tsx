@@ -10,6 +10,8 @@ import { DATE_RANGES, type DateRange, type Role } from '../lib/types'
 interface TopBarProps {
   role: Role
   onRole: (role: Role) => void
+  /** Show the Admin/Manager/Waiter demo switcher. Hidden in real-auth mode. */
+  showRoleSwitcher?: boolean
   dateRange: DateRange
   onDateRange: (range: DateRange) => void
   viewTitle: string
@@ -20,7 +22,7 @@ interface TopBarProps {
 const ROLE_OPTIONS = (['admin', 'manager', 'waiter'] as Role[]).map(r => ({ value: r, label: ROLE_LABEL[r] }))
 const RANGE_OPTIONS = DATE_RANGES.map(r => ({ value: String(r.days), label: `${r.days}d` }))
 
-export function TopBar({ role, onRole, dateRange, onDateRange, viewTitle, showDateRange, onReset }: TopBarProps) {
+export function TopBar({ role, onRole, showRoleSwitcher = true, dateRange, onDateRange, viewTitle, showDateRange, onReset }: TopBarProps) {
   const { tokens: t } = useTheme()
   const [confirmReset, setConfirmReset] = useState(false)
 
@@ -44,18 +46,20 @@ export function TopBar({ role, onRole, dateRange, onDateRange, viewTitle, showDa
           />
         )}
 
-        <div className="flex items-center gap-1.5 pl-1">
-          <span className="hidden sm:inline text-[10px] uppercase tracking-wider" style={{ color: t.descColor, fontFamily: t.descFont }}>
-            Demo as
-          </span>
-          <SegmentedControl
-            ariaLabel="Switch demo role"
-            size="sm"
-            options={ROLE_OPTIONS}
-            value={role}
-            onChange={onRole}
-          />
-        </div>
+        {showRoleSwitcher && (
+          <div className="flex items-center gap-1.5 pl-1">
+            <span className="hidden sm:inline text-[10px] uppercase tracking-wider" style={{ color: t.descColor, fontFamily: t.descFont }}>
+              Demo as
+            </span>
+            <SegmentedControl
+              ariaLabel="Switch demo role"
+              size="sm"
+              options={ROLE_OPTIONS}
+              value={role}
+              onChange={onRole}
+            />
+          </div>
+        )}
 
         <button
           onClick={() => setConfirmReset(true)}

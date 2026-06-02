@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { OpsProvider } from './store/useOpsStore'
 import { ToastProvider } from './components/Toast'
@@ -64,8 +64,11 @@ export function ConsoleApp({ onExit }: ConsoleAppProps) {
 
 function ConsoleBody({ onExit }: ConsoleAppProps) {
   const auth = useAuth()
-  const [role, setRole] = useState<Role>('admin')
-  const [activeView, setActiveView] = useState<ConsoleView>(defaultViewFor('admin'))
+  // Demo mode defaults to admin and uses the manual switcher. In supabase mode the
+  // role follows the signed-in user's app_users.role (see the effect below).
+  const initialRole: Role = auth.mode === 'supabase' && auth.appRole ? auth.appRole : 'admin'
+  const [role, setRole] = useState<Role>(initialRole)
+  const [activeView, setActiveView] = useState<ConsoleView>(defaultViewFor(initialRole))
   const [dateRange, setDateRange] = useState<DateRange>(DATE_RANGES[0])
   const [billingFocusTableId, setBillingFocusTableId] = useState<string | null>(null)
 
@@ -75,6 +78,15 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
     setRole(r)
     setActiveView(defaultViewFor(r))
   }, [])
+
+  // Supabase mode only: when the user's app_users.role resolves (or changes),
+  // adopt it as the active console role and reset to that role's default view.
+  // Guarded so it never interferes with the demo-mode manual switcher.
+  useEffect(() => {
+    if (auth.mode !== 'supabase' || !auth.appRole) return
+    if (auth.appRole === role) return
+    handleRole(auth.appRole)
+  }, [auth.mode, auth.appRole, role, handleRole])
 
   const focusBilling = useCallback((tableId: string) => {
     setBillingFocusTableId(tableId)
@@ -111,6 +123,7 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
           <ConsoleShell
             role={role}
             onRole={handleRole}
+            showRoleSwitcher={auth.mode === 'demo'}
             activeView={activeView}
             onNavigate={navigate}
             dateRange={dateRange}
