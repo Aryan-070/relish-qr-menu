@@ -7,6 +7,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 
+const INPUT = process.argv[3] || process.env.PITCH_INPUT || 'pitch/index.html'
 const OUT = process.argv[2] || 'Relish-Pitch-by-TheShahStack.pdf'
 const ROOT = process.cwd()
 const PORT = 8123
@@ -24,7 +25,7 @@ const browser = await chromium.launch()
 const page = await browser.newPage()
 const errs = []
 page.on('pageerror', e => errs.push(e.message))
-await page.goto(`http://localhost:${PORT}/pitch/index.html`, { waitUntil: 'networkidle' })
+await page.goto(`http://localhost:${PORT}/${INPUT}`, { waitUntil: 'networkidle' })
 await page.waitForSelector('.pagedjs_page', { timeout: 90000 })
 await page.waitForTimeout(3000)
 const pages = await page.locator('.pagedjs_page').count()

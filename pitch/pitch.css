@@ -136,10 +136,11 @@ strong { font-weight: 700; color: var(--ink); }
 .cap b { color: var(--ink); font-weight:700; }
 .shot-h { font-family:'Clash Display'; font-weight:600; font-size: 11.5pt; color: var(--purple-deep); margin: 0 0 2pt; }
 
-/* journey screen block (image left/right + text) */
-.screen-block { display:grid; grid-template-columns: 232px 1fr; gap: 18pt; align-items:center; break-inside: avoid; margin: 14pt 0; }
+/* journey screen block (image left/right + text) — compact so 2 fit per page */
+.screen-block { display:grid; grid-template-columns: 172px 1fr; gap: 16pt; align-items:center; break-inside: avoid; margin: 9pt 0; }
+.screen-block .phone { width: 150px; }
 .screen-block.wide { grid-template-columns: 1fr; }
-.screen-block.flip { grid-template-columns: 1fr 232px; }
+.screen-block.flip { grid-template-columns: 1fr 172px; }
 .screen-block.flip .pane-text { order: 0; } .screen-block.flip .pane-img { order: 1; }
 
 /* tables */
