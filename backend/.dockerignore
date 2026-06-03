@@ -1,0 +1,20 @@
+# Build context hygiene — keep the image small and free of secrets/dev cruft.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+db.sqlite3
+.env
+*.log
+.git/
+.github/
+staticfiles/
+media/
+tests/
+**/tests/

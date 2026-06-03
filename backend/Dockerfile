@@ -21,5 +21,9 @@ RUN python manage.py collectstatic --noinput || true
 
 EXPOSE 8000
 
-# ASGI server (serves HTTP + WebSockets). Override CMD for the Celery worker.
-CMD ["uvicorn", "config.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+# Production ASGI server: gunicorn managing uvicorn workers (serves HTTP +
+# WebSockets/Channels). Override CMD for the Celery worker
+# (`celery -A config worker -l info`).
+CMD ["gunicorn", "config.asgi:application", \
+     "-k", "uvicorn.workers.UvicornWorker", \
+     "-b", "0.0.0.0:8000", "-w", "3", "--timeout", "60"]

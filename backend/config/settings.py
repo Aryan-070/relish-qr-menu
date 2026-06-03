@@ -279,3 +279,19 @@ LOGGING = {
     },
     "root": {"handlers": ["console"], "level": env("DJANGO_LOG_LEVEL", default="INFO")},
 }
+
+# ── Production security ──────────────────────────────────────────────────────
+# Enabled by DJANGO_SECURE_SSL=true (set in fly.toml / render.yaml), NOT by
+# DEBUG — so the HTTP test client (which runs with DEBUG=False) is never
+# redirected to HTTPS. Assumes a TLS-terminating proxy/LB (Fly/Render/Nginx).
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+SECURE_SSL = env.bool("DJANGO_SECURE_SSL", default=False)
+if SECURE_SSL:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31_536_000)  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True

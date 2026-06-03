@@ -1,0 +1,67 @@
+# Render.com blueprint for the Relish backend (web + Celery worker + Postgres +
+# Redis). Region singapore = closest Render region to India. Set ALLOWED_HOSTS,
+# CSRF_TRUSTED_ORIGINS, RAZORPAY_*, SENTRY_DSN, AWS_* in the dashboard (sync:false).
+databases:
+  - name: relish-db
+    region: singapore
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+services:
+  - type: redis
+    name: relish-redis
+    region: singapore
+    plan: free
+    ipAllowList: []
+
+  - type: web
+    name: relish-backend
+    runtime: docker
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health/ready/
+    preDeployCommand: python manage.py migrate --noinput
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECURE_SSL
+        value: "true"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: relish-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: relish-redis
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+
+  - type: worker
+    name: relish-worker
+    runtime: docker
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: celery -A config worker -l info
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          type: web
+          name: relish-backend
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: relish-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: relish-redis
+          property: connectionString

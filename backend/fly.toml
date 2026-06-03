@@ -1,0 +1,45 @@
+# Fly.io config for the Relish backend. Region bom = Mumbai (India proximity +
+# DPDP posture). Secrets are NOT here — set them with `fly secrets set` (see
+# DEPLOY.md): DJANGO_SECRET_KEY, DATABASE_URL, REDIS_URL, ALLOWED_HOSTS,
+# CSRF_TRUSTED_ORIGINS, RAZORPAY_*, SENTRY_DSN, AWS_* (R2/S3).
+app = "relish-backend"
+primary_region = "bom"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  release_command = "python manage.py migrate --noinput"
+
+[env]
+  DJANGO_DEBUG = "false"
+  DJANGO_SECURE_SSL = "true"
+
+[processes]
+  app = "gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 -w 3 --timeout 60"
+  worker = "celery -A config worker -l info"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/health/ready/"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["worker"]
