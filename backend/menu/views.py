@@ -84,10 +84,28 @@ class TenantScopedMenuViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer) -> None:
         """Stamp the active restaurant onto the new row."""
         serializer.save(restaurant_id=get_current_restaurant_id())
+        self._bust_public_cache()
+
+    def perform_update(self, serializer) -> None:
+        super().perform_update(serializer)
+        self._bust_public_cache()
 
     def perform_destroy(self, instance) -> None:
         """Soft-delete instead of removing the row."""
         instance.soft_delete()
+        self._bust_public_cache()
+
+    @staticmethod
+    def _bust_public_cache() -> None:
+        """Invalidate the cached public guest menu so edits show immediately.
+
+        Imported lazily to avoid a menu→public→menu import cycle at load time.
+        """
+        from public.services import bust_public_menu_cache
+
+        restaurant_id = get_current_restaurant_id()
+        if restaurant_id:
+            bust_public_menu_cache(restaurant_id)
 
 
 class MenuCategoryViewSet(TenantScopedMenuViewSet):
@@ -121,6 +139,7 @@ class MenuItemViewSet(TenantScopedMenuViewSet):
         serializer.is_valid(raise_exception=True)
         # ``version`` is read-only on the serializer, so bump it explicitly.
         serializer.save(version=instance.version + 1)
+        self._bust_public_cache()
 
         if getattr(instance, "_prefetched_objects_cache", None):
             instance._prefetched_objects_cache = {}

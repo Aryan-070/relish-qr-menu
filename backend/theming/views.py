@@ -25,6 +25,16 @@ from theming.services import get_or_create_theme, public_theme_config, publish_t
 _MANAGE_THEME = HasPermission("manage-theme")
 
 
+def _bust_public_cache(restaurant_id) -> None:
+    """Invalidate the cached public guest menu after a theme change.
+
+    Lazy import to avoid a theming→public→theming import cycle at load time.
+    """
+    from public.services import bust_public_menu_cache
+
+    bust_public_menu_cache(restaurant_id)
+
+
 def _no_tenant_response() -> Response:
     return Response(
         {
@@ -60,6 +70,7 @@ class ThemeView(APIView):
         serializer = RestaurantThemeSerializer(theme, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        _bust_public_cache(restaurant_id)
         return Response(serializer.data)
 
 
@@ -103,4 +114,5 @@ class ThemePublishView(APIView):
             return _no_tenant_response()
         theme = get_or_create_theme(restaurant_id)
         publish_theme(theme)
+        _bust_public_cache(restaurant_id)
         return Response(public_theme_config(restaurant_id))

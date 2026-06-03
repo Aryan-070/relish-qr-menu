@@ -24,7 +24,7 @@ django_settings_module = "config.settings"
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py", "tests.py"]
-testpaths = ["common", "accounts", "billing", "menu", "theming", "ops", "crm", "inventory", "public", "realtime", "tests"]
+testpaths = ["common", "accounts", "billing", "menu", "theming", "ops", "crm", "inventory", "assets", "public", "realtime", "tests"]
 addopts = "-ra -q --strict-markers --cov=. --cov-config=pyproject.toml --cov-report=term-missing"
 filterwarnings = ["ignore::DeprecationWarning"]
 

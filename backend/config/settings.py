@@ -60,6 +60,7 @@ LOCAL_APPS = [
     "ops",
     "crm",
     "inventory",
+    "assets",
     "public",
     "realtime",
 ]
@@ -154,6 +155,25 @@ if env("USE_S3"):
             "region_name": env("AWS_S3_REGION_NAME", default="ap-south-1"),
         },
     }
+
+# ── Media uploads (Phase 4: presigned S3/R2 + transcode) ────────────────────
+ASSET_BUCKET = env("AWS_STORAGE_BUCKET_NAME", default="relish-media")
+ASSET_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None)
+ASSET_S3_REGION = env("AWS_S3_REGION_NAME", default="ap-south-1")
+ASSET_PUBLIC_BASE_URL = env("ASSET_PUBLIC_BASE_URL", default="")  # CDN base, optional
+ASSET_IMAGE_MAX_BYTES = env.int("ASSET_IMAGE_MAX_BYTES", default=8_000_000)  # 8 MB
+ASSET_VIDEO_MAX_BYTES = env.int("ASSET_VIDEO_MAX_BYTES", default=200_000_000)  # 200 MB
+ASSET_TENANT_QUOTA_BYTES = env.int(
+    "ASSET_TENANT_QUOTA_BYTES", default=5_000_000_000
+)  # 5 GB per restaurant
+ASSET_ALLOWED_IMAGE_TYPES = env.list(
+    "ASSET_ALLOWED_IMAGE_TYPES",
+    default=["image/jpeg", "image/png", "image/webp", "image/avif"],
+)
+ASSET_ALLOWED_VIDEO_TYPES = env.list(
+    "ASSET_ALLOWED_VIDEO_TYPES", default=["video/mp4", "video/webm", "video/quicktime"]
+)
+ASSET_VIDEO_RENDITION_HEIGHTS = [1080, 720, 360]
 
 # ── DRF ─────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
