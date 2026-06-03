@@ -210,12 +210,32 @@ SIMPLE_JWT = {
     # accounts' token serializer and read by common.middleware (Phase 1).
 }
 
+# Schema + Swagger UI are gated behind admin auth in production unless
+# SCHEMA_PUBLIC=true; always open in DEBUG for local dev.
+SCHEMA_PUBLIC = env.bool("SCHEMA_PUBLIC", default=False)
+_SCHEMA_SERVE_PERMISSIONS = (
+    ["rest_framework.permissions.AllowAny"]
+    if (DEBUG or SCHEMA_PUBLIC)
+    else ["rest_framework.permissions.IsAdminUser"]
+)
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Relish Restaurant-OS API",
     "DESCRIPTION": "Multi-tenant restaurant operating system. See docs/ARCHITECTURE/backend.md.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    "SERVE_PERMISSIONS": _SCHEMA_SERVE_PERMISSIONS,
+    # Keep the default enum hook; add our global error-envelope documentation.
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "common.schema.error_envelope_postprocessing_hook",
+    ],
+    # The permission-keys choice set appears as both `add` and `revoke`
+    # (SetPermissionsSerializer) — name it once to avoid a collision warning.
+    "ENUM_NAME_OVERRIDES": {
+        "PermissionKeyEnum": "accounts.constants.PERMISSION_KEYS",
+    },
 }
 
 # ── CORS ────────────────────────────────────────────────────────────────────

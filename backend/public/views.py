@@ -9,6 +9,12 @@ When a restaurant is not publicly servable, it returns a branded
 from __future__ import annotations
 
 from django.core.cache import cache
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -16,6 +22,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Restaurant
 
+from .serializers import PublicCategorySerializer
 from .services import (
     build_public_menu,
     is_restaurant_public,
@@ -34,6 +41,35 @@ class PublicMenuView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "public_menu"
 
+    @extend_schema(
+        auth=[],
+        responses={
+            200: OpenApiResponse(
+                response=inline_serializer(
+                    "PublicMenuEnvelope",
+                    {
+                        "available": serializers.BooleanField(),
+                        "restaurant": inline_serializer(
+                            "PublicRestaurantRef",
+                            {
+                                "id": serializers.CharField(),
+                                "name": serializers.CharField(),
+                            },
+                        ),
+                        "theme": serializers.JSONField(),
+                        "categories": PublicCategorySerializer(many=True),
+                    },
+                ),
+                description=(
+                    "When the restaurant is unpublished, inactive, or its "
+                    "subscription is suspended, only `{\"available\": false}` is "
+                    "returned (no restaurant/theme/categories) to avoid leaking "
+                    "why."
+                ),
+            )
+        },
+        tags=["public"],
+    )
     def get(self, request, restaurant_id, *args, **kwargs):
         restaurant = Restaurant.objects.filter(pk=restaurant_id).first()
         if restaurant is None:

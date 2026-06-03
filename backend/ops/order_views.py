@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.exceptions import APIException, NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -23,7 +24,14 @@ from rest_framework.views import APIView
 from common.context import get_current_membership_id, get_current_restaurant_id
 from common.permissions import HasPermission, IsTenantMember
 from ops.models import Order
-from ops.order_serializers import OrderSerializer, PlaceOrderSerializer
+from ops.order_serializers import (
+    OrderCompSerializer,
+    OrderDiscountSerializer,
+    OrderSerializer,
+    OrderStatusSerializer,
+    OrderVoidSerializer,
+    PlaceOrderSerializer,
+)
 from ops.services import (
     OrderError,
     apply_discount,
@@ -32,8 +40,6 @@ from ops.services import (
     void_order,
 )
 from realtime.broadcast import broadcast_order_event
-
-ORDER_STATUSES = {"new", "preparing", "ready", "served"}
 
 
 class StaleVersionError(APIException):
@@ -73,6 +79,17 @@ class OrderListCreateView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
+    @extend_schema(
+        responses=inline_serializer(
+            "OrderListResponse",
+            {
+                "results": OrderSerializer(many=True),
+                "count": serializers.IntegerField(),
+                "page": serializers.IntegerField(),
+            },
+        ),
+        tags=["ops"],
+    )
     def get(self, request: Request) -> Response:
         orders = Order.objects.prefetch_related("lines__modifiers").order_by(
             "-placed_at"
@@ -93,6 +110,11 @@ class OrderListCreateView(APIView):
             }
         )
 
+    @extend_schema(
+        request=PlaceOrderSerializer,
+        responses={201: OrderSerializer},
+        tags=["ops"],
+    )
     def post(self, request: Request) -> Response:
         serializer = PlaceOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -121,15 +143,20 @@ class OrderStatusView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
+    @extend_schema(
+        request=OrderStatusSerializer,
+        responses={200: OrderSerializer},
+        tags=["ops"],
+    )
     def patch(self, request: Request, pk: Any) -> Response:
         order = _get_order_or_404(pk)
 
-        new_status = request.data.get("status")
-        if new_status not in ORDER_STATUSES:
-            raise ValidationError({"status": "Invalid order status."})
+        s = OrderStatusSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        new_status = s.validated_data["status"]
 
-        client_version = request.data.get("version")
-        if client_version is not None and int(client_version) != order.version:
+        client_version = s.validated_data.get("version")
+        if client_version is not None and client_version != order.version:
             raise StaleVersionError()
 
         order.status = new_status
@@ -148,9 +175,14 @@ class OrderVoidView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember, HasPermission("void")]
 
+    @extend_schema(
+        request=OrderVoidSerializer, responses=OrderSerializer, tags=["ops"]
+    )
     def post(self, request: Request, pk: Any) -> Response:
         order = _get_order_or_404(pk)
-        reason = str(request.data.get("reason", ""))
+        s = OrderVoidSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        reason = s.validated_data["reason"]
         void_order(order, get_current_membership_id(), reason)
 
         broadcast_order_event(
@@ -165,9 +197,14 @@ class OrderCompView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember, HasPermission("comp")]
 
+    @extend_schema(
+        request=OrderCompSerializer, responses=OrderSerializer, tags=["ops"]
+    )
     def post(self, request: Request, pk: Any) -> Response:
         order = _get_order_or_404(pk)
-        reason = str(request.data.get("reason", ""))
+        s = OrderCompSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        reason = s.validated_data["reason"]
         comp_order(order, get_current_membership_id(), reason)
 
         broadcast_order_event(
@@ -182,19 +219,15 @@ class OrderDiscountView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember, HasPermission("discount")]
 
+    @extend_schema(
+        request=OrderDiscountSerializer, responses=OrderSerializer, tags=["ops"]
+    )
     def post(self, request: Request, pk: Any) -> Response:
         order = _get_order_or_404(pk)
-        raw_pct = request.data.get("discount_pct")
-        if raw_pct is None:
-            raise ValidationError({"discount_pct": "This field is required."})
-        try:
-            pct = int(raw_pct)
-        except (TypeError, ValueError) as exc:
-            raise ValidationError(
-                {"discount_pct": "Must be an integer percentage."}
-            ) from exc
-
-        reason = str(request.data.get("reason", ""))
+        s = OrderDiscountSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        pct = s.validated_data["discount_pct"]
+        reason = s.validated_data["reason"]
         try:
             apply_discount(order, pct, get_current_membership_id(), reason)
         except OrderError as exc:

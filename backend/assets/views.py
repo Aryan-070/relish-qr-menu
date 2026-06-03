@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from rest_framework import mixins, status, viewsets
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -48,6 +49,21 @@ class PresignView(APIView):
     def get_permissions(self) -> list[Any]:
         return _write_permissions()
 
+    @extend_schema(
+        request=PresignRequestSerializer,
+        responses={
+            200: inline_serializer(
+                "PresignResult",
+                {
+                    "asset_id": serializers.CharField(),
+                    "upload_url": serializers.URLField(),
+                    "key": serializers.CharField(),
+                    "public_url": serializers.URLField(),
+                },
+            )
+        },
+        tags=["media"],
+    )
     def post(self, request: Any) -> Response:
         serializer = PresignRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -89,6 +105,11 @@ class CompleteUploadView(APIView):
     def get_permissions(self) -> list[Any]:
         return _write_permissions()
 
+    @extend_schema(
+        request=None,
+        responses={200: MediaAssetSerializer},
+        tags=["media"],
+    )
     def post(self, request: Any, pk: Any) -> Response:
         asset = MediaAsset.objects.filter(
             restaurant_id=get_current_restaurant_id(), pk=pk

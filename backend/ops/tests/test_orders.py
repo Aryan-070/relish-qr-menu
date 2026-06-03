@@ -323,6 +323,59 @@ def test_discount_requires_permission_and_recomputes_total(
     assert audit.after["discount_pct"] == 10
 
 
+@patch("ops.order_views.broadcast_order_event")
+def test_discount_out_of_range_is_rejected(mock_broadcast, tenant_a):
+    org, restaurant = tenant_a
+    item = _make_menu_item(restaurant, price_minor=20000)
+    order = _place_order_directly(restaurant, item)
+    membership = _make_membership(org, "disc-oob@relish.test")
+
+    resp = _auth_client(org, restaurant, membership, perms=["discount"]).post(
+        f"/api/ops/orders/{order.id}/discount/",
+        {"discount_pct": 200},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "discount_pct" in resp.data["detail"]
+    order.refresh_from_db()
+    assert order.discount_pct == 0
+    mock_broadcast.assert_not_called()
+
+
+@patch("ops.order_views.broadcast_order_event")
+def test_discount_missing_field_is_rejected(mock_broadcast, tenant_a):
+    org, restaurant = tenant_a
+    item = _make_menu_item(restaurant, price_minor=20000)
+    order = _place_order_directly(restaurant, item)
+    membership = _make_membership(org, "disc-missing@relish.test")
+
+    resp = _auth_client(org, restaurant, membership, perms=["discount"]).post(
+        f"/api/ops/orders/{order.id}/discount/",
+        {},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "discount_pct" in resp.data["detail"]
+    mock_broadcast.assert_not_called()
+
+
+@patch("ops.order_views.broadcast_order_event")
+def test_discount_valid_pct_applies(mock_broadcast, tenant_a):
+    org, restaurant = tenant_a
+    item = _make_menu_item(restaurant, price_minor=20000)  # 21000 w/ tax.
+    order = _place_order_directly(restaurant, item)
+    membership = _make_membership(org, "disc-valid@relish.test")
+
+    resp = _auth_client(org, restaurant, membership, perms=["discount"]).post(
+        f"/api/ops/orders/{order.id}/discount/",
+        {"discount_pct": 10},
+        format="json",
+    )
+    assert resp.status_code == 200, resp.data
+    assert resp.data["discount_pct"] == 10
+    assert resp.data["total_minor"] == 18900
+
+
 # --- Status flow + optimistic concurrency ------------------------------------
 
 
@@ -365,6 +418,47 @@ def test_status_patch_with_stale_version_returns_409(
         format="json",
     )
     assert resp.status_code == 409
+    order.refresh_from_db()
+    assert order.status == "new"
+    mock_broadcast.assert_not_called()
+
+
+@patch("ops.order_views.broadcast_order_event")
+def test_status_patch_missing_status_is_rejected(
+    mock_broadcast, waiter_client, tenant_a
+):
+    _org, restaurant = tenant_a
+    item = _make_menu_item(restaurant)
+    order = _place_order_directly(restaurant, item)
+
+    resp = waiter_client.patch(
+        f"/api/ops/orders/{order.id}/status/",
+        {"version": 1},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "status" in resp.data["detail"]
+    order.refresh_from_db()
+    assert order.status == "new"
+    assert order.version == 1
+    mock_broadcast.assert_not_called()
+
+
+@patch("ops.order_views.broadcast_order_event")
+def test_status_patch_invalid_status_is_rejected(
+    mock_broadcast, waiter_client, tenant_a
+):
+    _org, restaurant = tenant_a
+    item = _make_menu_item(restaurant)
+    order = _place_order_directly(restaurant, item)
+
+    resp = waiter_client.patch(
+        f"/api/ops/orders/{order.id}/status/",
+        {"status": "teleported", "version": 1},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "status" in resp.data["detail"]
     order.refresh_from_db()
     assert order.status == "new"
     mock_broadcast.assert_not_called()

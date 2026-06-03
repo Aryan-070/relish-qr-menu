@@ -11,7 +11,8 @@ Reads require an authenticated tenant member; writes additionally require the
 """
 from __future__ import annotations
 
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -55,6 +56,7 @@ class ThemeView(APIView):
             base.append(_MANAGE_THEME())
         return base
 
+    @extend_schema(responses={200: RestaurantThemeSerializer}, tags=["theming"])
     def get(self, request: Request) -> Response:
         restaurant_id = get_current_restaurant_id()
         if restaurant_id is None:
@@ -62,6 +64,11 @@ class ThemeView(APIView):
         theme = get_or_create_theme(restaurant_id)
         return Response(RestaurantThemeSerializer(theme).data)
 
+    @extend_schema(
+        request=RestaurantThemeSerializer,
+        responses={200: RestaurantThemeSerializer},
+        tags=["theming"],
+    )
     def put(self, request: Request) -> Response:
         restaurant_id = get_current_restaurant_id()
         if restaurant_id is None:
@@ -83,6 +90,14 @@ class ThemeDraftView(APIView):
             base.append(_MANAGE_THEME())
         return base
 
+    @extend_schema(
+        responses={
+            200: inline_serializer(
+                "ThemeDraftGet", {"draft": serializers.JSONField()}
+            )
+        },
+        tags=["theming"],
+    )
     def get(self, request: Request) -> Response:
         restaurant_id = get_current_restaurant_id()
         if restaurant_id is None:
@@ -90,6 +105,15 @@ class ThemeDraftView(APIView):
         theme = get_or_create_theme(restaurant_id)
         return Response({"draft": theme.draft})
 
+    @extend_schema(
+        request=ThemeDraftSerializer,
+        responses={
+            200: inline_serializer(
+                "ThemeDraftPut", {"draft": serializers.JSONField()}
+            )
+        },
+        tags=["theming"],
+    )
     def put(self, request: Request) -> Response:
         restaurant_id = get_current_restaurant_id()
         if restaurant_id is None:
@@ -108,6 +132,27 @@ class ThemePublishView(APIView):
     def get_permissions(self):
         return [IsAuthenticated(), IsTenantMember(), _MANAGE_THEME()]
 
+    @extend_schema(
+        request=None,
+        responses={
+            200: inline_serializer(
+                "PublishedThemeConfig",
+                {
+                    "ui_theme": serializers.CharField(),
+                    "component_style": serializers.CharField(),
+                    "media_mode": serializers.CharField(),
+                    "token_overrides": serializers.JSONField(),
+                    "allow_customer_choice": serializers.BooleanField(),
+                    "customer_choices": serializers.ListField(
+                        child=serializers.CharField()
+                    ),
+                    "logo_url": serializers.CharField(),
+                    "cover_url": serializers.CharField(),
+                },
+            )
+        },
+        tags=["theming"],
+    )
     def post(self, request: Request) -> Response:
         restaurant_id = get_current_restaurant_id()
         if restaurant_id is None:

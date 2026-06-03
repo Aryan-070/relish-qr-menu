@@ -9,7 +9,9 @@ import json
 import logging
 from typing import Any
 
-from rest_framework import status
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -84,6 +86,14 @@ class RazorpayWebhookView(APIView):
     permission_classes = [AllowAny]
     authentication_classes: list = []
 
+    @extend_schema(
+        request=OpenApiTypes.OBJECT,
+        responses=inline_serializer(
+            "WebhookAck", {"received": serializers.BooleanField()}
+        ),
+        auth=[],
+        tags=["billing"],
+    )
     def post(self, request: Request) -> Response:
         # Read the raw bytes FIRST — this is the exact payload the signature was
         # computed over. Accessing request.body before request.data avoids any
@@ -135,6 +145,18 @@ class CreateOrderView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "razorpay_order"
 
+    @extend_schema(
+        request=CreateOrderSerializer,
+        responses=inline_serializer(
+            "CreateOrderResult",
+            {
+                "order_id": serializers.CharField(),
+                "amount": serializers.IntegerField(),
+                "currency": serializers.CharField(),
+            },
+        ),
+        tags=["billing"],
+    )
     def post(self, request: Request) -> Response:
         serializer = CreateOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

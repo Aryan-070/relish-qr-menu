@@ -11,6 +11,7 @@ client's token against the stored one before applying an update.
 """
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from menu.models import (
@@ -50,6 +51,13 @@ class MenuCategorySerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class ModifierGroupRefSerializer(serializers.Serializer):
+    """Lightweight ``{id, name}`` reference to a linked modifier group."""
+
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+
+
 class MenuItemSerializer(serializers.ModelSerializer):
     """A menu item with all display fields and the concurrency token.
 
@@ -87,6 +95,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "version", "modifier_groups"]
 
+    @extend_schema_field(ModifierGroupRefSerializer(many=True))
     def get_modifier_groups(self, obj: MenuItem) -> list[dict[str, object]]:
         """Return the linked modifier groups as ``[{id, name}, ...]``."""
         return [

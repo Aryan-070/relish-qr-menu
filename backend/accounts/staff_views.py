@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -63,6 +64,11 @@ class StaffListCreateView(APIView):
 
     permission_classes = [IsAuthenticated, HasPermission("manage-staff")]
 
+    @extend_schema(
+        request=None,
+        responses={200: MembershipSerializer(many=True)},
+        tags=["accounts"],
+    )
     def get(self, request):
         org = _current_org_or_404()
         memberships = (
@@ -73,6 +79,22 @@ class StaffListCreateView(APIView):
         )
         return Response(MembershipSerializer(memberships, many=True).data)
 
+    @extend_schema(
+        request=InviteStaffSerializer,
+        responses={
+            201: inline_serializer(
+                name="StaffInviteResult",
+                fields={
+                    "id": serializers.CharField(),
+                    "email": serializers.EmailField(),
+                    "token": serializers.CharField(),
+                    "membership_id": serializers.CharField(),
+                    "status": serializers.CharField(),
+                },
+            )
+        },
+        tags=["accounts"],
+    )
     def post(self, request):
         org = _current_org_or_404()
         serializer = InviteStaffSerializer(data=request.data)
@@ -114,6 +136,11 @@ class StaffDetailView(APIView):
 
     permission_classes = [IsAuthenticated, HasPermission("manage-staff")]
 
+    @extend_schema(
+        request=StaffUpdateSerializer,
+        responses={200: MembershipSerializer},
+        tags=["accounts"],
+    )
     def patch(self, request, pk):
         org = _current_org_or_404()
         membership = _membership_in_org_or_404(pk, org)
@@ -147,6 +174,11 @@ class StaffDeactivateView(APIView):
 
     permission_classes = [IsAuthenticated, HasPermission("manage-staff")]
 
+    @extend_schema(
+        request=None,
+        responses={200: MembershipSerializer},
+        tags=["accounts"],
+    )
     def post(self, request, pk):
         org = _current_org_or_404()
         membership = _membership_in_org_or_404(pk, org)
@@ -164,6 +196,11 @@ class StaffPermissionsView(APIView):
 
     permission_classes = [IsAuthenticated, HasPermission("manage-staff")]
 
+    @extend_schema(
+        request=SetPermissionsSerializer,
+        responses={200: MembershipSerializer},
+        tags=["accounts"],
+    )
     def post(self, request, pk):
         org = _current_org_or_404()
         membership = _membership_in_org_or_404(pk, org)
@@ -189,6 +226,21 @@ class AcceptInviteView(APIView):
 
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=AcceptInviteSerializer,
+        responses={
+            200: inline_serializer(
+                name="AcceptInviteResult",
+                fields={
+                    "id": serializers.CharField(),
+                    "status": serializers.CharField(),
+                    "email": serializers.EmailField(),
+                },
+            )
+        },
+        auth=[],
+        tags=["accounts"],
+    )
     def post(self, request):
         serializer = AcceptInviteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

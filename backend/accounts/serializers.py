@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from accounts.constants import MEMBERSHIP_ACTIVE
+
+# Explicit field schema for the nullable method fields below. Using an override
+# makes drf-spectacular skip get_type_hints() on the `-> str | None` annotation,
+# which would otherwise fail to evaluate under PEP-604 on Python 3.9.
+_NULLABLE_STR = {"type": "string", "nullable": True}
 
 User = get_user_model()
 
@@ -94,14 +100,17 @@ class MembershipSummarySerializer(serializers.Serializer):
     def get_org_name(self, membership) -> str:
         return membership.org.name
 
+    @extend_schema_field(_NULLABLE_STR)
     def get_restaurant_id(self, membership) -> str | None:
         outlet = _primary_outlet(membership)
         return str(outlet.restaurant_id) if outlet else None
 
+    @extend_schema_field(_NULLABLE_STR)
     def get_restaurant_name(self, membership) -> str | None:
         outlet = _primary_outlet(membership)
         return outlet.restaurant.name if outlet else None
 
+    @extend_schema_field(_NULLABLE_STR)
     def get_role(self, membership) -> str | None:
         return membership.role.key if membership.role_id else None
 

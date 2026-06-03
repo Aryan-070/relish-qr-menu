@@ -37,6 +37,8 @@ jobs:
         run: python manage.py check
       - name: Migration drift gate
         run: python manage.py makemigrations --check --dry-run
+      - name: OpenAPI schema gate (zero warnings)
+        run: python manage.py spectacular --color --file /tmp/schema.yml --validate --fail-on-warn
       - name: Run tests (SQLite)
         run: pytest
 

@@ -9,6 +9,11 @@ inside the service. ``OtpVerifyView`` checks the code and, for a successful
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -18,6 +23,7 @@ from rest_framework.views import APIView
 from accounts.constants import OTP_LOGIN, OTP_PURPOSE_CHOICES
 from accounts.serializers import RelishTokenObtainPairSerializer
 from accounts.services.otp import request_otp, verify_otp
+from common.schema import TokenPairSerializer
 
 User = get_user_model()
 
@@ -54,6 +60,17 @@ class OtpRequestView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "anon"
 
+    @extend_schema(
+        request=OtpRequestSerializer,
+        responses={
+            200: inline_serializer(
+                name="OtpRequestResult",
+                fields={"sent": serializers.BooleanField()},
+            )
+        },
+        auth=[],
+        tags=["accounts"],
+    )
     def post(self, request):
         serializer = OtpRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -73,6 +90,21 @@ class OtpVerifyView(APIView):
 
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=OtpVerifySerializer,
+        responses={
+            200: OpenApiResponse(
+                response=TokenPairSerializer,
+                description=(
+                    "Returns a JWT access/refresh pair on a successful "
+                    "``login`` verification tied to an existing user; "
+                    "otherwise returns ``{\"verified\": true}``."
+                ),
+            )
+        },
+        auth=[],
+        tags=["accounts"],
+    )
     def post(self, request):
         serializer = OtpVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

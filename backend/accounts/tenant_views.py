@@ -6,7 +6,8 @@ reflect the membership the caller just provisioned or switched into.
 """
 from __future__ import annotations
 
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -39,6 +40,20 @@ class ProvisionOrgView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=ProvisionOrgSerializer,
+        responses={
+            200: inline_serializer(
+                name="TokenWithMembershipProvision",
+                fields={
+                    "access": serializers.CharField(),
+                    "refresh": serializers.CharField(),
+                    "membership": MembershipSummarySerializer(),
+                },
+            )
+        },
+        tags=["accounts"],
+    )
     def post(self, request):
         serializer = ProvisionOrgSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -70,6 +85,20 @@ class TenantSwitchView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=TenantSwitchSerializer,
+        responses={
+            200: inline_serializer(
+                name="TokenWithMembershipSwitch",
+                fields={
+                    "access": serializers.CharField(),
+                    "refresh": serializers.CharField(),
+                    "membership": MembershipSummarySerializer(),
+                },
+            )
+        },
+        tags=["accounts"],
+    )
     def post(self, request):
         serializer = TenantSwitchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

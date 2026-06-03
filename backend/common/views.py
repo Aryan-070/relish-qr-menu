@@ -6,7 +6,8 @@ import logging
 from django.core.cache import cache
 from django.db import connection
 from django.utils import timezone
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -20,6 +21,20 @@ class HealthView(APIView):
 
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        auth=[],
+        responses={
+            200: inline_serializer(
+                "HealthResponse",
+                {
+                    "status": serializers.CharField(),
+                    "service": serializers.CharField(),
+                    "time": serializers.DateTimeField(),
+                },
+            )
+        },
+        tags=["ops"],
+    )
     def get(self, request: Request) -> Response:
         return Response(
             {
@@ -39,6 +54,25 @@ class ReadinessView(APIView):
 
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        auth=[],
+        responses={
+            200: inline_serializer(
+                "ReadinessResponse",
+                {
+                    "status": serializers.CharField(),
+                    "checks": inline_serializer(
+                        "ReadinessChecks",
+                        {
+                            "database": serializers.BooleanField(),
+                            "cache": serializers.BooleanField(),
+                        },
+                    ),
+                },
+            )
+        },
+        tags=["ops"],
+    )
     def get(self, request: Request) -> Response:
         checks = {"database": self._check_db(), "cache": self._check_cache()}
         ok = all(checks.values())

@@ -1,3 +1,5 @@
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -35,6 +37,21 @@ class MeView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            200: inline_serializer(
+                name="MeResponse",
+                fields={
+                    "id": serializers.CharField(),
+                    "email": serializers.EmailField(),
+                    "memberships": MembershipSummarySerializer(many=True),
+                    "active": MembershipSummarySerializer(allow_null=True),
+                },
+            )
+        },
+        tags=["accounts"],
+    )
     def get(self, request):
         user = request.user
         memberships = list(

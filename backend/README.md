@@ -37,6 +37,24 @@ docker compose up --build         # web on :8000, db on :5432, redis on :6379
 - Tenancy: every tenant-scoped model extends `common.models.TenantScopedModel`; querysets auto-filter via `TenantManager`. Postgres RLS is the backstop (Phase 1/6).
 - Money: integer **minor units** (paise).
 - Tests: `pytest` (pytest-django), target ≥ 80% coverage. Lint `ruff check .`; types `mypy .`.
-- API docs: `/api/schema/` (OpenAPI) and `/api/docs/` (Swagger UI).
+- API docs: `/api/schema/` (OpenAPI) and `/api/docs/` (Swagger UI). Admin-gated in
+  prod unless `SCHEMA_PUBLIC=true`. The schema is warning-clean and CI-gated
+  (`spectacular --validate --fail-on-warn`), so it generates faithful client types.
+
+## Generating the frontend TypeScript client
+
+The OpenAPI schema is the source of truth for the frontend's API types (the
+`*Repo.ts` rewire). With the dev server running:
+
+```bash
+# from repo root
+npx openapi-typescript http://localhost:8000/api/schema/ -o src/api/schema.ts
+# …or from a committed schema file:
+cd backend && python manage.py spectacular --file ../src/api/schema.yml
+npx openapi-typescript src/api/schema.yml -o src/api/schema.ts
+```
+
+Every endpoint resolves to a named, fully-typed interface (no `any`/`unknown`
+fallbacks); error responses are typed as `ErrorEnvelope` (`{success, error, detail}`).
 
 See the architecture doc for the phased build plan and per-phase verification.

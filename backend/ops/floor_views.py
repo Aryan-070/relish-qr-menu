@@ -27,7 +27,8 @@ from __future__ import annotations
 from typing import Any
 
 from django.utils import timezone
-from rest_framework import status, viewsets
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -164,6 +165,7 @@ class TableViewSet(viewsets.ModelViewSet):
         self._broadcast(instance)
         return Response(serializer.data)
 
+    @extend_schema(request=SeatTableSerializer, responses=TableSerializer)
     @action(detail=True, methods=["post"])
     def seat(self, request: Any, *args: Any, **kwargs: Any) -> Response:
         """Seat guests at a table: status='seated', guests, seated_at=now."""
@@ -185,6 +187,7 @@ class TableViewSet(viewsets.ModelViewSet):
         self._broadcast(table)
         return Response(TableSerializer(table).data)
 
+    @extend_schema(request=None, responses=TableSerializer)
     @action(detail=True, methods=["post"])
     def clear(self, request: Any, *args: Any, **kwargs: Any) -> Response:
         """Clear a table: status='available', guests=0, waiter+seated_at null."""
@@ -201,6 +204,16 @@ class TableViewSet(viewsets.ModelViewSet):
         self._broadcast(table)
         return Response(TableSerializer(table).data)
 
+    @extend_schema(
+        request=inline_serializer(
+            "TableSetStatusRequest",
+            {
+                "status": serializers.CharField(),
+                "version": serializers.IntegerField(required=False),
+            },
+        ),
+        responses=TableSerializer,
+    )
     @action(detail=True, methods=["post"], url_path="set_status")
     def set_status(self, request: Any, *args: Any, **kwargs: Any) -> Response:
         """Set an arbitrary table status from the floor state machine."""
@@ -290,6 +303,7 @@ class ServiceRequestViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @extend_schema(request=None, responses=ServiceRequestSerializer)
     @action(detail=True, methods=["post"])
     def claim(self, request: Any, *args: Any, **kwargs: Any) -> Response:
         """Claim a pending request for the calling membership."""
@@ -301,6 +315,7 @@ class ServiceRequestViewSet(viewsets.ModelViewSet):
         self._broadcast(request_obj)
         return Response(ServiceRequestSerializer(request_obj).data)
 
+    @extend_schema(request=None, responses=ServiceRequestSerializer)
     @action(detail=True, methods=["post"])
     def resolve(self, request: Any, *args: Any, **kwargs: Any) -> Response:
         """Mark a request resolved (served / handled)."""
