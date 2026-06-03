@@ -176,6 +176,9 @@ ASSET_ALLOWED_VIDEO_TYPES = env.list(
     "ASSET_ALLOWED_VIDEO_TYPES", default=["video/mp4", "video/webm", "video/quicktime"]
 )
 ASSET_VIDEO_RENDITION_HEIGHTS = [1080, 720, 360]
+# When False (e.g. no Celery worker), video uploads are served as the uploaded
+# original (status 'ready') instead of being queued for ffmpeg transcoding.
+MEDIA_TRANSCODE_ENABLED = env.bool("MEDIA_TRANSCODE_ENABLED", default=True)
 
 # ── DRF ─────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {

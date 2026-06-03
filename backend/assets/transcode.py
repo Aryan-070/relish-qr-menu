@@ -27,11 +27,17 @@ class TranscodeError(Exception):
 
 
 def _s3_client():
-    """Build a boto3 S3 client from Django settings (endpoint/region)."""
+    """Build a boto3 S3 client from Django settings (endpoint/region).
+
+    Path-style + SigV4 for Supabase Storage / non-AWS S3 compatibility.
+    """
+    from botocore.config import Config
+
     return boto3.client(
         "s3",
         endpoint_url=settings.ASSET_S3_ENDPOINT_URL,
         region_name=settings.ASSET_S3_REGION,
+        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
     )
 
 

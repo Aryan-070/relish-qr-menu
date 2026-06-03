@@ -71,11 +71,15 @@ def _s3_client():
         raise MediaConfigError("ASSET_BUCKET is not configured.")
 
     import boto3
+    from botocore.config import Config
 
     return boto3.client(
         "s3",
         endpoint_url=getattr(settings, "ASSET_S3_ENDPOINT_URL", None),
         region_name=getattr(settings, "ASSET_S3_REGION", None),
+        # Supabase Storage's S3-compatible endpoint (and most non-AWS S3s)
+        # require path-style addressing + SigV4 presigning.
+        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
     )
 
 
@@ -200,8 +204,13 @@ def complete_upload(asset: MediaAsset) -> MediaAsset:
     deferred so this module never hard-depends on the Celery task at import
     time). Everything else (images / logos / covers / banners) is immediately
     ``ready`` — CDN transforms handle responsive variants on the fly.
+
+    When ``MEDIA_TRANSCODE_ENABLED`` is False (e.g. no Celery worker running),
+    videos are marked ``ready`` immediately and served as the uploaded original
+    — renditions can be generated later once the worker is enabled.
     """
-    if asset.kind == "video":
+    transcode_enabled = getattr(settings, "MEDIA_TRANSCODE_ENABLED", True)
+    if asset.kind == "video" and transcode_enabled:
         asset.status = "processing"
         asset.save(update_fields=["status", "updated_at"])
         from assets.tasks import transcode_asset

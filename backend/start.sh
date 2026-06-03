@@ -8,6 +8,11 @@ set -e
 
 python manage.py migrate --noinput
 
+# Optional one-time demo seed: set SEED_DEMO=true (idempotent, safe to leave on).
+if [ "$SEED_DEMO" = "true" ]; then
+  python manage.py seed_demo
+fi
+
 exec gunicorn config.asgi:application \
   -k uvicorn.workers.UvicornWorker \
   -b "0.0.0.0:${PORT:-8000}" \
