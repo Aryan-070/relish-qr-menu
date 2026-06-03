@@ -16,7 +16,6 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
-from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import Restaurant
@@ -82,7 +81,9 @@ SEATS = [2, 2, 4, 4, 4, 6]
 class Command(BaseCommand):
     help = "Seed a fully-public demo restaurant (idempotent)."
 
-    @transaction.atomic
+    # No outer transaction: each step commits independently (provision_org keeps
+    # its own atomic block). This keeps lock windows tiny and makes the seed
+    # safe to run in the background while the web server is already serving.
     def handle(self, *args, **options) -> None:
         User = get_user_model()
         user, created = User.objects.get_or_create(email=DEMO_EMAIL)
