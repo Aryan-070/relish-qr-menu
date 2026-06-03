@@ -68,6 +68,8 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 # ── Middleware ──────────────────────────────────────────────────────────────
 MIDDLEWARE = [
+    # First, so every log line and response carries a request id.
+    "common.request_id.RequestIDMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -252,15 +254,28 @@ RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", default="")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", default="")
 RAZORPAY_WEBHOOK_SECRET = env("RAZORPAY_WEBHOOK_SECRET", default="")
 
-# ── Logging (structured, single-line JSON-ish) ──────────────────────────────
+# ── Sentry (optional error reporting — no-op when SENTRY_DSN is unset) ───────
+SENTRY_DSN = env("SENTRY_DSN", default="")
+SENTRY_TRACES_SAMPLE_RATE = env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0)
+SENTRY_ENV = env("SENTRY_ENV", default="development" if DEBUG else "production")
+
+# ── Logging (structured single-line JSON with request-id correlation) ───────
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
+        "json": {"()": "common.logging.JsonLogFormatter"},
         "verbose": {"format": "%(levelname)s %(asctime)s %(name)s %(message)s"},
     },
+    "filters": {
+        "request_id": {"()": "common.logging.RequestIDLogFilter"},
+    },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose" if DEBUG else "json",
+            "filters": ["request_id"],
+        },
     },
     "root": {"handlers": ["console"], "level": env("DJANGO_LOG_LEVEL", default="INFO")},
 }

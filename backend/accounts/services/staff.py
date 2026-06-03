@@ -129,7 +129,9 @@ def accept_invite(*, token: str, password: str) -> Membership:
     """
     try:
         invite = (
-            Invite.objects.select_for_update()
+            # of=("self",) locks only the invite row — Postgres rejects FOR
+            # UPDATE on the nullable side of the membership LEFT JOIN otherwise.
+            Invite.objects.select_for_update(of=("self",))
             .select_related("membership")
             .get(token=token, status=INVITE_PENDING)
         )

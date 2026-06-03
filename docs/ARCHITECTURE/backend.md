@@ -125,6 +125,13 @@ Roster fields fold into `Membership` (or a 1:1 `StaffProfile`) — one people-mo
 
 ---
 
+## 5b. Hardening (P6 — implemented)
+
+- **Validated on real PostgreSQL.** The full suite runs against Postgres in CI (and was run locally), not just SQLite — this exercises partial indexes, `FOR UPDATE` join semantics, and RLS. (It already caught a real `select_for_update()`-on-nullable-join bug SQLite hid.)
+- **Postgres RLS backstop.** Migration `common/0001_rls_backstop` auto-discovers every `restaurant_id` table from `information_schema` and adds an `ENABLE ROW LEVEL SECURITY` + `tenant_isolation` policy keyed on the `app.current_restaurant` session GUC the middleware sets. It is **not forced**, so it's inert for the superuser/owner connection (the app keeps working, app-layer scoping stays primary). **Activation** is a deploy step: connect the app as a non-superuser, non-owner role and `FORCE ROW LEVEL SECURITY`. A Postgres-only test (`common/tests/test_rls.py`) proves isolation under a non-privileged `SET ROLE`.
+- **Observability.** `RequestIDMiddleware` stamps `X-Request-ID` (in/out) and correlates it into single-line JSON logs (`common.logging.JsonLogFormatter`); optional Sentry via `init_sentry()` (no-op unless `SENTRY_DSN` is set).
+- **Readiness.** `GET /api/health/ready/` checks DB + cache and returns 503 until ready (vs. the liveness `GET /api/health/`).
+
 ## 6. Security (baked in, not retrofitted)
 - **Razorpay webhook:** HMAC via `hmac.compare_digest` (constant-time); idempotent via `PaymentEvent(razorpay_event_id unique)`; failures logged + alerted (never a silent 200 over a failed write).
 - **Order create:** authenticated; verify the invoice belongs to the caller's org; rate-limited.
