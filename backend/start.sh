@@ -8,13 +8,9 @@ set -e
 
 python manage.py migrate --noinput
 
-# Optional one-time demo seed: set SEED_DEMO=true (idempotent, safe to leave on).
-# Runs in the BACKGROUND so it can never delay/block the web port binding — the
-# server must come up regardless of how long (or whether) the seed completes.
-if [ "$SEED_DEMO" = "true" ]; then
-  echo "==> SEED_DEMO=true: seeding demo data in background"
-  python manage.py seed_demo &
-fi
+# Demo seeding is NOT done here — it runs in-process via the guarded endpoint
+# POST /api/admin/seed-demo/ (set SEED_TOKEN), so it never competes with the web
+# worker for memory on a small instance or blocks the port binding.
 
 exec gunicorn config.asgi:application \
   -k uvicorn.workers.UvicornWorker \

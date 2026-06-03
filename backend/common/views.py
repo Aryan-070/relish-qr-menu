@@ -1,9 +1,12 @@
 """Operational views owned by the ``common`` app."""
 from __future__ import annotations
 
+import io
 import logging
 
+from django.conf import settings
 from django.core.cache import cache
+from django.core.management import call_command
 from django.db import connection
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -100,3 +103,66 @@ class ReadinessView(APIView):
         except Exception:  # noqa: BLE001 - probe must never raise
             logger.exception("readiness: cache check failed")
             return False
+
+
+class SeedDemoView(APIView):
+    """Run the idempotent demo seed in-process, guarded by a secret token.
+
+    Triggered manually (e.g. once after deploy) on hosts without a shell. Runs
+    inside the web worker — no second process, so it can't be OOM-killed on a
+    small instance — and returns the result (or the real error) so the caller
+    can see what happened. Disabled unless ``SEED_TOKEN`` is set; the request
+    must send a matching ``X-Seed-Token`` header.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    @extend_schema(
+        auth=[],
+        request=None,
+        responses={
+            200: inline_serializer(
+                "SeedDemoResult",
+                {
+                    "success": serializers.BooleanField(),
+                    "restaurant_id": serializers.CharField(allow_null=True),
+                    "public_menu": serializers.CharField(allow_null=True),
+                    "output": serializers.CharField(),
+                },
+            )
+        },
+        tags=["ops"],
+    )
+    def post(self, request: Request) -> Response:
+        token = getattr(settings, "SEED_TOKEN", "") or ""
+        if not token or request.headers.get("X-Seed-Token") != token:
+            return Response(
+                {"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        buffer = io.StringIO()
+        try:
+            call_command("seed_demo", stdout=buffer)
+        except Exception as exc:  # noqa: BLE001 - surface the real error to caller
+            logger.exception("seed_demo failed")
+            return Response(
+                {"success": False, "error": str(exc), "output": buffer.getvalue()},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        from accounts.models import Restaurant
+
+        restaurant = (
+            Restaurant.objects.filter(published=True).order_by("created_at").first()
+        )
+        return Response(
+            {
+                "success": True,
+                "restaurant_id": str(restaurant.id) if restaurant else None,
+                "public_menu": (
+                    f"/api/public/menu/{restaurant.id}/" if restaurant else None
+                ),
+                "output": buffer.getvalue(),
+            }
+        )

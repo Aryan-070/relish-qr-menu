@@ -180,6 +180,10 @@ ASSET_VIDEO_RENDITION_HEIGHTS = [1080, 720, 360]
 # original (status 'ready') instead of being queued for ffmpeg transcoding.
 MEDIA_TRANSCODE_ENABLED = env.bool("MEDIA_TRANSCODE_ENABLED", default=True)
 
+# Secret that enables POST /api/admin/seed-demo/ (one-time demo seed on hosts
+# with no shell). Unset = endpoint returns 404.
+SEED_TOKEN = env("SEED_TOKEN", default="")
+
 # ── DRF ─────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
