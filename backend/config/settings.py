@@ -57,6 +57,7 @@ LOCAL_APPS = [
     "billing",
     "menu",
     "theming",
+    "ops",
     "public",
     "realtime",
 ]

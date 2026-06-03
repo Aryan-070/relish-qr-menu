@@ -26,5 +26,6 @@ urlpatterns = [
     path("api/billing/", include("billing.urls")),
     path("api/menu/", include("menu.urls")),
     path("api/theme/", include("theming.urls")),
+    path("api/ops/", include("ops.urls")),
     path("api/public/", include("public.urls")),
 ]
