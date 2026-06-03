@@ -108,6 +108,12 @@ DATABASES = {
 }
 DATABASES["default"].setdefault("ATOMIC_REQUESTS", False)
 
+# Routes a promoted tenant's data-plane queries to its dedicated DB connection
+# (per TenantShard.connection_alias). Inert while only "default" exists — it
+# never queries the DB in the hot path and returns None (default routing) until
+# extra connections are configured (Phase 7). See common/routers.py.
+DATABASE_ROUTERS = ["common.routers.TenantShardRouter"]
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 

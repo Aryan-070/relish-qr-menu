@@ -1,12 +1,16 @@
-from rest_framework.generics import CreateAPIView, RetrieveAPIView
+from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from accounts.constants import MEMBERSHIP_ACTIVE
 from accounts.serializers import (
+    MembershipSummarySerializer,
     RelishTokenObtainPairSerializer,
     SignupSerializer,
-    UserSerializer,
 )
+from common.context import get_current_org_id
 
 
 class SignupView(CreateAPIView):
@@ -22,11 +26,44 @@ class RelishTokenObtainPairView(TokenObtainPairView):
     serializer_class = RelishTokenObtainPairSerializer
 
 
-class MeView(RetrieveAPIView):
-    """Return the currently authenticated user."""
+class MeView(APIView):
+    """Return the authenticated user plus their active memberships.
+
+    ``active`` is the membership matching the request's current org (resolved by
+    the tenancy middleware from the JWT), falling back to the first membership.
+    """
 
     permission_classes = [IsAuthenticated]
-    serializer_class = UserSerializer
 
-    def get_object(self):
-        return self.request.user
+    def get(self, request):
+        user = request.user
+        memberships = list(
+            user.memberships.filter(status=MEMBERSHIP_ACTIVE, active=True)
+            .select_related("org", "role")
+            .prefetch_related("outlets__restaurant")
+        )
+
+        current_org_id = get_current_org_id()
+        active = None
+        if current_org_id is not None:
+            active = next(
+                (m for m in memberships if str(m.org_id) == str(current_org_id)),
+                None,
+            )
+        if active is None and memberships:
+            active = memberships[0]
+
+        return Response(
+            {
+                "id": str(user.id),
+                "email": user.email,
+                "memberships": MembershipSummarySerializer(
+                    memberships, many=True
+                ).data,
+                "active": (
+                    MembershipSummarySerializer(active).data
+                    if active is not None
+                    else None
+                ),
+            }
+        )
