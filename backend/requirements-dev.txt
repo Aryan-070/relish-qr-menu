@@ -1,0 +1,12 @@
+# Relish backend — development & CI dependencies.
+-r requirements.txt
+pytest==8.3.2
+pytest-django==4.8.0
+pytest-cov==5.0.0
+pytest-asyncio==0.23.8
+ruff==0.6.4
+mypy==1.11.2
+# Type stubs are best-effort (no version-pinned extras that fight mypy's range).
+django-stubs==4.2.7
+model-bakery==1.19.5
+freezegun==1.5.1

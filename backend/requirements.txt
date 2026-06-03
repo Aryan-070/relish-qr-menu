@@ -1,0 +1,23 @@
+# Relish backend — runtime dependencies.
+# Django 4.2 LTS: supports Python 3.9–3.12 (local dev runs on the system 3.9;
+# the Docker image uses 3.12). Pins are conservative and known-compatible.
+Django==4.2.16
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+drf-spectacular==0.27.2
+channels==4.1.0
+channels-redis==4.2.0
+daphne==4.1.2
+celery==5.3.6
+redis==5.0.8
+django-redis==5.4.0
+django-environ==0.11.2
+django-cors-headers==4.4.0
+django-storages==1.14.4
+boto3==1.34.162
+requests==2.32.3
+Pillow==10.4.0
+psycopg2-binary==2.9.9
+whitenoise==6.7.0
+gunicorn==22.0.0
+uvicorn[standard]==0.30.6

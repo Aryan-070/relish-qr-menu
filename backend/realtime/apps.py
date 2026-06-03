@@ -1,0 +1,10 @@
+"""App config for the realtime (KDS / waiter live sync) Channels app."""
+from __future__ import annotations
+
+from django.apps import AppConfig
+
+
+class RealtimeConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "realtime"
+    verbose_name = "Realtime (KDS / live sync)"
