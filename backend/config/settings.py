@@ -58,6 +58,8 @@ LOCAL_APPS = [
     "menu",
     "theming",
     "ops",
+    "crm",
+    "inventory",
     "public",
     "realtime",
 ]
