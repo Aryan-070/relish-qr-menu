@@ -24,6 +24,7 @@ from accounts.models import Restaurant
 from billing.services import RazorpayConfigError, RazorpayError
 from common.context import get_current_membership_id
 from common.permissions import IsTenantMember
+from ops.order_serializers import OrderSerializer, PlaceOrderSerializer
 from ops.services import OrderError
 from realtime.broadcast import broadcast_order_event, broadcast_session_event
 
@@ -186,10 +187,12 @@ class SessionOrderView(APIView):
     authentication_classes: list = []
     permission_classes = [CanSubmitOrder]
 
-    @extend_schema(tags=["dining"])
+    @extend_schema(
+        request=PlaceOrderSerializer,
+        responses={201: OrderSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
-        from ops.order_serializers import PlaceOrderSerializer
-
         session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
         device = getattr(request, "dining_device", None)
         if device is None:  # pragma: no cover - permission guarantees this
@@ -213,8 +216,6 @@ class SessionOrderView(APIView):
         broadcast_session_event(session.id, "order_placed", _order_event_payload(order))
         broadcast_session_event(session.id, "check_updated", None)
 
-        from ops.order_serializers import OrderSerializer
-
         return Response(
             OrderSerializer(order).data, status=status.HTTP_201_CREATED
         )
@@ -225,7 +226,11 @@ class SessionContactView(APIView):
 
     permission_classes = [IsSessionParticipant]
 
-    @extend_schema(request=ContactSerializer, tags=["dining"])
+    @extend_schema(
+        request=ContactSerializer,
+        responses={200: DiningSessionSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
         device = getattr(request, "dining_device", None)
@@ -254,7 +259,11 @@ class SessionPromoteView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
-    @extend_schema(request=PromoteSerializer, tags=["dining"])
+    @extend_schema(
+        request=PromoteSerializer,
+        responses={200: DiningSessionSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         s = PromoteSerializer(data=request.data)
@@ -287,7 +296,11 @@ class SessionConfirmView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
-    @extend_schema(request=ConfirmOrdersSerializer, tags=["dining"])
+    @extend_schema(
+        request=ConfirmOrdersSerializer,
+        responses={200: DiningSessionSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         s = ConfirmOrdersSerializer(data=request.data)
@@ -306,7 +319,11 @@ class SessionRequestBillView(APIView):
 
     permission_classes = [IsSessionParticipant]
 
-    @extend_schema(tags=["dining"])
+    @extend_schema(
+        request=None,
+        responses={200: DiningSessionSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
         device = getattr(request, "dining_device", None)
@@ -323,7 +340,11 @@ class SessionCloseView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
-    @extend_schema(tags=["dining"])
+    @extend_schema(
+        request=None,
+        responses={200: DiningSessionSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         close_session(session=session)
@@ -338,7 +359,11 @@ class SessionPayView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "dining_pay"
 
-    @extend_schema(responses={200: PayResultSerializer}, tags=["dining"])
+    @extend_schema(
+        request=None,
+        responses={200: PayResultSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
         try:
@@ -357,7 +382,11 @@ class SessionSettleCashView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
-    @extend_schema(tags=["dining"])
+    @extend_schema(
+        request=None,
+        responses={200: DiningSessionSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         try:
@@ -373,7 +402,11 @@ class SessionDisputeView(APIView):
 
     permission_classes = [IsAuthenticated, IsTenantMember]
 
-    @extend_schema(request=DisputeSerializer, tags=["dining"])
+    @extend_schema(
+        request=DisputeSerializer,
+        responses={200: DiningSessionSerializer},
+        tags=["dining"],
+    )
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         s = DisputeSerializer(data=request.data)
