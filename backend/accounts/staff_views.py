@@ -12,6 +12,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -47,6 +48,20 @@ def _membership_in_org_or_404(pk, org: Organization) -> Membership:
     """Return membership ``pk`` within ``org``, excluding soft-deleted rows."""
     return get_object_or_404(
         Membership, id=pk, org=org, deleted_at__isnull=True
+    )
+
+
+def _membership_for_response(membership: Membership) -> Membership:
+    """Re-fetch ``membership`` with role + outlets + overrides for serialization.
+
+    Shared by the staff detail / deactivate / permissions endpoints so the
+    response-shaping query (and its ``select_related``/``prefetch_related``) lives
+    in exactly one place.
+    """
+    return (
+        Membership.objects.select_related("role")
+        .prefetch_related("outlets", "permission_overrides")
+        .get(pk=membership.pk)
     )
 
 
@@ -150,9 +165,14 @@ class StaffDetailView(APIView):
 
         update_fields: list[str] = []
         if "role_key" in data:
-            membership.role = Role.objects.get(
+            role = Role.objects.filter(
                 key=data["role_key"], org__isnull=True
-            )
+            ).first()
+            if role is None:
+                raise ValidationError(
+                    {"role_key": "Unknown system role."}
+                )
+            membership.role = role
             update_fields.append("role")
         if "active" in data:
             membership.active = data["active"]
@@ -161,12 +181,7 @@ class StaffDetailView(APIView):
             update_fields.append("updated_at")
             membership.save(update_fields=update_fields)
 
-        membership = (
-            Membership.objects.select_related("role")
-            .prefetch_related("outlets", "permission_overrides")
-            .get(pk=membership.pk)
-        )
-        return Response(MembershipSerializer(membership).data)
+        return Response(MembershipSerializer(_membership_for_response(membership)).data)
 
 
 class StaffDeactivateView(APIView):
@@ -183,12 +198,7 @@ class StaffDeactivateView(APIView):
         org = _current_org_or_404()
         membership = _membership_in_org_or_404(pk, org)
         deactivate_membership(membership)
-        membership = (
-            Membership.objects.select_related("role")
-            .prefetch_related("outlets", "permission_overrides")
-            .get(pk=membership.pk)
-        )
-        return Response(MembershipSerializer(membership).data)
+        return Response(MembershipSerializer(_membership_for_response(membership)).data)
 
 
 class StaffPermissionsView(APIView):
@@ -213,12 +223,7 @@ class StaffPermissionsView(APIView):
             add=data.get("add", []),
             revoke=data.get("revoke", []),
         )
-        membership = (
-            Membership.objects.select_related("role")
-            .prefetch_related("outlets", "permission_overrides")
-            .get(pk=membership.pk)
-        )
-        return Response(MembershipSerializer(membership).data)
+        return Response(MembershipSerializer(_membership_for_response(membership)).data)
 
 
 class AcceptInviteView(APIView):

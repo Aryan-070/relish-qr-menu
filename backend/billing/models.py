@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -35,7 +36,7 @@ class Subscription(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     renewal_at = models.DateTimeField()
     auto_renew = models.BooleanField(default=True)
-    gst_pct = models.IntegerField(default=18)
+    gst_pct = models.IntegerField(default=18, validators=[MinValueValidator(0)])
 
     class Meta:
         ordering = ["-started_at"]
@@ -68,9 +69,9 @@ class Invoice(models.Model):
         related_name="invoices",
     )
     description = models.TextField(blank=True)
-    base_minor = models.IntegerField()
-    gst_minor = models.IntegerField()
-    total_minor = models.IntegerField()
+    base_minor = models.IntegerField(validators=[MinValueValidator(0)])
+    gst_minor = models.IntegerField(validators=[MinValueValidator(0)])
+    total_minor = models.IntegerField(validators=[MinValueValidator(0)])
     status = models.CharField(
         max_length=8, choices=Status.choices, default=Status.DUE
     )

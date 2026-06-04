@@ -78,9 +78,11 @@ class RazorpayWebhookView(APIView):
     """Receive Razorpay webhooks: verify signature, then idempotently apply.
 
     Authentication is intentionally disabled — the HMAC signature over the raw
-    body is the authentication. On a valid signature we always return 200 (even
-    for duplicates) so Razorpay stops retrying; only an invalid signature or
-    malformed body yields a 400.
+    body is the authentication. On a valid signature we return 200 once the event
+    is durably applied (duplicates included, so Razorpay stops retrying); an
+    invalid signature or malformed body yields a 400. An unexpected failure while
+    applying the (atomic) event yields a 500 so Razorpay retries and re-applies
+    cleanly — we never swallow it into a false 200.
     """
 
     permission_classes = [AllowAny]
@@ -120,15 +122,18 @@ class RazorpayWebhookView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Signature is valid past this point: never raise back to Razorpay, and
-        # always answer 200 so retries stop, regardless of duplicate/new.
-        try:
-            event_id = _extract_event_id(body)
-            kind = str(body.get("event", ""))
-            entity = _extract_inner_entity(body)
-            record_and_apply_event(event_id, kind, entity)
-        except Exception:  # noqa: BLE001 — must never 500 back to Razorpay
-            logger.exception("Failed to apply Razorpay webhook event")
+        # Signature is valid past this point. Envelope parsing is total (the
+        # extractors fall back rather than raise), so the only thing that can
+        # fail here is the durable apply. We deliberately do NOT swallow that:
+        # ``record_and_apply_event`` is fully atomic, so an unexpected failure
+        # rolls back the idempotency ledger row entirely. Letting it propagate
+        # (DRF → 500) makes Razorpay retry — which then re-applies cleanly —
+        # and surfaces the bug in Sentry, instead of silently dropping a real
+        # payment under a blanket ``except``.
+        event_id = _extract_event_id(body)
+        kind = str(body.get("event", ""))
+        entity = _extract_inner_entity(body)
+        record_and_apply_event(event_id, kind, entity)
 
         return Response({"received": True}, status=status.HTTP_200_OK)
 

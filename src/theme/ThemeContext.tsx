@@ -47,15 +47,19 @@ export function ThemeProvider({ children, forced }: { children: ReactNode; force
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
   }, [theme, forced])
 
-  const setTheme = forced ? () => {} : setStored
-
+  // `setTheme` is built inside the memo so the value identity only changes with
+  // `theme`/`forced` (a forced subtree gets a no-op setter; otherwise the stable
+  // `setStored`). Consumers therefore don't re-render on unrelated parent renders.
   const value = useMemo(
-    () => ({ theme, tokens: THEMES[theme], setTheme }),
+    () => ({
+      theme,
+      tokens: THEMES[theme],
+      setTheme: forced ? () => {} : setStored,
+    }),
     [theme, forced],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
-
 }
 
 export function useTheme(): ThemeCtx {

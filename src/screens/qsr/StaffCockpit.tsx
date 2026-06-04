@@ -122,6 +122,7 @@ function SessionDetail({
 }) {
   const { tokens: t } = useTheme()
   const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const radius = isHard(t) ? 0 : 999
   const pendingOrders = session.orders.filter(o => o.confirmation === 'pending_confirmation')
   const total = session.check?.total_minor ?? 0
@@ -129,7 +130,16 @@ function SessionDetail({
 
   const act = async (fn: () => Promise<void>) => {
     setBusy(true)
-    try { await fn() } finally { setBusy(false) }
+    setNotice(null)
+    try {
+      await fn()
+    } catch {
+      // Surface a retryable message instead of letting the action fail silently
+      // (the promise would otherwise reject unhandled with no feedback).
+      setNotice('That action didn’t go through — please try again.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -221,6 +231,11 @@ function SessionDetail({
           </Button>
         </div>
       </div>
+      {notice && (
+        <p className="mt-3 px-1 text-[12px]" style={{ ...bodyStyle(t), color: t.accent }}>
+          {notice}
+        </p>
+      )}
       <div className="h-6" />
     </div>
   )

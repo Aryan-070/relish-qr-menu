@@ -118,7 +118,12 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
   const [billOpen, setBillOpen] = useState(false)
 
   const toggleCraving = useCallback((c: Craving) => {
-    setCravings(prev => { const next = new Set(prev); next.has(c) ? next.delete(c) : next.add(c); return next })
+    setCravings(prev => {
+      const next = new Set(prev)
+      if (next.has(c)) next.delete(c)
+      else next.add(c)
+      return next
+    })
   }, [])
   const toggleDietary = useCallback((d: DietFilter) => {
     setDietary(prev => {

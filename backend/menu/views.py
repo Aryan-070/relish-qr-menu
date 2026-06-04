@@ -21,13 +21,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from rest_framework import status, viewsets
-from rest_framework.exceptions import APIException
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from common.context import get_current_restaurant_id
 from common.permissions import HasPermission, IsTenantMember
+from common.versioning import StaleVersionError, parse_client_version
 from menu.models import (
     MenuCategory,
     MenuItem,
@@ -46,16 +46,6 @@ EDIT_MENU_PERMISSION = "edit-menu"
 
 #: Actions that mutate state and therefore require ``edit-menu``.
 _WRITE_ACTIONS = frozenset({"create", "update", "partial_update", "destroy"})
-
-
-class StaleVersionError(APIException):
-    """Raised when an update carries a stale optimistic-concurrency token."""
-
-    status_code = status.HTTP_409_CONFLICT
-    default_detail = (
-        "This item was modified by someone else. Reload and try again."
-    )
-    default_code = "stale_version"
 
 
 class TenantScopedMenuViewSet(viewsets.ModelViewSet):
@@ -129,7 +119,7 @@ class MenuItemViewSet(TenantScopedMenuViewSet):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
-        client_version = self._client_version(request.data)
+        client_version = parse_client_version(request.data)
         if client_version is not None and client_version != instance.version:
             raise StaleVersionError()
 
@@ -145,17 +135,6 @@ class MenuItemViewSet(TenantScopedMenuViewSet):
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
-
-    @staticmethod
-    def _client_version(data: Any) -> int | None:
-        """Coerce a supplied ``version`` to ``int``; ``None`` when absent/blank."""
-        raw = data.get("version") if hasattr(data, "get") else None
-        if raw in (None, ""):
-            return None
-        try:
-            return int(raw)
-        except (TypeError, ValueError):
-            return None
 
 
 class ModifierGroupViewSet(TenantScopedMenuViewSet):

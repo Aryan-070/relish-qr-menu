@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -40,6 +41,7 @@ from common.context import (
     get_current_restaurant_id,
 )
 from common.permissions import IsTenantMember
+from common.versioning import StaleVersionError, parse_client_version
 from ops.floor_serializers import (
     CreateServiceRequestSerializer,
     SeatTableSerializer,
@@ -59,27 +61,6 @@ from realtime.broadcast import (
 #: Service-request statuses surfaced by default on the list endpoint (the live
 #: queue) — resolved requests are excluded unless explicitly requested.
 _ACTIVE_REQUEST_STATUSES = ("pending", "claimed")
-
-
-class StaleVersionError(APIException):
-    """Raised when a table mutation carries a stale optimistic-concurrency token."""
-
-    status_code = status.HTTP_409_CONFLICT
-    default_detail = (
-        "This table was modified by someone else. Reload and try again."
-    )
-    default_code = "stale_version"
-
-
-def _client_version(data: Any) -> int | None:
-    """Coerce a supplied ``version`` to ``int``; ``None`` when absent/blank."""
-    raw = data.get("version") if hasattr(data, "get") else None
-    if raw in (None, ""):
-        return None
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return None
 
 
 def _apply_versioned(pk: Any, client_version: int | None, fields: dict[str, Any]) -> bool:
@@ -180,7 +161,7 @@ class TableViewSet(viewsets.ModelViewSet):
 
         fields = dict(serializer.validated_data)
         fields.pop("version", None)
-        if not _apply_versioned(instance.pk, _client_version(request.data), fields):
+        if not _apply_versioned(instance.pk, parse_client_version(request.data), fields):
             raise StaleVersionError()
 
         instance.refresh_from_db()
@@ -221,7 +202,7 @@ class TableViewSet(viewsets.ModelViewSet):
             "waiter_membership": None,
             "seated_at": None,
         }
-        if not _apply_versioned(table.pk, _client_version(request.data), fields):
+        if not _apply_versioned(table.pk, parse_client_version(request.data), fields):
             raise StaleVersionError()
 
         table.refresh_from_db()
@@ -250,7 +231,7 @@ class TableViewSet(viewsets.ModelViewSet):
             raise ValidationError({"status": "Invalid table status."})
 
         if not _apply_versioned(
-            table.pk, _client_version(request.data), {"status": new_status}
+            table.pk, parse_client_version(request.data), {"status": new_status}
         ):
             raise StaleVersionError()
 
@@ -291,8 +272,21 @@ class ServiceRequestViewSet(viewsets.ModelViewSet):
         """Soft-delete instead of removing the row."""
         instance.soft_delete()
 
+    #: How many sequential codes to try before giving up under extreme
+    #: contention. Reaching this would require this many simultaneous creates
+    #: all racing the same code — effectively impossible in practice.
+    _CODE_RETRY_ATTEMPTS = 25
+
     def create(self, request: Any, *args: Any, **kwargs: Any) -> Response:
-        """Create a request with a generated code + ``service_request_event``."""
+        """Create a request with a generated code + ``service_request_event``.
+
+        The human-facing ``REQ-NNNNN`` code is seeded from a row count, which is
+        inherently racy — two concurrent creates can compute the same number. A
+        unique constraint on ``(restaurant_id, code)`` turns that collision into
+        an ``IntegrityError`` instead of a silent duplicate, and we retry with
+        the next sequential code until the insert lands, so racing requests
+        always come away with distinct codes.
+        """
         serializer = CreateServiceRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -307,19 +301,54 @@ class ServiceRequestViewSet(viewsets.ModelViewSet):
         if table is None:
             raise ValidationError({"table_id": "No such table for this restaurant."})
 
-        request_obj = ServiceRequest.objects.create(
-            restaurant_id=restaurant_id,
-            table=table,
-            type=data["type"],
-            note=data.get("note", ""),
-            code=self._next_code(restaurant_id),
-        )
+        request_obj = self._create_with_unique_code(restaurant_id, table, data)
 
         self._broadcast(request_obj)
         return Response(
             ServiceRequestSerializer(request_obj).data,
             status=status.HTTP_201_CREATED,
         )
+
+    def _create_with_unique_code(
+        self, restaurant_id: Any, table: RestaurantTable, data: dict[str, Any]
+    ) -> ServiceRequest:
+        """Insert a ServiceRequest, retrying on the unique ``code`` collision.
+
+        Each attempt runs in its own ``transaction.atomic()`` block so a failed
+        insert rolls back cleanly (a raw ``IntegrityError`` would otherwise poison
+        the surrounding transaction on Postgres).
+        """
+        seed = self._next_seq(restaurant_id)
+        for offset in range(self._CODE_RETRY_ATTEMPTS):
+            code = f"REQ-{seed + offset:05d}"
+            try:
+                with transaction.atomic():
+                    return ServiceRequest.objects.create(
+                        restaurant_id=restaurant_id,
+                        table=table,
+                        type=data["type"],
+                        note=data.get("note", ""),
+                        code=code,
+                    )
+            except IntegrityError:
+                continue
+        raise APIException(
+            "Could not allocate a unique service-request code; please retry."
+        )
+
+    @staticmethod
+    def _next_seq(restaurant_id: Any) -> int:
+        """Best-effort next sequence number for a ``REQ-NNNNN`` code.
+
+        Based on the all-time row count (soft-deleted included) so codes stay
+        monotonic across deletes. This is only a *starting* guess — uniqueness is
+        guaranteed by the DB constraint + retry in
+        :meth:`_create_with_unique_code`, not by this count being exact.
+        """
+        count = ServiceRequest.all_objects.filter(
+            restaurant_id=restaurant_id
+        ).count()
+        return count + 1
 
     @extend_schema(request=None, responses=ServiceRequestSerializer)
     @action(detail=True, methods=["post"])

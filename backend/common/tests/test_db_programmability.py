@@ -43,7 +43,7 @@ def test_triggers_and_indexes_exist():
             "SELECT tgname, tgrelid::regclass::text FROM pg_trigger "
             "WHERE tgname IN ('touch_updated_at', 'audit_row')"
         )
-        triggers = {(name, tbl) for name, tbl in cur.fetchall()}
+        triggers = set(cur.fetchall())
         cur.execute(
             "SELECT indexname FROM pg_indexes "
             "WHERE indexname IN ('menu_menuitem_name_trgm', 'ops_order_unpaid_idx')"

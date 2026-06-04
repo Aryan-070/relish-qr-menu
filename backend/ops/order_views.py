@@ -15,7 +15,7 @@ from typing import Any
 
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
-from rest_framework.exceptions import APIException, NotFound, ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -23,6 +23,7 @@ from rest_framework.views import APIView
 
 from common.context import get_current_membership_id, get_current_restaurant_id
 from common.permissions import HasPermission, IsTenantMember
+from common.versioning import StaleVersionError
 from ops.models import Order
 from ops.order_serializers import (
     OrderCompSerializer,
@@ -40,14 +41,6 @@ from ops.services import (
     void_order,
 )
 from realtime.broadcast import broadcast_order_event
-
-
-class StaleVersionError(APIException):
-    """Raised when an optimistic-concurrency ``version`` no longer matches."""
-
-    status_code = status.HTTP_409_CONFLICT
-    default_detail = "This order was modified by someone else. Reload and retry."
-    default_code = "stale_version"
 
 
 def _order_event_payload(order: Order) -> dict[str, Any]:

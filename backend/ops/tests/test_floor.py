@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -335,6 +336,49 @@ def test_create_service_request_generates_code_and_broadcasts(floor_ctx):
     )
     assert resp2.status_code == 201
     assert resp2.data["code"] == "REQ-00002"
+
+
+def test_service_request_code_is_unique_per_restaurant(floor_ctx):
+    """The DB constraint backs the retry: a duplicate code is rejected."""
+    _floor_client, _membership, restaurant = floor_ctx
+    table = RestaurantTable.objects.create(
+        restaurant_id=restaurant.id, code="T12", label="Table 12"
+    )
+    ServiceRequest.objects.create(
+        restaurant_id=restaurant.id, table=table, type="waiter", code="REQ-00001"
+    )
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ServiceRequest.objects.create(
+            restaurant_id=restaurant.id, table=table, type="bill", code="REQ-00001"
+        )
+
+
+def test_create_service_request_retries_past_code_collision(floor_ctx):
+    """A seeded code that already exists is skipped, not 500'd.
+
+    Seeding one existing row makes ``_next_seq`` compute ``REQ-00002``; that code
+    is already taken, so the create must retry forward to ``REQ-00003`` rather
+    than raising the unique-constraint IntegrityError.
+    """
+    floor_client, _membership, restaurant = floor_ctx
+    table = RestaurantTable.objects.create(
+        restaurant_id=restaurant.id, code="T13", label="Table 13"
+    )
+    # One existing row → seq seed becomes 2 → first attempted code is REQ-00002,
+    # which we pre-occupy to force the collision/retry path.
+    ServiceRequest.objects.create(
+        restaurant_id=restaurant.id, table=table, type="waiter", code="REQ-00002"
+    )
+
+    with patch("ops.floor_views.broadcast_service_request_event"):
+        resp = floor_client.post(
+            "/api/ops/requests/",
+            {"table_id": str(table.id), "type": "bill"},
+            format="json",
+        )
+
+    assert resp.status_code == 201, resp.data
+    assert resp.data["code"] == "REQ-00003"
 
 
 def test_create_service_request_rejects_foreign_table(floor_ctx):

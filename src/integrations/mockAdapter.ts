@@ -35,7 +35,6 @@ function delay(ms: number): Promise<void> {
  * lint rules that only forbid console.log stay happy.
  */
 function logSync(label: string, action: string, detail: Record<string, unknown>): void {
-  // eslint-disable-next-line no-console
   console.info(`[aggregator:${label}] ${action}`, detail)
 }
 

@@ -255,6 +255,12 @@ class ServiceRequest(TenantScopedModel):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["restaurant_id", "code"],
+                name="uniq_request_restaurant_code",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["restaurant_id", "-created_at"],
