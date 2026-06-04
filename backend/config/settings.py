@@ -34,7 +34,11 @@ DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 
 # ── Applications ────────────────────────────────────────────────────────────
+# ``daphne`` must precede the contrib apps so ``manage.py runserver`` serves the
+# ASGI application (Channels WebSockets), not the WSGI dev server. Production
+# runs daphne/uvicorn against ``config.asgi:application`` directly.
 DJANGO_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",

@@ -16,6 +16,14 @@ export const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, '') ??
   'http://localhost:8000/api'
 
+/** WebSocket base, e.g. `ws://localhost:8000`. Derived from the API base
+ * (swap http→ws, drop the trailing `/api`) unless VITE_WS_BASE_URL overrides. */
+export function wsBaseUrl(): string {
+  const explicit = import.meta.env.VITE_WS_BASE_URL as string | undefined
+  if (explicit) return explicit.replace(/\/+$/, '')
+  return API_BASE_URL.replace(/^http/, 'ws').replace(/\/api$/, '')
+}
+
 /** localStorage key the staff JWT is stashed under (set by the console auth). */
 const STAFF_TOKEN_KEY = 'relish.staff.jwt'
 

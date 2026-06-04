@@ -24,7 +24,7 @@ from accounts.models import Restaurant
 from billing.services import RazorpayConfigError, RazorpayError
 from common.context import get_current_membership_id
 from common.permissions import IsTenantMember
-from realtime.broadcast import broadcast_order_event
+from realtime.broadcast import broadcast_order_event, broadcast_session_event
 
 from .models import DiningSession
 from .payments import (
@@ -191,6 +191,8 @@ class SessionOrderView(APIView):
 
         if order.confirmation == "confirmed":
             broadcast_order_event(session.restaurant_id, _order_event_payload(order))
+        broadcast_session_event(session.id, "order_placed", _order_event_payload(order))
+        broadcast_session_event(session.id, "check_updated", None)
 
         from ops.order_serializers import OrderSerializer
 
@@ -251,6 +253,9 @@ class SessionPromoteView(APIView):
             if str(exc) == "stale_version":
                 raise SessionStaleVersionError() from exc
             raise ValidationError(str(exc)) from exc
+        broadcast_session_event(
+            session.id, "leader_changed", {"leader_device_id": str(device.id)}
+        )
         return _session_response(session)
 
 
@@ -267,6 +272,9 @@ class SessionConfirmView(APIView):
         fired = confirm_orders(session=session, order_ids=s.validated_data["order_ids"])
         for order in fired:
             broadcast_order_event(session.restaurant_id, _order_event_payload(order))
+        if fired:
+            broadcast_session_event(session.id, "order_confirmed", None)
+            broadcast_session_event(session.id, "check_updated", None)
         return _session_response(session)
 
 
@@ -283,6 +291,7 @@ class SessionRequestBillView(APIView):
             request_bill(session=session)
         except SessionError as exc:
             raise ValidationError(str(exc)) from exc
+        broadcast_session_event(session.id, "bill_requested", None)
         return _session_response(session, device)
 
 
@@ -295,6 +304,7 @@ class SessionCloseView(APIView):
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         close_session(session=session)
+        broadcast_session_event(session.id, "session_closed", None)
         return _session_response(session)
 
 
@@ -331,6 +341,7 @@ class SessionSettleCashView(APIView):
             settle_check_cash(session, get_current_membership_id())
         except CheckPaymentError as exc:
             raise ValidationError(str(exc)) from exc
+        broadcast_session_event(session.id, "check_updated", None)
         return _session_response(session)
 
 
@@ -350,4 +361,5 @@ class SessionDisputeView(APIView):
             )
         except CheckPaymentError as exc:
             raise ValidationError(str(exc)) from exc
+        broadcast_session_event(session.id, "check_updated", None)
         return _session_response(session)

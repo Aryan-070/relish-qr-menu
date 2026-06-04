@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError } from '../lib/api/client'
+import { ApiError, wsBaseUrl } from '../lib/api/client'
 import {
   closeSession,
   confirmOrders,
@@ -157,6 +157,41 @@ export function useSession(params?: { restaurantId: string; tableId: string } | 
   const refetch = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey })
   }, [queryClient, queryKey])
+
+  // Live updates over Channels: each typed event nudges a snapshot refetch (the
+  // snapshot stays server-authoritative). Polling above remains the fallback if
+  // the socket can't connect (flaky venue wifi). Auto-reconnects with a delay.
+  useEffect(() => {
+    if (!enabled || stored === null) return
+    let socket: WebSocket | null = null
+    let retry: ReturnType<typeof setTimeout> | null = null
+    let disposed = false
+
+    const connect = () => {
+      if (disposed) return
+      try {
+        socket = new WebSocket(
+          `${wsBaseUrl()}/ws/session/${stored.sessionId}/?token=${stored.deviceToken}`,
+        )
+      } catch {
+        return // polling carries on
+      }
+      socket.onmessage = () => {
+        void queryClient.invalidateQueries({ queryKey })
+      }
+      socket.onclose = () => {
+        if (disposed) return
+        retry = setTimeout(connect, 3000)
+      }
+    }
+    connect()
+
+    return () => {
+      disposed = true
+      if (retry) clearTimeout(retry)
+      socket?.close()
+    }
+  }, [enabled, stored, queryClient, queryKey])
 
   const session = query.data ?? null
   const deviceToken = stored?.deviceToken ?? null

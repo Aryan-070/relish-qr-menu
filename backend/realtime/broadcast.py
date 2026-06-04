@@ -41,3 +41,23 @@ def broadcast_table_event(restaurant_id: Any, payload: Any) -> None:
 def broadcast_service_request_event(restaurant_id: Any, payload: Any) -> None:
     """Push a service-request event (call waiter / bill request) to the KDS group."""
     _broadcast(restaurant_id, "service_request_event", payload)
+
+
+def broadcast_session_event(
+    session_id: Any, event: str, payload: Any = None
+) -> None:
+    """Push a typed event to a dining session's group (``session_<id>``).
+
+    ``event`` is the typed frame name the guest devices switch on
+    (``order_placed`` / ``order_confirmed`` / ``leader_changed`` /
+    ``check_updated`` / ``bill_requested`` / ``session_closed`` / ``presence``).
+    No-ops when no channel layer is configured, so REST handlers never crash on
+    a broadcast.
+    """
+    layer = get_channel_layer()
+    if layer is None:
+        return
+    async_to_sync(layer.group_send)(
+        f"session_{session_id}",
+        {"type": "session_event", "event": event, "payload": payload},
+    )

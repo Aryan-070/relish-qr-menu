@@ -16,6 +16,7 @@ from django.db import transaction
 
 from billing.services import create_razorpay_order
 from ops.models import AuditLog
+from realtime.broadcast import broadcast_session_event
 
 from .models import Check, DiningSession
 from .services import recompute_check
@@ -130,6 +131,8 @@ def settle_check_from_payload(payload: dict[str, Any]) -> Check | None:
         check.paid_minor = check.total_minor
         check.status = "settled"
         check.save(update_fields=["paid_minor", "status", "updated_at"])
+    # Tell connected guest devices the bill is settled (webhook is out-of-band).
+    broadcast_session_event(check.session_id, "check_updated", None)
     return check
 
 
