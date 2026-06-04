@@ -1,70 +1,119 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Sparkles, Leaf, Flame, ShoppingBag, Tag, Mail } from 'lucide-react'
-import { categories, type MenuItem } from '../../data/menu'
+import { categories, matchesDietFilters, type QsrMenuItem, type Craving, type QsrMood, type DietFilter } from '../../data/qsrMenu'
 import { formatMoney } from '../../lib/money'
-import { combosForContext, useWhisper, type TableContext } from './useWhisper'
+import { combosForContext, useQsrWhisper, menuScore, envelopeForContext, type QsrContext } from './useQsrWhisper'
+import { TastePass } from './TastePass'
+import { QsrOrderSheet } from './QsrOrderSheet'
 import type { OrderApi } from './types'
+import type { UseSessionResult } from '../../hooks/useSession'
 import { useTheme } from '../../theme/ThemeContext'
 import { panelStyle, headingStyle, sectionTitleStyle, bodyStyle, isHard } from '../../console/lib/skin'
 import { Button } from '../../console/components/Button'
 import { AnimatedNumber } from '../../components/ui/animated-number'
 import { BorderBeam } from '../../components/fx/BorderBeam'
+import { SpotlightCard } from '../../components/fx/SpotlightCard'
 import { fadeUp, stagger } from '../../animations/variants'
 import { cn } from '../../console/lib/format'
 
 interface GuestFastMenuProps {
   order: OrderApi
+  /** Live dining session (present when reached via a `?r=&t=` QR). */
+  session?: UseSessionResult
 }
 
-const JAIN_GREEN = '#2e7d32'
-const SPICE_RED = '#c0392b'
+const VEG_GREEN = '#2e7d4f'
+const NONVEG_RED = '#c0392b'
 
 /**
- * Customer QSR fast-menu — a faster, tile-first way to present the menu than the
- * cinematic landing. Combos are pinned on top, every dish is one tap to add, and
- * the same whisper engine surfaces a single upsell card above the cart. Fully
- * theme-aware (warm / hybrid / brutalist / editorial) via the shared skin tokens.
+ * Customer QSR fast-menu for The Table Theory — its OWN menu (bowls, wraps,
+ * sandwiches, pasta, sides, beverages, desserts; veg & non-veg), not the Relish
+ * consumer catalogue. The single Jain toggle is replaced by the "Taste Pass":
+ * a craving rail + dietary gate + table mood that live-reorder the grid and
+ * drive a concept-aware whisper plus the brand's envelope suggestion.
  */
-export function GuestFastMenu({ order }: GuestFastMenuProps) {
+export function GuestFastMenu({ order, session }: GuestFastMenuProps) {
   const { tokens: t } = useTheme()
   const { orderItems, addItem, addCombo, total, count } = order
 
-  const [jainOnly, setJainOnly] = useState(false)
+  // Ordering authority comes from the backend session (when present). With no
+  // session (offline prototype) the cart behaves as before — anyone can place.
+  const sessionActive = Boolean(session?.enabled && session.session)
+  const canOrder = session?.canOrder ?? true
+  const mode = session?.session?.order_confirmation_mode
+  const ctaLabel = !sessionActive
+    ? 'Place order'
+    : !canOrder
+      ? 'Ask your server'
+      : mode === 'waiter_confirm'
+        ? 'Send to server'
+        : 'Place order'
+  const ctaNote = sessionActive
+    ? canOrder
+      ? mode === 'waiter_confirm'
+        ? 'Your server confirms this before the kitchen starts.'
+        : undefined
+      : mode === 'leader'
+        ? 'Ask your server to start your order.'
+        : 'Your server will confirm orders for this table.'
+    : undefined
+
+  const [cravings, setCravings] = useState<ReadonlySet<Craving>>(new Set())
+  const [dietary, setDietary] = useState<ReadonlySet<DietFilter>>(new Set())
+  const [mood, setMood] = useState<QsrMood | null>(null)
   const [activeCategoryId, setActiveCategoryId] = useState<string>(categories[0]?.id ?? '')
   const [suppressed, setSuppressed] = useState<ReadonlySet<string>>(new Set())
+  const [reviewOpen, setReviewOpen] = useState(false)
 
-  const ctx: TableContext = useMemo(() => ({ mood: null, partySize: null, jainOnly }), [jainOnly])
+  const toggleCraving = useCallback((c: Craving) => {
+    setCravings(prev => { const next = new Set(prev); next.has(c) ? next.delete(c) : next.add(c); return next })
+  }, [])
+  const toggleDietary = useCallback((d: DietFilter) => {
+    setDietary(prev => {
+      const next = new Set(prev)
+      if (next.has(d)) { next.delete(d); return next }
+      next.add(d)
+      // Veg and Non-veg are mutually exclusive.
+      if (d === 'veg') next.delete('nonveg')
+      if (d === 'nonveg') next.delete('veg')
+      return next
+    })
+  }, [])
+
+  const ctx: QsrContext = useMemo(() => ({ dietary, cravings, mood }), [dietary, cravings, mood])
   const combos = useMemo(() => combosForContext(ctx).slice(0, 3), [ctx])
   const cartItemIds = useMemo(() => orderItems.map(o => o.item.id), [orderItems])
-  const whisper = useWhisper(cartItemIds, ctx, suppressed)
+  const whisper = useQsrWhisper(cartItemIds, ctx, suppressed)
+  const envelope = envelopeForContext(ctx)
 
   const activeCategory = useMemo(
     () => categories.find(c => c.id === activeCategoryId) ?? categories[0],
     [activeCategoryId],
   )
 
-  const visibleItems = useMemo(
-    () => activeCategory.items.filter(item => !jainOnly || item.isJain),
-    [activeCategory, jainOnly],
-  )
+  // Hard dietary gate, then soft craving/mood re-rank (stable — neutral order
+  // is preserved when no preference is active).
+  const visibleItems = useMemo(() => {
+    const items = (activeCategory.items as QsrMenuItem[]).filter(item => matchesDietFilters(item, dietary))
+    if (cravings.size === 0 && !mood) return items
+    return [...items].sort((a, b) => menuScore(b, ctx) - menuScore(a, ctx))
+  }, [activeCategory, dietary, cravings, mood, ctx])
 
   const acceptWhisper = () => {
     if (!whisper) return
     if (whisper.kind === 'combo') addCombo(whisper.combo)
     else addItem(whisper.item)
   }
-  const dismissWhisper = () => {
-    if (whisper) setSuppressed(prev => new Set(prev).add(whisper.id))
-  }
+  const dismissWhisper = () => { if (whisper) setSuppressed(prev => new Set(prev).add(whisper.id)) }
 
   const pillRadius = isHard(t) ? 0 : 999
   const priceStyle = { fontFamily: t.priceFont, color: t.priceColor }
 
   return (
     <div className="flex flex-col h-full" style={{ background: t.bg }}>
-      {/* Header + Jain toggle */}
-      <div className="flex-shrink-0 px-4 sm:px-6 pt-5 pb-3 flex items-end justify-between gap-3">
+      {/* Header + Taste Pass */}
+      <div className="flex-shrink-0 px-4 sm:px-6 pt-5 pb-3 flex flex-col gap-3">
         <div className="min-w-0">
           <p className="text-[12px] uppercase tracking-[0.18em]" style={bodyStyle(t)}>
             Sit Down. Open Up.
@@ -73,36 +122,29 @@ export function GuestFastMenu({ order }: GuestFastMenuProps) {
             Quick Menu
           </h2>
         </div>
-        <button
-          onClick={() => setJainOnly(v => !v)}
-          aria-pressed={jainOnly}
-          className="text-[12px] font-medium px-3 py-1.5 flex items-center gap-1.5 flex-shrink-0 transition-colors"
-          style={{
-            ...bodyStyle(t),
-            borderRadius: pillRadius,
-            background: jainOnly ? JAIN_GREEN : 'rgba(46,125,50,0.12)',
-            color: jainOnly ? '#fff' : JAIN_GREEN,
-            border: `1px solid ${jainOnly ? JAIN_GREEN : 'rgba(46,125,50,0.3)'}`,
-          }}
-        >
-          <Leaf size={13} /> Jain
-        </button>
+        <TastePass
+          cravings={cravings}
+          onToggleCraving={toggleCraving}
+          dietary={dietary}
+          onToggleDietary={toggleDietary}
+          mood={mood}
+          onSetMood={setMood}
+        />
       </div>
 
-      {/* The Envelope — the brand's signature ritual, surfaced as a quiet note. */}
+      {/* The Envelope — mood-matched card, else the generic ritual line. */}
       <div className="flex-shrink-0 px-4 sm:px-6 pb-3">
         <div
           className="flex items-center gap-2.5 px-3.5 py-2.5"
-          style={{
-            borderRadius: t.cardRadius,
-            background: 'rgba(143,179,154,0.16)',
-            border: `1px solid ${t.ruleColor}`,
-          }}
+          style={{ borderRadius: t.cardRadius, background: 'rgba(143,179,154,0.16)', border: `1px solid ${t.ruleColor}` }}
         >
           <Mail size={15} className="flex-shrink-0" style={{ color: t.accent }} />
           <p className="text-[11.5px] leading-snug" style={bodyStyle(t)}>
-            <span style={{ fontFamily: t.accentFont, color: t.accent }}>Today’s Theory</span>
-            {' '}— a card arrives with your order. Open only after the first bite.
+            <span style={{ fontFamily: t.accentFont, color: t.accent }}>
+              {envelope ? envelope.name : 'Today’s Theory'}
+            </span>
+            {' — '}
+            {envelope ? envelope.line : 'a card arrives with your order. Open only after the first bite.'}
           </p>
         </div>
       </div>
@@ -112,7 +154,7 @@ export function GuestFastMenu({ order }: GuestFastMenuProps) {
         {combos.length > 0 && (
           <div className="mb-5">
             <p className="text-[11px] uppercase tracking-[0.16em] mb-2 flex items-center gap-1.5" style={bodyStyle(t)}>
-              <Tag size={12} /> Most-loved combos · save 10%
+              <Tag size={12} /> {mood ? `For the ${mood.toLowerCase()} table · save 10%` : 'Most-loved combos · save 10%'}
             </p>
             <div className="relative">
               <div className="no-scrollbar flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 lg:grid lg:grid-cols-3 lg:gap-3 lg:overflow-visible">
@@ -149,7 +191,6 @@ export function GuestFastMenu({ order }: GuestFastMenuProps) {
                   </div>
                 ))}
               </div>
-              {/* Right-edge fade so cards don't hard-clip (mobile/tablet only) */}
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-y-0 right-0 w-10 lg:hidden"
@@ -184,16 +225,23 @@ export function GuestFastMenu({ order }: GuestFastMenuProps) {
         </div>
 
         {/* Dish tiles */}
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-        >
-          {visibleItems.map(item => (
-            <GuestTile key={item.id} item={item} priceStyle={priceStyle} onAdd={() => addItem(item)} />
-          ))}
-        </motion.div>
+        {visibleItems.length === 0 ? (
+          <p className="text-[13px] py-8 text-center" style={bodyStyle(t)}>
+            Nothing in this category matches your diet filter — try clearing one.
+          </p>
+        ) : (
+          <motion.div
+            key={activeCategoryId + [...cravings].join() + [...dietary].join() + mood}
+            variants={stagger}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+          >
+            {visibleItems.map(item => (
+              <GuestTile key={item.id} item={item} priceStyle={priceStyle} onAdd={() => addItem(item)} />
+            ))}
+          </motion.div>
+        )}
       </div>
 
       {/* Whisper card + cart bar */}
@@ -218,42 +266,28 @@ export function GuestFastMenu({ order }: GuestFastMenuProps) {
                   : `+${formatMoney(whisper.priceDelta)}`}
               </p>
             </div>
-            <Button variant="primary" size="sm" onClick={acceptWhisper} aria-label="Add suggestion">
-              Add
-            </Button>
-            <Button variant="ghost" size="sm" onClick={dismissWhisper} aria-label="Dismiss suggestion">
-              No
-            </Button>
+            <Button variant="primary" size="sm" onClick={acceptWhisper} aria-label="Add suggestion">Add</Button>
+            <Button variant="ghost" size="sm" onClick={dismissWhisper} aria-label="Dismiss suggestion">No</Button>
           </motion.div>
         )}
 
-        <div
-          className="px-4 sm:px-6 py-3 flex items-center gap-3"
-          style={{ background: t.accent, color: '#fff' }}
-        >
+        <div className="px-4 sm:px-6 py-3 flex items-center gap-3" style={{ background: t.accent, color: '#fff' }}>
           <ShoppingBag size={20} style={{ color: '#fff' }} />
           <div className="flex-1 min-w-0">
             <p className="text-[11px]" style={{ fontFamily: t.descFont, color: 'rgba(255,255,255,0.75)' }}>
               {count} {count === 1 ? 'item' : 'items'}
             </p>
             <span className="font-bold text-[18px] leading-none text-white" style={{ fontFamily: t.priceFont }}>
-              <AnimatedNumber
-                value={total}
-                format={(v) => formatMoney(Math.round(v))}
-                stiffness={200}
-                damping={26}
-                mass={0.6}
-              />
+              <AnimatedNumber value={total} format={(v) => formatMoney(Math.round(v))} stiffness={200} damping={26} mass={0.6} />
             </span>
           </div>
           <div className="relative flex-shrink-0">
             <button
               aria-label="Review order"
+              onClick={() => setReviewOpen(true)}
               className="font-semibold text-[14px] px-6 py-2.5 transition-transform active:scale-[0.97]"
               style={{
-                background: '#fff',
-                color: t.accent,
-                fontFamily: t.descFont,
+                background: '#fff', color: t.accent, fontFamily: t.descFont,
                 borderRadius: isHard(t) ? 0 : 999,
                 textTransform: isHard(t) ? 'uppercase' : 'none',
                 letterSpacing: isHard(t) ? '0.04em' : 0,
@@ -265,12 +299,21 @@ export function GuestFastMenu({ order }: GuestFastMenuProps) {
           </div>
         </div>
       </div>
+
+      <QsrOrderSheet
+        open={reviewOpen}
+        order={order}
+        onClose={() => setReviewOpen(false)}
+        ctaLabel={ctaLabel}
+        ctaDisabled={sessionActive && !canOrder}
+        ctaNote={ctaNote}
+      />
     </div>
   )
 }
 
 interface GuestTileProps {
-  item: MenuItem
+  item: QsrMenuItem
   priceStyle: { fontFamily: string; color: string }
   onAdd: () => void
 }
@@ -278,29 +321,42 @@ interface GuestTileProps {
 function GuestTile({ item, priceStyle, onAdd }: GuestTileProps) {
   const { tokens: t } = useTheme()
   return (
-    <motion.div variants={fadeUp} className="p-3 flex flex-col" style={panelStyle(t)}>
-      <div className="flex items-center gap-1 mb-1 min-h-[12px]">
-        {item.chefsSpecial && <Sparkles size={12} style={{ color: t.accent }} />}
-        {item.isJain && <Leaf size={11} style={{ color: JAIN_GREEN }} />}
-        {typeof item.spiceLevel === 'number' && item.spiceLevel > 0 && <Flame size={11} style={{ color: SPICE_RED }} />}
-      </div>
-      <p className={cn('font-semibold text-[15px] leading-tight')} style={sectionTitleStyle(t)}>
-        {item.name}
-      </p>
-      <p className="text-[11px] mt-1 flex-1 line-clamp-2" style={bodyStyle(t)}>
-        {item.description}
-      </p>
-      <div className="flex items-center justify-between gap-2 mt-2">
-        <span className="font-bold text-[15px]" style={priceStyle}>{formatMoney(item.price)}</span>
-        <button
-          onClick={onAdd}
-          className="w-8 h-8 flex items-center justify-center flex-shrink-0 transition-colors"
-          style={{ background: t.accent, color: '#fff', borderRadius: isHard(t) ? 0 : 999 }}
-          aria-label={`Add ${item.name}`}
-        >
-          <Plus size={16} />
-        </button>
-      </div>
+    <motion.div variants={fadeUp} className="h-full">
+      <SpotlightCard
+        color="rgba(11,74,47,0.10)"
+        className="p-3 flex flex-col h-full"
+        style={panelStyle(t)}
+      >
+        <div className="flex items-center gap-1.5 mb-1 min-h-[12px]">
+          <span
+            aria-hidden
+            className="inline-block w-2.5 h-2.5 rounded-[2px] flex-shrink-0"
+            style={{ border: `1.5px solid ${item.isVeg ? VEG_GREEN : NONVEG_RED}` }}
+          >
+            <span className="block w-full h-full rounded-full scale-50" style={{ background: item.isVeg ? VEG_GREEN : NONVEG_RED }} />
+          </span>
+          {item.chefsSpecial && <Sparkles size={12} style={{ color: t.accent }} />}
+          {typeof item.spiceLevel === 'number' && item.spiceLevel > 0 && <Flame size={11} style={{ color: NONVEG_RED }} />}
+          {item.dietary?.includes('vegan') && <Leaf size={11} style={{ color: VEG_GREEN }} />}
+        </div>
+        <p className={cn('font-semibold text-[15px] leading-tight')} style={sectionTitleStyle(t)}>
+          {item.name}
+        </p>
+        <p className="text-[11px] mt-1 flex-1 line-clamp-2" style={bodyStyle(t)}>
+          {item.description}
+        </p>
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <span className="font-bold text-[15px]" style={priceStyle}>{formatMoney(item.price)}</span>
+          <button
+            onClick={onAdd}
+            className="w-8 h-8 flex items-center justify-center flex-shrink-0 transition-colors"
+            style={{ background: t.accent, color: '#fff', borderRadius: isHard(t) ? 0 : 999 }}
+            aria-label={`Add ${item.name}`}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      </SpotlightCard>
     </motion.div>
   )
 }

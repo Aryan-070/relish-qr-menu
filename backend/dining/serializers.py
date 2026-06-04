@@ -48,6 +48,10 @@ class DiningSessionSerializer(serializers.ModelSerializer):
     devices = GuestDeviceSerializer(many=True, read_only=True)
     check = CheckSerializer(source="tab", read_only=True)
     orders = serializers.SerializerMethodField()
+    # The requesting device's own view of itself (null for staff/no-token), plus
+    # the server-authoritative "may I order?" flag so the UI never has to guess.
+    me = serializers.SerializerMethodField()
+    can_order = serializers.SerializerMethodField()
 
     class Meta:
         model = DiningSession
@@ -65,12 +69,29 @@ class DiningSessionSerializer(serializers.ModelSerializer):
             "devices",
             "check",
             "orders",
+            "me",
+            "can_order",
         ]
         read_only_fields = fields
 
     def get_orders(self, obj: DiningSession) -> list:
         orders = obj.orders.filter(voided=False).prefetch_related("lines__modifiers")
         return OrderSerializer(orders, many=True).data
+
+    def get_me(self, obj: DiningSession) -> dict | None:
+        device = self.context.get("device")
+        if device is None:
+            return None
+        return {
+            "id": str(device.id),
+            "role": device.role,
+            "is_payer": device.is_payer,
+        }
+
+    def get_can_order(self, obj: DiningSession) -> bool:
+        from .services import device_can_order
+
+        return device_can_order(obj, self.context.get("device"))
 
 
 # ── Write boundaries ──────────────────────────────────────────────────────────

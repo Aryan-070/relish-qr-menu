@@ -76,6 +76,13 @@ def _org_id_for(session: DiningSession) -> Any:
     return restaurant.org_id if restaurant is not None else None
 
 
+def _session_response(session: DiningSession, device: Any = None) -> Response:
+    """Serialize a session with the requesting device's ``me`` / ``can_order``."""
+    return Response(
+        DiningSessionSerializer(session, context={"device": device}).data
+    )
+
+
 class JoinView(APIView):
     """POST a (restaurant_id, table_id) to join/open a table session."""
 
@@ -132,7 +139,7 @@ class SessionDetailView(APIView):
             .prefetch_related("devices", "orders__lines__modifiers")
             .first()
         )
-        return Response(DiningSessionSerializer(session).data)
+        return _session_response(session, device)
 
 
 class SessionOrderView(APIView):
@@ -199,7 +206,7 @@ class SessionContactView(APIView):
             phone=s.validated_data["phone"],
             name=s.validated_data.get("name", ""),
         )
-        return Response(DiningSessionSerializer(session).data)
+        return _session_response(session, device)
 
 
 class SessionPromoteView(APIView):
@@ -225,7 +232,7 @@ class SessionPromoteView(APIView):
             if str(exc) == "stale_version":
                 raise SessionStaleVersionError() from exc
             raise ValidationError(str(exc)) from exc
-        return Response(DiningSessionSerializer(session).data)
+        return _session_response(session)
 
 
 class SessionConfirmView(APIView):
@@ -241,7 +248,7 @@ class SessionConfirmView(APIView):
         fired = confirm_orders(session=session, order_ids=s.validated_data["order_ids"])
         for order in fired:
             broadcast_order_event(session.restaurant_id, _order_event_payload(order))
-        return Response(DiningSessionSerializer(session).data)
+        return _session_response(session)
 
 
 class SessionRequestBillView(APIView):
@@ -252,11 +259,12 @@ class SessionRequestBillView(APIView):
     @extend_schema(tags=["dining"])
     def post(self, request: Request, pk: Any) -> Response:
         session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
+        device = getattr(request, "dining_device", None)
         try:
             request_bill(session=session)
         except SessionError as exc:
             raise ValidationError(str(exc)) from exc
-        return Response(DiningSessionSerializer(session).data)
+        return _session_response(session, device)
 
 
 class SessionCloseView(APIView):
@@ -268,4 +276,4 @@ class SessionCloseView(APIView):
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         close_session(session=session)
-        return Response(DiningSessionSerializer(session).data)
+        return _session_response(session)
