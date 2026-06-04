@@ -1,12 +1,13 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronLeft, Users, LogOut, Check, BellRing, CreditCard, AlertTriangle, Crown } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
-import { panelStyle, sectionTitleStyle, bodyStyle, headingStyle, isHard } from '../../console/lib/skin'
+import { panelStyle, sectionTitleStyle, bodyStyle, isHard } from '../../console/lib/skin'
 import { Button } from '../../console/components/Button'
 import { fadeUp, stagger } from '../../animations/variants'
 import { formatMoney } from '../../lib/money'
-import { isStaffAuthed, staffLogin, staffLogout } from '../../lib/api/auth'
+import { isStaffAuthed, staffLogout } from '../../lib/api/auth'
+import { StaffLogin } from '../../components/StaffLogin'
 import { useStaffSessions, type UseStaffSessionsResult } from '../../hooks/useStaffSessions'
 import type { DiningSessionView } from '../../lib/api/dining'
 
@@ -21,7 +22,15 @@ export function StaffCockpit() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const staff = useStaffSessions(authed)
 
-  if (!authed) return <StaffLogin onSuccess={() => setAuthed(true)} />
+  if (!authed) {
+    return (
+      <StaffLogin
+        onSuccess={() => setAuthed(true)}
+        title="Floor sign-in"
+        subtitle="Sign in to manage live tables."
+      />
+    )
+  }
 
   const selected = staff.sessions.find(s => s.id === selectedId) ?? null
   if (selected) {
@@ -229,57 +238,3 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function StaffLogin({ onSuccess }: { onSuccess: () => void }) {
-  const { tokens: t } = useTheme()
-  const [email, setEmail] = useState('staff@tabletheory.test')
-  const [password, setPassword] = useState('TableTheory#2026')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      await staffLogin(email, password)
-      onSuccess()
-    } catch {
-      setError('Sign-in failed — check the email and password.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const inputStyle = {
-    ...bodyStyle(t),
-    background: '#fff',
-    border: `1px solid ${t.ruleColor}`,
-    borderRadius: isHard(t) ? 0 : 12,
-    color: t.ink,
-  }
-
-  return (
-    <div className="flex flex-col h-full items-center justify-center px-6" style={{ background: t.bg }}>
-      <form onSubmit={submit} className="w-full max-w-sm p-6" style={panelStyle(t)}>
-        <h2 className="text-[22px] mb-1" style={headingStyle(t)}>Floor sign-in</h2>
-        <p className="text-[12px] mb-4" style={{ ...bodyStyle(t), color: t.descColor }}>
-          Sign in to manage live tables.
-        </p>
-        <label className="block text-[11px] mb-1" style={bodyStyle(t)}>Email</label>
-        <input
-          type="email" value={email} onChange={e => setEmail(e.target.value)}
-          className="w-full px-3 py-2.5 mb-3 text-[14px]" style={inputStyle} autoComplete="username"
-        />
-        <label className="block text-[11px] mb-1" style={bodyStyle(t)}>Password</label>
-        <input
-          type="password" value={password} onChange={e => setPassword(e.target.value)}
-          className="w-full px-3 py-2.5 mb-4 text-[14px]" style={inputStyle} autoComplete="current-password"
-        />
-        {error && <p className="text-[12px] mb-3" style={{ color: '#c0392b' }}>{error}</p>}
-        <Button variant="primary" size="md" type="submit" disabled={busy} aria-label="Sign in">
-          {busy ? 'Signing in…' : 'Sign in'}
-        </Button>
-      </form>
-    </div>
-  )
-}

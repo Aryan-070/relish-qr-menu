@@ -10,7 +10,9 @@ import { fadeIn } from '../animations/variants'
 import { AdminDashboard } from './views/AdminDashboard'
 import { ReportsCenter } from './views/ReportsCenter'
 import { FloorView } from './views/FloorView'
-import { MenuManager } from './views/MenuManager'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '../lib/queryClient'
+import { MenuManagerLive } from './views/MenuManagerLive'
 import { StaffPerformance } from './views/StaffPerformance'
 import { BillingView } from './views/BillingView'
 import { WaiterTables } from './views/WaiterTables'
@@ -44,7 +46,7 @@ function renderView(view: ConsoleView) {
     case 'manager-floor':
       return <FloorView />
     case 'manager-menu':
-      return <MenuManager />
+      return <MenuManagerLive />
     case 'manager-staff':
       return <StaffPerformance />
     case 'admin-billing':
@@ -92,8 +94,14 @@ interface ConsoleAppProps {
 
 export function ConsoleApp({ onExit }: ConsoleAppProps) {
   // AuthProvider is hoisted to App.tsx (above OpsProvider) so the ops store can
-  // read the signed-in user's restaurantId for Supabase sync; here we just render.
-  return <ConsoleBody onExit={onExit} />
+  // read the signed-in user's restaurantId for Supabase sync; here we just
+  // render. The QueryClientProvider powers the Django-backed views (e.g. the
+  // live Menu editor) that are migrating off the localStorage ops store.
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ConsoleBody onExit={onExit} />
+    </QueryClientProvider>
+  )
 }
 
 function ConsoleBody({ onExit }: ConsoleAppProps) {
