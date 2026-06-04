@@ -6,6 +6,7 @@ import { formatMoney } from '../../lib/money'
 import { combosForContext, useQsrWhisper, menuScore, envelopeForContext, type QsrContext } from './useQsrWhisper'
 import { TastePass } from './TastePass'
 import { QsrOrderSheet } from './QsrOrderSheet'
+import { BillSheet } from './BillSheet'
 import { cartToOrderLines } from './orderMapping'
 import type { OrderApi } from './types'
 import type { UseSessionResult } from '../../hooks/useSession'
@@ -51,6 +52,7 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
   const sessionActive = Boolean(session?.enabled && session.session)
   const canOrder = session?.canOrder ?? true
   const mode = session?.session?.order_confirmation_mode
+  const billTotal = session?.session?.check?.total_minor ?? 0
   const ctaLabel = !sessionActive
     ? 'Place order'
     : !canOrder
@@ -82,7 +84,7 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
     if (lines.length === 0) {
       flash(
         routedToServer > 0
-          ? 'Combos & customised items — please ask your server to add them.'
+          ? 'Customised items — please ask your server to add them.'
           : 'These items aren’t available right now.',
       )
       return
@@ -97,7 +99,7 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
       setReviewOpen(false)
       const base =
         mode === 'waiter_confirm' ? 'Sent to your server to confirm.' : 'Order placed!'
-      const extra = routedToServer > 0 ? ' Ask your server about combos/customised items.' : ''
+      const extra = routedToServer > 0 ? ' Ask your server about customised items.' : ''
       flash(base + extra)
     } catch {
       flash('Could not place the order — please try again.')
@@ -113,6 +115,7 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string>(categories[0]?.id ?? '')
   const [suppressed, setSuppressed] = useState<ReadonlySet<string>>(new Set())
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [billOpen, setBillOpen] = useState(false)
 
   const toggleCraving = useCallback((c: Craving) => {
     setCravings(prev => { const next = new Set(prev); next.has(c) ? next.delete(c) : next.add(c); return next })
@@ -329,6 +332,19 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
               <AnimatedNumber value={total} format={(v) => formatMoney(Math.round(v))} stiffness={200} damping={26} mass={0.6} />
             </span>
           </div>
+          {sessionActive && billTotal > 0 && (
+            <button
+              aria-label="View bill"
+              onClick={() => setBillOpen(true)}
+              className="font-semibold text-[13px] px-4 py-2.5 flex-shrink-0 transition-transform active:scale-[0.97]"
+              style={{
+                background: 'rgba(255,255,255,0.16)', color: '#fff', fontFamily: t.descFont,
+                borderRadius: isHard(t) ? 0 : 999,
+              }}
+            >
+              Bill
+            </button>
+          )}
           <div className="relative flex-shrink-0">
             <button
               aria-label="Review order"
@@ -370,6 +386,10 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
         ctaNote={ctaNote}
         onCta={canPlaceToBackend ? handlePlace : undefined}
       />
+
+      {session && (
+        <BillSheet open={billOpen} session={session} onClose={() => setBillOpen(false)} />
+      )}
     </div>
   )
 }

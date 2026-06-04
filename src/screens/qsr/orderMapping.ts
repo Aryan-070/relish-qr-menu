@@ -1,30 +1,22 @@
 /**
  * Maps the local QSR cart to backend order lines for real submission.
  *
- * v1 only submits **plain, unmodified** items, each resolved to a real backend
- * ``MenuItem`` by ``code`` (== the static qsrMenu item id). Two cases are
- * deliberately NOT auto-submitted because the backend can't yet price them
- * correctly, and silently charging a different amount than the guest saw would
- * be wrong:
- *   - **combos** — the backend has no bundle-discount concept, so expanding to
- *     components would bill the à-la-carte sum (an overcharge vs the shown
- *     combo price);
- *   - **modified / build-your-own lines** — modifier price deltas aren't yet
- *     resolved to backend modifier ids, so they'd bill at the base price.
- * Both are returned as ``routedToServer`` so the UI can tell the guest to have
- * their server add them. (Tracked for the backend combo/modifier increment.)
+ * Plain items and combos both resolve to a real backend ``MenuItem`` by
+ * ``code``: plain items use the qsrMenu id, combos use ``combo:<id>`` (the cart
+ * line id), seeded as a bundle item at the discounted price so the charged
+ * price matches the shown one. Only **modified / build-your-own** lines are NOT
+ * auto-submitted — their modifier deltas aren't resolved to backend modifier
+ * ids yet, so they'd bill at the base price; those route to the server.
  */
 import type { OrderItem } from '../../hooks/useOrder'
 import type { OrderLineInput } from '../../lib/api/dining'
 import type { PublicMenuItem } from '../../lib/api/publicMenu'
 
-const COMBO_PREFIX = 'combo:'
-
 export interface MappedOrder {
   lines: OrderLineInput[]
-  /** Lines that need the server (combos / modified items) — not auto-submitted. */
+  /** Modified/BYO lines that need the server (not auto-submitted). */
   routedToServer: number
-  /** Plain lines whose item is unavailable / sold out / not on the backend. */
+  /** Lines whose item is unavailable / sold out / not on the backend. */
   unavailable: number
 }
 
@@ -41,11 +33,12 @@ export function cartToOrderLines(
   let unavailable = 0
 
   for (const line of orderItems) {
-    // Combos and modifier-bearing lines can't be priced correctly yet.
-    if (line.item.id.startsWith(COMBO_PREFIX) || line.modifiers.length > 0) {
+    // Modifier-bearing lines can't be priced correctly server-side yet.
+    if (line.modifiers.length > 0) {
       routedToServer += 1
       continue
     }
+    // Plain item (id == code) or combo (id == "combo:<id>" == code) resolve alike.
     const backend = byCode.get(line.item.id)
     if (isOrderable(backend)) {
       lines.push({ menu_item_id: backend.id, qty: line.quantity })

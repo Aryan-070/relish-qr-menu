@@ -11,6 +11,7 @@ paste into ``/qsr?r=<rid>&t=<tid>``.
 """
 from __future__ import annotations
 
+import math
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
@@ -94,6 +95,24 @@ MENU: dict[str, tuple[str, int, list[tuple[str, str, int]]]] = {
 
 TABLES = [("T1", 4), ("T2", 2), ("T3", 6), ("T4", 4), ("T5", 2), ("T6", 8)]
 
+# Orderable bundles. Code is ``combo:<id>`` to match the cart line id the
+# frontend produces (comboLineId). Priced off the live item prices with the same
+# formula the frontend's buildCombo uses, so the charged price == the shown one.
+COMBOS = [
+    ("solo-quick", "The Quick One", ["ttb-vegpower", "ttsd-fries", "ttbev-coldcoffee"]),
+    ("date-share", "The Shareable", ["ttb-butterchicken", "ttb-schezwanpaneer", "ttsd-koreanfries", "ttdes-browniecream"]),
+    ("friends-feast", "The Group Table", ["ttw-koreanchicken", "ttw-periveggie", "ttsd-cheesefries", "ttbev-brownieshake"]),
+    ("work-lunch", "The Office Lunch", ["ttb-grilledprotein", "ttbev-peachtea"]),
+]
+BUNDLE_DISCOUNT = 0.1
+
+
+def _combo_rupees(component_rupees: list[int]) -> int:
+    """Mirror the frontend buildCombo: 10% off, rounded to nearest ₹10 (half-up)."""
+    total = sum(component_rupees)
+    discounted = math.floor(total * (1 - BUNDLE_DISCOUNT) / 10 + 0.5) * 10
+    return min(total, discounted)
+
 
 class Command(BaseCommand):
     help = "Seed The Table Theory demo tenant (restaurant + menu + tables)."
@@ -153,6 +172,32 @@ class Command(BaseCommand):
                     },
                 )
                 item_count += created
+
+        # Combos as orderable bundle items (own category, code == cart combo id).
+        rupees_by_code = {
+            code: rupees
+            for _cc, (_n, _s, items) in MENU.items()
+            for code, _name, rupees in items
+        }
+        combo_category, _ = MenuCategory.all_objects.get_or_create(
+            restaurant_id=restaurant.id,
+            code="combos",
+            defaults={"name": "Combos", "sort_order": 8},
+        )
+        for combo_id, combo_name, component_codes in COMBOS:
+            price = _combo_rupees([rupees_by_code[c] for c in component_codes])
+            _, created = MenuItem.all_objects.get_or_create(
+                restaurant_id=restaurant.id,
+                code=f"combo:{combo_id}",
+                defaults={
+                    "category": combo_category,
+                    "name": combo_name,
+                    "price_minor": price * 100,
+                    "description": "Bundle: " + ", ".join(component_codes),
+                    "available": True,
+                },
+            )
+            item_count += created
 
         self.stdout.write(self.style.SUCCESS("Seeded The Table Theory."))
         self.stdout.write(f"  restaurant_id = {restaurant.id}")
