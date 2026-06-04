@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, Smartphone } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
 import { headingStyle } from '../lib/skin'
 import { SegmentedControl } from './SegmentedControl'
@@ -60,6 +60,16 @@ export function TopBar({ role, onRole, showRoleSwitcher = true, dateRange, onDat
             />
           </div>
         )}
+
+        <a
+          href="/qsr"
+          title="QSR Copilot prototype"
+          aria-label="Open QSR Copilot prototype"
+          className="w-9 h-9 inline-flex items-center justify-center rounded-full cursor-pointer hover:bg-black/5 shrink-0"
+          style={{ color: t.inkSoft }}
+        >
+          <Smartphone size={17} />
+        </a>
 
         <button
           onClick={() => setConfirmReset(true)}

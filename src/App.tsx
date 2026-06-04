@@ -1,6 +1,6 @@
 import { useState, lazy, Suspense } from 'react'
 import { motion } from 'framer-motion'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutGrid, Smartphone } from 'lucide-react'
 import { LandingSignatureDish } from './screens/LandingSignatureDish'
 import { ItemDetail } from './screens/ItemDetail'
 import { AddToOrder } from './screens/AddToOrder'
@@ -41,11 +41,17 @@ const MenuBooklet = lazy(() => import('./screens/MenuBooklet').then(m => ({ defa
 const RecommendationFlow = lazy(() => import('./screens/RecommendationFlow').then(m => ({ default: m.RecommendationFlow })))
 const ConsoleApp = lazy(() => import('./console/ConsoleApp').then(m => ({ default: m.ConsoleApp })))
 const Kiosk = lazy(() => import('./screens/Kiosk').then(m => ({ default: m.Kiosk })))
+const QsrApp = lazy(() => import('./screens/qsr/QsrApp').then(m => ({ default: m.QsrApp })))
 
 // Kiosk mode: a full-screen self-order station, activated by `?kiosk=1` in the
 // URL (read once at load — a kiosk is provisioned via its own URL).
 const KIOSK_MODE =
   typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('kiosk') === '1'
+
+// QSR prototype: the Waiter Copilot + Customer Quick Menu pitch, served at the
+// dedicated `/qsr` path (read once at load). See src/screens/qsr/.
+const QSR_MODE =
+  typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/qsr'
 
 type Screen = 'cover' | 'menu' | 'recommend'
 type LandingVariant = 'classic' | 'gastronomique' | 'editorial' | 'botanica' | 'signature' | 'cinematic' | 'reel'
@@ -101,6 +107,20 @@ function AppInner() {
 
   // All hooks are declared above this point — keep the early returns below them
   // so hook order stays stable across guest/staff/kiosk toggles (Rules of Hooks).
+  if (QSR_MODE) {
+    // The /qsr pitch surface always renders in The Table Theory brand skin —
+    // a nested forced provider pins it without touching the consumer app's theme.
+    return (
+      <ThemeProvider forced="table-theory">
+        <div className="app-shell" data-ui-theme="table-theory">
+          <Suspense fallback={null}>
+            <QsrApp />
+          </Suspense>
+        </div>
+      </ThemeProvider>
+    )
+  }
+
   if (KIOSK_MODE) {
     return (
       <div className="app-shell" data-ui-theme={theme}>
@@ -408,6 +428,24 @@ function AppInner() {
       >
         <LayoutGrid size={16} />
       </motion.button>
+
+      {/* Discreet QSR-prototype entry — bottom-left, beside the staff console */}
+      <motion.a
+        whileTap={{ scale: 0.9 }}
+        href="/qsr"
+        aria-label="Open QSR Copilot prototype"
+        title="QSR Copilot"
+        className="fixed bottom-3 left-14 z-50 w-9 h-9 inline-flex items-center justify-center rounded-full"
+        style={{
+          background: 'rgba(42,30,30,0.42)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: 'rgba(255,248,234,0.78)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+        }}
+      >
+        <Smartphone size={16} />
+      </motion.a>
     </div>
   )
 }
