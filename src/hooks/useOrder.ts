@@ -25,10 +25,10 @@ export interface OrderItem {
 const CART_STORAGE_KEY = 'relish.cart.v1'
 
 /** SSR-safe, parse-guarded read of the persisted cart. Returns [] on any failure. */
-function loadStoredCart(): OrderItem[] {
+function loadStoredCart(key: string): OrderItem[] {
   if (typeof window === 'undefined') return []
   try {
-    const raw = window.localStorage.getItem(CART_STORAGE_KEY)
+    const raw = window.localStorage.getItem(key)
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -38,17 +38,22 @@ function loadStoredCart(): OrderItem[] {
   }
 }
 
-export function useOrder() {
-  const [orderItems, setOrderItems] = useState<OrderItem[]>(loadStoredCart)
+/**
+ * Cart state, persisted to localStorage. Pass a distinct `storageKey` to run an
+ * independent cart (e.g. the `/qsr` surface uses its own so it never mixes with
+ * the consumer app's cart). Defaults to the shared consumer key.
+ */
+export function useOrder(storageKey: string = CART_STORAGE_KEY) {
+  const [orderItems, setOrderItems] = useState<OrderItem[]>(() => loadStoredCart(storageKey))
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
-      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(orderItems))
+      window.localStorage.setItem(storageKey, JSON.stringify(orderItems))
     } catch {
       // Storage unavailable (private mode / quota) — degrade silently.
     }
-  }, [orderItems])
+  }, [orderItems, storageKey])
 
   const addItem = useCallback((item: MenuItem, modifiers: SelectedModifier[] = []) => {
     const lineId = selectionKey(item.id, modifiers)
@@ -123,12 +128,12 @@ export function useOrder() {
     setOrderItems([])
     if (typeof window !== 'undefined') {
       try {
-        window.localStorage.removeItem(CART_STORAGE_KEY)
+        window.localStorage.removeItem(storageKey)
       } catch {
         // Storage unavailable — nothing to clear.
       }
     }
-  }, [])
+  }, [storageKey])
 
   const total = useMemo(
     () => orderItems.reduce((sum, o) => sum + o.unitPrice * o.quantity, 0),

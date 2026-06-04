@@ -1,12 +1,18 @@
 // Small formatting + class-name helpers shared across the console.
 
+import { formatMoney } from '../../lib/money'
+
 export function cn(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ')
 }
 
-/** ₹ with thousands separators, no decimals. */
+/** ₹ with thousands separators, no decimals.
+ *
+ * Delegates to the app-wide {@link formatMoney} so the console and the guest
+ * surface share one money formatter (en-IN grouping, whole rupees) instead of
+ * two implementations that could drift on rounding or separators. */
 export function inr(amount: number): string {
-  return `₹${Math.round(amount).toLocaleString('en-IN')}`
+  return formatMoney(amount, 'INR')
 }
 
 /** Compact ₹ for axes / KPI deltas (₹12.4k). */

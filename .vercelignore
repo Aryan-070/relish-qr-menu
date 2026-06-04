@@ -1,0 +1,11 @@
+# This repo is a monorepo: a Vite frontend at the root + a Django backend under
+# backend/. Vercel deploys ONLY the frontend (vercel.json pins framework=vite,
+# buildCommand=npm run build, outputDirectory=dist).
+#
+# Exclude the Python backend and the root requirements.txt so Vercel does not
+# mis-detect a Python project (which fails the deploy), and to slim the upload.
+# None of these are inputs to `vite build`.
+backend/
+requirements.txt
+scripts/db-setup.sh
+supabase/

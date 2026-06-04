@@ -141,6 +141,32 @@ html, body {
   height: 1.5px;
 }
 
+/* The Table Theory — Forest Green leads, Cream rests the eye (60/30/10).
+   Sage/Teal punctuate, Ink anchors text. Cream surface, forest accents. */
+[data-ui-theme="table-theory"] {
+  --paper: #F5EFE2;
+  --paper-2: #FBF7EC;
+  --ink: #1A1A1A;
+  --ink-soft: #4A4742;
+  --maroon: #0B4A2F; /* Forest Green becomes the "primary accent" within this skin */
+  --gold: #8FB39A;   /* Sage */
+  --olive: #1E6E63;  /* Teal */
+}
+[data-ui-theme="table-theory"].app-shell {
+  background: #F5EFE2;
+}
+[data-ui-theme="table-theory"] .paper-bg {
+  background-color: #F5EFE2;
+  background-image:
+    radial-gradient(circle at 22px 22px, rgba(11,74,47,0.05) 2px, transparent 0),
+    radial-gradient(circle at 11px 11px, rgba(143,179,154,0.06) 1px, transparent 0);
+  background-size: 44px 44px, 22px 22px;
+}
+[data-ui-theme="table-theory"] .gold-divider {
+  background: linear-gradient(to right, transparent, #8FB39A, transparent);
+  height: 1.5px;
+}
+
 /* Re-skin the serif display/accent utilities per theme so all panel titles
    (Order / Service / Recommendation / ItemDetail) follow the theme's type.
    Higher specificity than the base .font-* class, so it wins. */
@@ -149,11 +175,13 @@ html, body {
 [data-ui-theme="brutalist"] .font-playfair { font-family: 'Syne', 'Arial Black', sans-serif; letter-spacing: -0.01em; }
 
 [data-ui-theme="editorial"] .font-playfair  { font-family: 'Fraunces', Georgia, serif; }
+[data-ui-theme="table-theory"] .font-playfair { font-family: 'Lora', Georgia, serif; }
 
 [data-ui-theme="warm"]      .font-cormorant { font-family: 'Instrument Serif', Georgia, serif; }
 [data-ui-theme="hybrid"]    .font-cormorant { font-family: 'Martian Mono', monospace; font-style: normal; }
 [data-ui-theme="brutalist"] .font-cormorant { font-family: 'JetBrains Mono', monospace; font-style: normal; }
 [data-ui-theme="editorial"] .font-cormorant { font-family: 'Instrument Serif', Georgia, serif; }
+[data-ui-theme="table-theory"] .font-cormorant { font-family: 'Lora', Georgia, serif; font-style: normal; }
 
 /* Staff console data-density type scope — sans + mono, no serif (dashboard rule).
    Numerals/IDs/timestamps inside .console-mono render in Geist Mono. */

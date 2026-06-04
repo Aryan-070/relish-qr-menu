@@ -66,24 +66,32 @@ export function Checkout({
   const handlePay = async () => {
     if (payState === 'processing' || payState === 'paid') return
     setPayState('processing')
-    const gateway = getPaymentGateway()
-    const result = await gateway.pay({
-      amount: grandTotal,
-      currency: 'INR',
-      reference,
-      description: `Relish — table bill (${tr('checkout.title')})`,
-      customerEmail,
-    })
-    if (result.status === 'paid') {
-      setPayState('paid')
-      window.setTimeout(() => {
-        onPaid()
-        setPayState('idle')
-        setTipPct(0)
-        setWays(1)
-      }, 1100)
-    } else {
-      setPayState(result.status === 'dismissed' ? 'dismissed' : 'failed')
+    try {
+      const gateway = getPaymentGateway()
+      const result = await gateway.pay({
+        amount: grandTotal,
+        currency: 'INR',
+        reference,
+        description: `Relish — table bill (${tr('checkout.title')})`,
+        customerEmail,
+      })
+      if (result.status === 'paid') {
+        setPayState('paid')
+        window.setTimeout(() => {
+          onPaid()
+          setPayState('idle')
+          setTipPct(0)
+          setWays(1)
+        }, 1100)
+      } else {
+        setPayState(result.status === 'dismissed' ? 'dismissed' : 'failed')
+      }
+    } catch {
+      // A conforming gateway resolves rather than rejects, but resolving the
+      // gateway or an unexpected provider error could still throw. Route that
+      // to the (already-rendered) retryable "failed" state instead of leaving
+      // the button stuck on "processing" forever.
+      setPayState('failed')
     }
   }
 

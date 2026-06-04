@@ -14,21 +14,30 @@ const STORAGE_KEY = 'relish-ui-theme'
 function readStored(): UiTheme {
   try {
     const s = localStorage.getItem(STORAGE_KEY)
-    if (s === 'warm' || s === 'hybrid' || s === 'brutalist' || s === 'editorial') return s
+    if (s === 'warm' || s === 'hybrid' || s === 'brutalist' || s === 'editorial' || s === 'table-theory') return s
   } catch {
     /* ignore */
   }
   return 'warm'
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<UiTheme>(readStored)
+/**
+ * `forced` pins the theme for a subtree (e.g. the `/qsr` brand surface always
+ * renders in 'table-theory'), bypassing the stored/user-selectable theme and
+ * never writing to localStorage. Without it, the theme is user-selectable and
+ * persisted. Nesting a forced provider overrides the outer one for its children.
+ */
+export function ThemeProvider({ children, forced }: { children: ReactNode; forced?: UiTheme }) {
+  const [stored, setStored] = useState<UiTheme>(readStored)
+  const theme = forced ?? stored
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, theme)
-    } catch {
-      /* ignore */
+    if (!forced) {
+      try {
+        localStorage.setItem(STORAGE_KEY, theme)
+      } catch {
+        /* ignore */
+      }
     }
     // Mirror the active theme's shadcn token set onto :root so shadcn / Cult UI /
     // Watermelon components — including Radix overlays that portal to document.body
@@ -36,15 +45,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement
     const vars = shadcnVars(THEMES[theme])
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
-  }, [theme])
+  }, [theme, forced])
 
+  // `setTheme` is built inside the memo so the value identity only changes with
+  // `theme`/`forced` (a forced subtree gets a no-op setter; otherwise the stable
+  // `setStored`). Consumers therefore don't re-render on unrelated parent renders.
   const value = useMemo(
-    () => ({ theme, tokens: THEMES[theme], setTheme }),
-    [theme],
+    () => ({
+      theme,
+      tokens: THEMES[theme],
+      setTheme: forced ? () => {} : setStored,
+    }),
+    [theme, forced],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
-
 }
 
 export function useTheme(): ThemeCtx {

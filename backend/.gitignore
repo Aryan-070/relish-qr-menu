@@ -1,0 +1,20 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Local secrets & DB
+.env
+db.sqlite3
+staticfiles/
+media/
+
+# Virtualenv
+.venv/
+venv/

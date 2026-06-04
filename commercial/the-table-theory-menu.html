@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Table Theory — Menu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* The Table Theory — Forest Green leads, Cream rests the eye (60/30/10) */
+    --bg:        #f5efe2;  /* Cream — surface */
+    --surface:   #fbf7ec;  /* Raised cream card */
+    --surface2:  #f1e9d8;  /* Hover / nested */
+    --surface3:  #eae0cc;  /* Deepest cream */
+    --amber:     #0b4a2f;  /* Forest Green — primary accent (kept var name for cascade) */
+    --amber-dim: #1e6e63;  /* Teal — secondary accent */
+    --cream:     #1a1a1a;  /* Ink — primary text (kept var name for cascade) */
+    --cream-dim: #4a4742;  /* Soft ink — secondary text */
+    --red:       #c0392b;  /* Non-veg dietary dot (functional, unchanged) */
+    --green:     #2e7d4f;  /* Veg dietary dot (functional, unchanged) */
+    --sage:      #8fb39a;  /* Sage — soft accent / dividers */
+    --teal:      #1e6e63;  /* Teal — accent */
+    --muted:     #8a8276;  /* Muted captions */
+    --border:    rgba(11,74,47,0.16);    /* Forest hairline */
+    --border2:   rgba(143,179,154,0.40); /* Sage hairline */
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { font-size: 16px; }
+
+  body {
+    background: var(--bg);
+    color: var(--cream);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── GRAIN OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 999; opacity: 0.35; mix-blend-mode: multiply;
+  }
+
+  /* ── HEADER ── */
+  .site-header {
+    position: relative;
+    text-align: center;
+    padding: 3.5rem 2rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #fbf7ec 0%, var(--bg) 100%);
+    overflow: hidden;
+  }
+  .site-header::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: 50%;
+    transform: translateX(-50%);
+    width: 500px; height: 200px;
+    background: radial-gradient(ellipse, rgba(143,179,154,0.30) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .brand-eyebrow {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.28em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 0.9rem;
+    opacity: 0.9;
+  }
+  .brand-name {
+    font-family: 'Lora', Georgia, serif;
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    font-weight: 900;
+    line-height: 1.05;
+    color: var(--cream);
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  .brand-name em {
+    color: var(--amber);
+    font-style: italic;
+  }
+  .brand-tagline {
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+  }
+  .brand-pills {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .pill {
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.85rem;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    color: var(--cream-dim);
+    background: rgba(11,74,47,0.04);
+  }
+
+  /* ── NAV TABS ── */
+  .nav-wrap {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(245,239,226,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border2);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-wrap::-webkit-scrollbar { display: none; }
+  .nav-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 1.5rem;
+    min-width: max-content;
+  }
+  .nav-tab {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 1rem 1.2rem;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .nav-tab:hover { color: var(--cream-dim); }
+  .nav-tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 3rem 2rem 5rem;
+  }
+
+  /* ── SECTION ── */
+  .menu-section {
+    display: none;
+    animation: fadeUp 0.4s ease both;
+  }
+  .menu-section.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border2);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .section-label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.5rem;
+  }
+  .section-title {
+    font-family: 'Lora', Georgia, serif;
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--cream);
+  }
+  .section-title em { color: var(--amber); font-style: italic; }
+  .section-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+    max-width: 340px;
+    line-height: 1.6;
+    text-align: right;
+  }
+
+  /* ── SUB-SECTION ── */
+  .sub-section {
+    margin-bottom: 3rem;
+  }
+  .sub-title {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.62rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amber-dim);
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border2);
+  }
+
+  /* ── BUILD STEPS ── */
+  .build-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--border2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 3rem;
+  }
+  .build-step {
+    background: var(--surface);
+    padding: 1.5rem;
+  }
+  .step-num {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: var(--amber);
+    opacity: 0.25;
+    line-height: 1;
+    margin-bottom: 0.4rem;
+  }
+  .step-label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.8rem;
+  }
+  .step-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--cream);
+    margin-bottom: 0.8rem;
+  }
+  .step-items { list-style: none; display: flex; flex-direction: column; gap: 0.45rem; }
+  .step-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--cream-dim);
+  }
+  .step-item-price {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.72rem;
+    color: var(--amber);
+    white-space: nowrap;
+    margin-left: 0.5rem;
+  }
+  .step-item-price.incl {
+    color: var(--green);
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── ITEM CARDS GRID ── */
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1px;
+    background: var(--border2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .item-card {
+    background: var(--surface);
+    padding: 1.2rem 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    transition: background 0.18s;
+    position: relative;
+  }
+  .item-card:hover { background: var(--surface2); }
+  .item-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 20%; bottom: 20%;
+    width: 2px;
+    background: var(--amber);
+    opacity: 0;
+    transition: opacity 0.18s;
+    border-radius: 0 2px 2px 0;
+  }
+  .item-card:hover::before { opacity: 1; }
+
+  .item-info { flex: 1; min-width: 0; }
+  .item-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--cream);
+    line-height: 1.3;
+    margin-bottom: 0.2rem;
+  }
+  .item-badge {
+    display: inline-block;
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.5rem;
+    border-radius: 100px;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+  .badge-veg   { background: rgba(46,125,79,0.12);  color: #2e7d4f; border: 1px solid rgba(46,125,79,0.35); }
+  .badge-nonveg{ background: rgba(192,57,43,0.12);  color: #c0392b; border: 1px solid rgba(192,57,43,0.35); }
+  .badge-new   { background: rgba(11,74,47,0.08);   color: var(--amber);     border: 1px solid rgba(11,74,47,0.25); }
+  .badge-best  { background: rgba(143,179,154,0.18); color: var(--amber-dim); border: 1px solid rgba(143,179,154,0.5); }
+
+  .item-sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+  .item-price {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--amber);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── WIDE ITEM ROW (for sandwiches, sides etc) ── */
+  .items-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1px;
+    background: var(--border2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* ── COMBO CARDS ── */
+  .combo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .combo-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.6rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .combo-card:hover { transform: translateY(-2px); border-color: var(--amber); }
+  .combo-card::after {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 100px; height: 100px;
+    background: radial-gradient(circle, rgba(143,179,154,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .combo-name {
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--cream);
+    margin-bottom: 0.4rem;
+  }
+  .combo-items {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+  .combo-price {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--amber);
+  }
+  .combo-savings {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #2e7d4f;
+    background: rgba(46,125,79,0.12);
+    border: 1px solid rgba(46,125,79,0.3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 100px;
+    margin-left: 0.6rem;
+    vertical-align: middle;
+  }
+
+  /* ── THE ENVELOPE ── */
+  .envelope-intro {
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: var(--cream-dim);
+    max-width: 640px;
+    margin: 0 0 2rem;
+  }
+  .envelope-foot {
+    text-align: center;
+    font-family: 'Lora', Georgia, serif;
+    font-size: 1.05rem;
+    color: var(--amber);
+    letter-spacing: 0.01em;
+  }
+  .envelope-foot em { font-style: italic; color: var(--teal); }
+  #envelope .combo-price {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--teal);
+  }
+
+  /* ── BEVERAGE SPECIAL ── */
+  .bev-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--border2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* ── DIVIDER ── */
+  .ornament {
+    text-align: center;
+    margin: 2.5rem 0;
+    color: var(--border);
+    font-size: 1.2rem;
+    letter-spacing: 0.6em;
+    user-select: none;
+  }
+
+  /* ── VEG / NON-VEG DOT ── */
+  .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    flex-shrink: 0;
+    position: relative;
+    top: -1px;
+  }
+  .dot.veg { background: #2e7d4f; box-shadow: 0 0 4px rgba(46,125,79,0.4); }
+  .dot.nonveg { background: #c0392b; box-shadow: 0 0 4px rgba(192,57,43,0.4); }
+
+  /* ── FOOTER ── */
+  .site-footer {
+    text-align: center;
+    padding: 2rem;
+    border-top: 1px solid var(--border2);
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 640px) {
+    .main { padding: 2rem 1rem 4rem; }
+    .items-grid, .items-list, .bev-grid { grid-template-columns: 1fr; }
+    .build-grid { grid-template-columns: 1fr 1fr; }
+    .section-desc { text-align: left; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header class="site-header">
+  <p class="brand-eyebrow">The Table Theory · Est. 2026</p>
+  <h1 class="brand-name">Every Table Has <em>A Story.</em></h1>
+  <p class="brand-tagline">Food · Coffee · Conversations</p>
+  <div class="brand-pills">
+    <span class="pill">Dine In</span>
+    <span class="pill">Takeaway</span>
+    <span class="pill">Delivery</span>
+    <span class="pill">All Day Café</span>
+  </div>
+</header>
+
+<!-- ══ NAV ══ -->
+<nav class="nav-wrap">
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('bowls', this)">Signature Bowls</button>
+    <button class="nav-tab" onclick="showSection('wraps', this)">Wraps</button>
+    <button class="nav-tab" onclick="showSection('sandwiches', this)">Sandwiches</button>
+    <button class="nav-tab" onclick="showSection('pasta', this)">Pasta</button>
+    <button class="nav-tab" onclick="showSection('sides', this)">Sides & Snacks</button>
+    <button class="nav-tab" onclick="showSection('beverages', this)">Beverages</button>
+    <button class="nav-tab" onclick="showSection('desserts', this)">Desserts</button>
+    <button class="nav-tab" onclick="showSection('combos', this)">Combos</button>
+    <button class="nav-tab" onclick="showSection('envelope', this)">The Envelope</button>
+  </div>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<main class="main">
+
+  <!-- ────── BOWLS ────── -->
+  <section class="menu-section active" id="bowls">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Hero Category 01</p>
+        <h2 class="section-title">Signature <em>Bowls</em></h2>
+      </div>
+      <p class="section-desc">Build your own or pick a curated signature. Every bowl comes with your choice of base, protein, sauce & toppings.</p>
+    </div>
+
+    <!-- Build Your Own -->
+    <div class="sub-section">
+      <p class="sub-title">Build Your Own Bowl — Customise in 4 Steps</p>
+      <div class="build-grid">
+        <div class="build-step">
+          <div class="step-num">01</div>
+          <div class="step-label">Choose Your Base</div>
+          <ul class="step-items">
+            <li class="step-item">Steamed Rice <span class="step-item-price incl">Included</span></li>
+            <li class="step-item">Herbed Rice <span class="step-item-price incl">Included</span></li>
+            <li class="step-item">Noodles <span class="step-item-price">+₹20</span></li>
+            <li class="step-item">Lettuce Mix <span class="step-item-price">+₹20</span></li>
+          </ul>
+        </div>
+        <div class="build-step">
+          <div class="step-num">02</div>
+          <div class="step-label">Choose Your Protein</div>
+          <div class="step-title" style="color:var(--green); font-size:0.7rem; margin-bottom:0.5rem;">● Veg</div>
+          <ul class="step-items">
+            <li class="step-item">Peri Peri Paneer <span class="step-item-price">₹59</span></li>
+            <li class="step-item">Tandoori Paneer <span class="step-item-price">₹69</span></li>
+            <li class="step-item">Crispy Mushroom <span class="step-item-price">₹69</span></li>
+            <li class="step-item">Schezwan Soya <span class="step-item-price">₹49</span></li>
+            <li class="step-item">Corn & Bean Mix <span class="step-item-price">₹49</span></li>
+          </ul>
+          <div class="step-title" style="color:#c0392b; font-size:0.7rem; margin:0.8rem 0 0.5rem;">● Non-Veg</div>
+          <ul class="step-items">
+            <li class="step-item">Smoky Chicken <span class="step-item-price">₹89</span></li>
+            <li class="step-item">Korean Chicken <span class="step-item-price">₹99</span></li>
+            <li class="step-item">Grilled Chicken <span class="step-item-price">₹89</span></li>
+            <li class="step-item">Butter Chicken <span class="step-item-price">₹109</span></li>
+          </ul>
+        </div>
+        <div class="build-step">
+          <div class="step-num">03</div>
+          <div class="step-label">Choose Your Sauce</div>
+          <div style="font-size:0.68rem; color:var(--green); margin-bottom:0.7rem; letter-spacing:0.08em;">All sauces included</div>
+          <ul class="step-items">
+            <li class="step-item" style="color:var(--cream-dim);">Smoky Peri Sauce</li>
+            <li class="step-item" style="color:var(--cream-dim);">Korean Spicy Mayo</li>
+            <li class="step-item" style="color:var(--cream-dim);">Creamy Herb Sauce</li>
+            <li class="step-item" style="color:var(--cream-dim);">Garlic Butter Sauce</li>
+            <li class="step-item" style="color:var(--cream-dim);">Tandoori Chipotle</li>
+          </ul>
+        </div>
+        <div class="build-step">
+          <div class="step-num">04</div>
+          <div class="step-label">Add Toppings</div>
+          <ul class="step-items">
+            <li class="step-item">Crispy Onions <span class="step-item-price">+₹20</span></li>
+            <li class="step-item">Cheese Sauce <span class="step-item-price">+₹25</span></li>
+            <li class="step-item">Jalapeños <span class="step-item-price">+₹20</span></li>
+            <li class="step-item">Fried Garlic <span class="step-item-price">+₹20</span></li>
+            <li class="step-item">Fried Egg <span class="step-item-price">+₹30</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signature Bowls -->
+    <div class="sub-section">
+      <p class="sub-title">Indian Comfort Bowls</p>
+      <div class="items-grid">
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Butter Paneer Bowl</div>
+            <div class="item-sub">Herbed rice · Butter sauce · Paneer</div>
+          </div>
+          <div class="item-price">₹229</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Tandoori Paneer Bowl</div>
+            <div class="item-sub">Steamed rice · Tandoori chipotle</div>
+          </div>
+          <div class="item-price">₹239</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Smoky Chicken Bowl</div>
+            <div class="item-sub">Herbed rice · Smoky peri sauce</div>
+          </div>
+          <div class="item-price">₹269</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Butter Chicken Bowl<span class="item-badge badge-best">Bestseller</span></div>
+            <div class="item-sub">Steamed rice · Rich butter sauce</div>
+          </div>
+          <div class="item-price">₹289</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Asian Fusion Bowls</p>
+      <div class="items-grid">
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Korean Veg Bowl</div>
+            <div class="item-sub">Noodles · Korean spicy mayo</div>
+          </div>
+          <div class="item-price">₹249</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Korean Chicken Bowl<span class="item-badge badge-new">Popular</span></div>
+            <div class="item-sub">Noodles · Korean spicy mayo</div>
+          </div>
+          <div class="item-price">₹299</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Teriyaki Chicken Bowl</div>
+            <div class="item-sub">Herbed rice · Garlic butter sauce</div>
+          </div>
+          <div class="item-price">₹309</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Schezwan Paneer Bowl</div>
+            <div class="item-sub">Noodles · Schezwan toss</div>
+          </div>
+          <div class="item-price">₹249</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Healthy Power Bowls</p>
+      <div class="items-grid">
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Grilled Chicken Protein Bowl<span class="item-badge badge-new">High Protein</span></div>
+            <div class="item-sub">Lettuce mix · Creamy herb sauce</div>
+          </div>
+          <div class="item-price">₹319</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Veg Power Bowl</div>
+            <div class="item-sub">Lettuce mix · Corn & bean · Herb sauce</div>
+          </div>
+          <div class="item-price">₹249</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Paneer & Corn Fresh Bowl</div>
+            <div class="item-sub">Lettuce mix · Creamy herb · Fresh toppings</div>
+          </div>
+          <div class="item-price">₹259</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── WRAPS ────── -->
+  <section class="menu-section" id="wraps">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Hero Category 02</p>
+        <h2 class="section-title">Signature <em>Wraps</em></h2>
+      </div>
+      <p class="section-desc">Handcrafted wraps with your pick of base, protein, sauce and toppings. Or go signature.</p>
+    </div>
+
+    <div class="sub-section">
+      <p class="sub-title">Build Your Own Wrap — Customise in 4 Steps</p>
+      <div class="build-grid">
+        <div class="build-step">
+          <div class="step-num">01</div>
+          <div class="step-label">Choose Your Wrap</div>
+          <ul class="step-items">
+            <li class="step-item">Classic Tortilla <span class="step-item-price incl">Included</span></li>
+            <li class="step-item">Whole Wheat Wrap <span class="step-item-price">+₹20</span></li>
+            <li class="step-item">Multigrain Wrap <span class="step-item-price">+₹30</span></li>
+          </ul>
+        </div>
+        <div class="build-step">
+          <div class="step-num">02</div>
+          <div class="step-label">Choose Your Protein</div>
+          <div class="step-title" style="color:var(--green); font-size:0.7rem; margin-bottom:0.5rem;">● Veg</div>
+          <ul class="step-items">
+            <li class="step-item">Peri Peri Paneer <span class="step-item-price">₹59</span></li>
+            <li class="step-item">Tandoori Paneer <span class="step-item-price">₹69</span></li>
+            <li class="step-item">Crispy Mushroom <span class="step-item-price">₹69</span></li>
+            <li class="step-item">Schezwan Soya <span class="step-item-price">₹49</span></li>
+          </ul>
+          <div class="step-title" style="color:#c0392b; font-size:0.7rem; margin:0.8rem 0 0.5rem;">● Non-Veg</div>
+          <ul class="step-items">
+            <li class="step-item">Smoky Chicken <span class="step-item-price">₹89</span></li>
+            <li class="step-item">Korean Chicken <span class="step-item-price">₹99</span></li>
+            <li class="step-item">Grilled Chicken <span class="step-item-price">₹89</span></li>
+            <li class="step-item">Butter Chicken <span class="step-item-price">₹109</span></li>
+          </ul>
+        </div>
+        <div class="build-step">
+          <div class="step-num">03</div>
+          <div class="step-label">Choose Your Sauce</div>
+          <div style="font-size:0.68rem; color:var(--green); margin-bottom:0.7rem;">All sauces included</div>
+          <ul class="step-items">
+            <li class="step-item" style="color:var(--cream-dim);">Smoky Peri Sauce</li>
+            <li class="step-item" style="color:var(--cream-dim);">Korean Spicy Mayo</li>
+            <li class="step-item" style="color:var(--cream-dim);">Creamy Herb Sauce</li>
+            <li class="step-item" style="color:var(--cream-dim);">Garlic Butter Sauce</li>
+            <li class="step-item" style="color:var(--cream-dim);">Tandoori Chipotle</li>
+          </ul>
+        </div>
+        <div class="build-step">
+          <div class="step-num">04</div>
+          <div class="step-label">Add Toppings</div>
+          <ul class="step-items">
+            <li class="step-item">Cheese Sauce <span class="step-item-price">+₹25</span></li>
+            <li class="step-item">Crispy Onions <span class="step-item-price">+₹20</span></li>
+            <li class="step-item">Jalapeños <span class="step-item-price">+₹20</span></li>
+            <li class="step-item">Fried Garlic <span class="step-item-price">+₹20</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub-section">
+      <p class="sub-title">Signature Veg Wraps</p>
+      <div class="items-grid">
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Tandoori Paneer Wrap</div>
+          </div>
+          <div class="item-price">₹169</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Peri Peri Veggie Wrap</div>
+          </div>
+          <div class="item-price">₹159</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Schezwan Corn & Cheese Wrap</div>
+          </div>
+          <div class="item-price">₹179</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Crispy Mushroom Wrap</div>
+          </div>
+          <div class="item-price">₹189</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Signature Non-Veg Wraps</p>
+      <div class="items-grid">
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Smoky Chicken Wrap</div>
+          </div>
+          <div class="item-price">₹209</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Korean Chicken Wrap<span class="item-badge badge-new">Popular</span></div>
+          </div>
+          <div class="item-price">₹219</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Butter Chicken Wrap<span class="item-badge badge-best">Bestseller</span></div>
+          </div>
+          <div class="item-price">₹229</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Crispy Chicken Wrap</div>
+          </div>
+          <div class="item-price">₹209</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── SANDWICHES ────── -->
+  <section class="menu-section" id="sandwiches">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Supporting Category 01</p>
+        <h2 class="section-title">Grilled <em>Sandwiches</em></h2>
+      </div>
+      <p class="section-desc">Hot-pressed, golden-grilled, generously filled.</p>
+    </div>
+    <div class="items-list">
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Three Cheese Sandwich</div>
+          <div class="item-sub">Triple cheese blend · Grilled to perfection</div>
+        </div>
+        <div class="item-price">₹169</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Pesto Corn Sandwich</div>
+          <div class="item-sub">Basil pesto · Sweet corn · Mozzarella</div>
+        </div>
+        <div class="item-price">₹179</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Paneer Tikka Sandwich</div>
+          <div class="item-sub">Marinated paneer · Mint chutney · Onions</div>
+        </div>
+        <div class="item-price">₹199</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot nonveg"></span>Chicken & Cheese Melt<span class="item-badge badge-best">Bestseller</span></div>
+          <div class="item-sub">Pulled chicken · Cheddar melt · Chipotle</div>
+        </div>
+        <div class="item-price">₹229</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot nonveg"></span>Spicy Chicken Sandwich</div>
+          <div class="item-sub">Crispy chicken · Sriracha mayo · Slaw</div>
+        </div>
+        <div class="item-price">₹239</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── PASTA ────── -->
+  <section class="menu-section" id="pasta">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Supporting Category 02</p>
+        <h2 class="section-title">Fresh <em>Pasta</em></h2>
+      </div>
+      <p class="section-desc">Made-to-order pasta in rich white and red sauces.</p>
+    </div>
+    <div class="sub-section">
+      <p class="sub-title">White Sauce Pasta</p>
+      <div class="items-list">
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Creamy Veg Alfredo Pasta</div>
+            <div class="item-sub">Rich béchamel · Seasonal vegetables · Parmesan</div>
+          </div>
+          <div class="item-price">₹219</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Chicken Alfredo Pasta<span class="item-badge badge-best">Bestseller</span></div>
+            <div class="item-sub">Grilled chicken · Creamy alfredo · Herbs</div>
+          </div>
+          <div class="item-price">₹269</div>
+        </div>
+      </div>
+    </div>
+    <div class="ornament">· · ·</div>
+    <div class="sub-section">
+      <p class="sub-title">Red Sauce Pasta</p>
+      <div class="items-list">
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot veg"></span>Arrabbiata Veg Pasta</div>
+            <div class="item-sub">Spicy tomato base · Garden vegetables · Basil</div>
+          </div>
+          <div class="item-price">₹209</div>
+        </div>
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-name"><span class="dot nonveg"></span>Spicy Chicken Arrabbiata</div>
+            <div class="item-sub">Tender chicken · Fiery arrabbiata · Fresh herbs</div>
+          </div>
+          <div class="item-price">₹269</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── SIDES ────── -->
+  <section class="menu-section" id="sides">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Sides & Snacks</p>
+        <h2 class="section-title">Crispy <em>Bites</em></h2>
+      </div>
+      <p class="section-desc">Perfect companions. Or a snack on their own.</p>
+    </div>
+    <div class="items-grid">
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Classic Fries</div>
+          <div class="item-sub">Golden, salted, crispy</div>
+        </div>
+        <div class="item-price">₹99</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Peri Peri Fries</div>
+          <div class="item-sub">Spiced with house peri peri seasoning</div>
+        </div>
+        <div class="item-price">₹119</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Loaded Cheese Fries</div>
+          <div class="item-sub">Fries · Cheese sauce · Jalapeños</div>
+        </div>
+        <div class="item-price">₹179</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Korean Loaded Fries<span class="item-badge badge-new">New</span></div>
+          <div class="item-sub">Fries · Korean mayo · Crispy toppings</div>
+        </div>
+        <div class="item-price">₹199</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot nonveg"></span>Crispy Chicken Pops<span class="item-badge badge-best">Bestseller</span></div>
+          <div class="item-sub">Bite-sized crispy chicken · Dipping sauce</div>
+        </div>
+        <div class="item-price">₹189</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Garlic Breadsticks</div>
+          <div class="item-sub">Herb butter · Garlic · Dip included</div>
+        </div>
+        <div class="item-price">₹119</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name"><span class="dot veg"></span>Nachos & Cheese Dip</div>
+          <div class="item-sub">Corn tortilla chips · House cheese dip · Salsa</div>
+        </div>
+        <div class="item-price">₹169</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── BEVERAGES ────── -->
+  <section class="menu-section" id="beverages">
+    <div class="section-header">
+      <div>
+        <p class="section-label">All Day · All Mood</p>
+        <h2 class="section-title">Drinks & <em>Beverages</em></h2>
+      </div>
+      <p class="section-desc">Hot coffee, cold brews, coolers, shakes, chai & signature specials.</p>
+    </div>
+
+    <div class="sub-section">
+      <p class="sub-title">Hot Coffee</p>
+      <div class="bev-grid">
+        <div class="item-card"><div class="item-info"><div class="item-name">Espresso</div></div><div class="item-price">₹89</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Americano</div></div><div class="item-price">₹109</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Cappuccino</div></div><div class="item-price">₹139</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Latte</div></div><div class="item-price">₹149</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Mocha</div></div><div class="item-price">₹169</div></div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Cold Coffee</p>
+      <div class="bev-grid">
+        <div class="item-card"><div class="item-info"><div class="item-name">Classic Cold Coffee</div></div><div class="item-price">₹159</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Hazelnut Cold Coffee</div></div><div class="item-price">₹179</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Caramel Frappe</div></div><div class="item-price">₹199</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Mocha Frappe</div></div><div class="item-price">₹209</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Oreo Cold Coffee</div><div class="item-sub">Oreo crumble · Cream</div></div><div class="item-price">₹219</div></div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Coolers & Refreshers</p>
+      <div class="bev-grid">
+        <div class="item-card"><div class="item-info"><div class="item-name">Mint Mojito</div></div><div class="item-price">₹139</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Blue Lagoon</div></div><div class="item-price">₹149</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Peach Iced Tea</div></div><div class="item-price">₹149</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Watermelon Cooler</div></div><div class="item-price">₹159</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Berry Blast Refresher</div></div><div class="item-price">₹169</div></div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Shakes</p>
+      <div class="bev-grid">
+        <div class="item-card"><div class="item-info"><div class="item-name">Belgian Chocolate Shake</div></div><div class="item-price">₹199</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Oreo Shake</div></div><div class="item-price">₹189</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">KitKat Shake</div></div><div class="item-price">₹199</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Brownie Shake<span class="item-badge badge-best">Bestseller</span></div></div><div class="item-price">₹219</div></div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Chai Program</p>
+      <div class="bev-grid">
+        <div class="item-card"><div class="item-info"><div class="item-name">Masala Chai</div></div><div class="item-price">₹59</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Ginger Chai</div></div><div class="item-price">₹69</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Elaichi Chai</div></div><div class="item-price">₹69</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Kulhad Chai<span class="item-badge badge-best">Bestseller</span></div></div><div class="item-price">₹79</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Lemon Ice Tea</div></div><div class="item-price">₹119</div></div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+
+    <div class="sub-section">
+      <p class="sub-title">Signature Drinks</p>
+      <div class="bev-grid">
+        <div class="item-card"><div class="item-info"><div class="item-name">Smoked Cold Coffee<span class="item-badge badge-new">Signature</span></div></div><div class="item-price">₹239</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Korean Strawberry Fizz<span class="item-badge badge-new">Signature</span></div></div><div class="item-price">₹219</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Nitro Coffee Cooler<span class="item-badge badge-new">Signature</span></div></div><div class="item-price">₹249</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Mango Chili Refresher<span class="item-badge badge-new">Signature</span></div></div><div class="item-price">₹199</div></div>
+        <div class="item-card"><div class="item-info"><div class="item-name">Tandoori Chai Cooler<span class="item-badge badge-new">Signature</span></div></div><div class="item-price">₹189</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── DESSERTS ────── -->
+  <section class="menu-section" id="desserts">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Sweet Endings</p>
+        <h2 class="section-title">Desserts & <em>Indulgences</em></h2>
+      </div>
+    </div>
+    <div class="items-grid">
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name">Chocolate Brownie</div>
+          <div class="item-sub">Warm, fudgy, house-baked</div>
+        </div>
+        <div class="item-price">₹99</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name">Brownie with Ice Cream<span class="item-badge badge-best">Bestseller</span></div>
+          <div class="item-sub">Warm brownie · Vanilla scoop · Chocolate drizzle</div>
+        </div>
+        <div class="item-price">₹159</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name">Chocolate Dessert Jar</div>
+          <div class="item-sub">Layered chocolate mousse · Crumble · Cream</div>
+        </div>
+        <div class="item-price">₹179</div>
+      </div>
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-name">Lotus Biscoff Jar<span class="item-badge badge-new">Must Try</span></div>
+          <div class="item-sub">Biscoff cream · Cookie crumble · Caramel</div>
+        </div>
+        <div class="item-price">₹199</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── COMBOS ────── -->
+  <section class="menu-section" id="combos">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Value Combos</p>
+        <h2 class="section-title">More for <em>Less</em></h2>
+      </div>
+      <p class="section-desc">Curated combinations for every occasion. Great savings on every combo.</p>
+    </div>
+    <div class="combo-grid">
+      <div class="combo-card">
+        <div class="combo-name">Office Lunch Combo</div>
+        <div class="combo-items">Bowl + Cooler<br>Perfect for the workday refuel</div>
+        <div class="combo-price">₹349 – ₹449 <span class="combo-savings">Best Value</span></div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">Café Combo</div>
+        <div class="combo-items">Sandwich + Cold Coffee<br>Ideal for a quick café break</div>
+        <div class="combo-price">₹299 – ₹399 <span class="combo-savings">Save More</span></div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">Snack Combo</div>
+        <div class="combo-items">Fries + Shake<br>When hunger strikes between meals</div>
+        <div class="combo-price">₹249 – ₹349 <span class="combo-savings">Great Deal</span></div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">Group Combo</div>
+        <div class="combo-items">2 Wraps + Fries + 2 Drinks<br>Feeds two, priced right</div>
+        <div class="combo-price">₹599 – ₹799 <span class="combo-savings">Group Saver</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────── THE ENVELOPE ────── -->
+  <section class="menu-section" id="envelope">
+    <div class="section-header">
+      <div>
+        <p class="section-label">Our Signature Ritual</p>
+        <h2 class="section-title">The <em>Envelope</em></h2>
+      </div>
+      <p class="section-desc">Something selected for you — placed quietly on your table. Open only after the first bite.</p>
+    </div>
+
+    <p class="envelope-intro">The food brings people in. The interaction makes them return. Every order arrives
+    with an envelope — chosen by your server for who is at the table. A small act of attention, never random.</p>
+
+    <div class="combo-grid">
+      <div class="combo-card">
+        <div class="combo-name">The Quiet Table</div>
+        <div class="combo-items">For the guest sitting alone — a thought to keep you company.</div>
+        <div class="combo-price">Solo</div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">The Chemistry</div>
+        <div class="combo-items">For couples — subtle, curious, never cheesy.</div>
+        <div class="combo-price">For Two</div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">The Debate</div>
+        <div class="combo-items">For friend groups — a hot take worth arguing over.</div>
+        <div class="combo-price">Groups</div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">The Office Confession</div>
+        <div class="combo-items">For the workday lunch — a little honesty with the meal.</div>
+        <div class="combo-price">Work</div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">The Theory Card</div>
+        <div class="combo-items">A psychology prompt with a small reward inside.</div>
+        <div class="combo-price">Reward</div>
+      </div>
+      <div class="combo-card">
+        <div class="combo-name">The Experiment</div>
+        <div class="combo-items">A social challenge. Phones away. See what happens.</div>
+        <div class="combo-price">Dare</div>
+      </div>
+    </div>
+
+    <div class="ornament">· · ·</div>
+    <p class="envelope-foot">Sit Down. Open Up. — <em>Where Conversations Begin.</em></p>
+  </section>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer class="site-footer">
+  <p>All prices inclusive of taxes &nbsp;·&nbsp; GST applicable as per government norms &nbsp;·&nbsp; Images are for representation only</p>
+  <p style="margin-top:0.5rem; color:var(--muted);">The Table Theory · Food · Coffee · Conversations · "Every Table Has A Story."</p>
+</footer>
+
+<script>
+  function showSection(id, tab) {
+    document.querySelectorAll('.menu-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    tab.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>

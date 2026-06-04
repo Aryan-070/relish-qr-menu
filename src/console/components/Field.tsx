@@ -44,7 +44,7 @@ interface TextFieldProps {
   onChange: (v: string) => void
   placeholder?: string
   hint?: string
-  type?: 'text' | 'number'
+  type?: 'text' | 'number' | 'tel' | 'email'
 }
 export function TextField({ label, value, onChange, placeholder, hint, type = 'text' }: TextFieldProps) {
   const id = useId()

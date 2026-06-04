@@ -9,8 +9,11 @@ import { DATE_RANGES, type DateRange, type Role } from './lib/types'
 import { fadeIn } from '../animations/variants'
 import { AdminDashboard } from './views/AdminDashboard'
 import { ReportsCenter } from './views/ReportsCenter'
-import { FloorView } from './views/FloorView'
-import { MenuManager } from './views/MenuManager'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '../lib/queryClient'
+import { MenuManagerLive } from './views/MenuManagerLive'
+import { FloorLive } from './views/FloorLive'
+import { LoyaltyCrmLive } from './views/LoyaltyCrmLive'
 import { StaffPerformance } from './views/StaffPerformance'
 import { BillingView } from './views/BillingView'
 import { WaiterTables } from './views/WaiterTables'
@@ -20,7 +23,6 @@ import { OrderHistory } from './views/OrderHistory'
 import { KitchenDisplay } from './views/KitchenDisplay'
 import { QrCodes } from './views/QrCodes'
 import { Reservations } from './views/Reservations'
-import { LoyaltyCrm } from './views/LoyaltyCrm'
 import { FeedbackInbox } from './views/FeedbackInbox'
 import { Campaigns } from './views/Campaigns'
 import { Inventory } from './views/Inventory'
@@ -42,9 +44,9 @@ function renderView(view: ConsoleView) {
     case 'reports':
       return <ReportsCenter />
     case 'manager-floor':
-      return <FloorView />
+      return <FloorLive />
     case 'manager-menu':
-      return <MenuManager />
+      return <MenuManagerLive />
     case 'manager-staff':
       return <StaffPerformance />
     case 'admin-billing':
@@ -64,7 +66,7 @@ function renderView(view: ConsoleView) {
     case 'reservations':
       return <Reservations />
     case 'loyalty':
-      return <LoyaltyCrm />
+      return <LoyaltyCrmLive />
     case 'feedback':
       return <FeedbackInbox />
     case 'campaigns':
@@ -92,8 +94,14 @@ interface ConsoleAppProps {
 
 export function ConsoleApp({ onExit }: ConsoleAppProps) {
   // AuthProvider is hoisted to App.tsx (above OpsProvider) so the ops store can
-  // read the signed-in user's restaurantId for Supabase sync; here we just render.
-  return <ConsoleBody onExit={onExit} />
+  // read the signed-in user's restaurantId for Supabase sync; here we just
+  // render. The QueryClientProvider powers the Django-backed views (e.g. the
+  // live Menu editor) that are migrating off the localStorage ops store.
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ConsoleBody onExit={onExit} />
+    </QueryClientProvider>
+  )
 }
 
 function ConsoleBody({ onExit }: ConsoleAppProps) {

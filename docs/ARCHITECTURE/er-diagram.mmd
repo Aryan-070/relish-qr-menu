@@ -1,0 +1,479 @@
+%% Relish — Multi-Tenant Restaurant-OS — Entity-Relationship model
+%% Target backend: Django + DRF + PostgreSQL (pooled multi-tenancy, app-scoped + RLS backstop)
+%% Render: https://mermaid.live  or any Mermaid-capable viewer.
+%%
+%% Legend:
+%%   ||--o{  one-to-many      ||--||  one-to-one      }o--||  many-to-one
+%%   Control-plane (shared): organization, membership, restaurant registry, subscription, invoice, payment_event, tenant_shard
+%%   Data-plane (pooled, tenant-scoped): everything else (carries restaurant_id)
+
+erDiagram
+    organization ||--o{ restaurant : "has outlets"
+    organization ||--o{ membership : "scopes identity"
+    organization ||--|| subscription : "billed as"
+    organization ||--o{ invoice : issued
+    organization ||--o{ customer : "CRM org-wide"
+    user         ||--o{ membership : "authenticates as"
+    membership   }o--|| role : holds
+    role         ||--o{ role_permission : grants
+    permission   ||--o{ role_permission : via
+    membership   ||--o{ membership_permission : "delta override"
+    membership   ||--o{ membership_outlet : "assigned to"
+    restaurant   ||--o{ membership_outlet : "staffed by"
+    restaurant   ||--o| tenant_shard : "routed by"
+
+    restaurant      ||--o| restaurant_theme : "styled by"
+    restaurant      ||--o{ media_asset : "owns media"
+    media_asset     ||--o{ asset_rendition : "sized as"
+
+    restaurant      ||--o{ menu_category : has
+    menu_category   ||--o{ menu_item : contains
+    menu_item       ||--o{ menu_item_modifier_group : links
+    modifier_group  ||--o{ menu_item_modifier_group : links
+    modifier_group  ||--o{ modifier : "has options"
+    menu_item       ||--o| recipe : "costed by"
+    recipe          ||--o{ recipe_line : BOM
+    ingredient      ||--o{ recipe_line : "used in"
+    supplier        ||--o{ ingredient : supplies
+
+    restaurant_table ||--o{ orders : "served at"
+    membership       ||--o{ orders : "waited by"
+    customer         ||--o{ orders : "placed by (nullable)"
+    orders           ||--o{ order_line : contains
+    order_line       ||--o{ order_line_modifier : selected
+    menu_item        ||--o{ order_line : "snapshot of"
+    restaurant_table ||--o{ service_request : "raised at"
+
+    ingredient      ||--o{ stock_movement : ledgered
+    supplier        ||--o{ purchase_order : "ordered from"
+    purchase_order  ||--o{ purchase_order_line : lines
+    ingredient      ||--o{ purchase_order_line : "ordered"
+    ingredient      ||--o{ wastage : wasted
+
+    customer ||--o{ customer_outlet : visits
+    restaurant ||--o{ customer_outlet : "has guests"
+    customer ||--o{ loyalty_ledger : "earns/spends"
+    customer ||--o{ reservation : books
+    restaurant ||--o{ reservation : at
+    restaurant ||--o{ waitlist : queues
+    restaurant ||--o{ feedback : rated
+    orders   ||--o| feedback : "about"
+    restaurant ||--o{ audit_log : governed
+    membership ||--o{ audit_log : "acted by"
+
+    subscription ||--o{ invoice : "billed under"
+    invoice ||--o{ payment_event : "reconciled by"
+
+    organization {
+        uuid id PK
+        text name
+        text slug "unique"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    restaurant {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text code "outlet code, unique per org"
+        text city
+        text timezone "Asia/Kolkata"
+        boolean published
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    tenant_shard {
+        uuid restaurant_id PK "FK -> restaurant, 1:1"
+        text shard "pool-main | pod-xxx"
+        text region "ap-south-1"
+        text connection_alias "Django DB alias"
+    }
+    user {
+        uuid id PK "custom email-based user"
+        text email "unique"
+        boolean is_active
+        timestamptz created_at
+    }
+    membership {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK "nullable: roster-only / invited"
+        uuid role_id FK
+        text display_name
+        text email
+        int  hue "avatar tint"
+        text shift "AM|PM, nullable"
+        boolean active
+        text status "active|invited|suspended"
+        text invite_token "nullable"
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    role {
+        uuid id PK
+        uuid org_id FK "nullable = system role"
+        text key "admin|manager|waiter|kitchen|host"
+        text label
+        boolean is_system
+    }
+    permission {
+        text key PK "void|comp|discount|refund|edit-menu|manage-stock|manage-staff|view-reports"
+        text label
+        text category
+    }
+    role_permission {
+        uuid role_id FK
+        text permission_key FK
+    }
+    membership_permission {
+        uuid membership_id FK
+        text permission_key FK
+        boolean granted "true=add, false=revoke vs role default"
+    }
+    membership_outlet {
+        uuid membership_id FK
+        uuid restaurant_id FK
+        boolean is_primary
+    }
+
+    restaurant_theme {
+        uuid restaurant_id PK "FK -> restaurant, 1:1"
+        text ui_theme "warm|hybrid|brutalist|editorial"
+        text component_style "classic|motion|spectacle"
+        text media_mode "video|image"
+        uuid logo_asset_id FK "nullable"
+        uuid cover_asset_id FK "nullable"
+        jsonb token_overrides "partial ThemeTokens patch"
+        boolean allow_customer_choice
+        text_array customer_choices
+        jsonb draft "unpublished working copy"
+        boolean published
+        timestamptz updated_at
+    }
+    media_asset {
+        uuid id PK
+        uuid restaurant_id FK
+        text kind "image|video|logo|cover|banner"
+        text owner_type "menu_item|category|restaurant"
+        uuid owner_id "nullable polymorphic"
+        text bucket
+        text key "object-storage key, NOT data-URL"
+        text poster_key "nullable"
+        jsonb renditions "{1080,720,360}"
+        bigint bytes
+        text status "processing|ready|failed"
+        text blurhash "LQIP"
+        timestamptz created_at
+    }
+    asset_rendition {
+        uuid id PK
+        uuid asset_id FK
+        text variant "thumb|card|hero|poster|mp4-720"
+        text key
+        int width
+        int height
+        bigint bytes
+    }
+
+    menu_category {
+        uuid id PK
+        uuid restaurant_id FK
+        text code
+        text name
+        int sort_order
+        uuid banner_asset_id FK "nullable"
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    menu_item {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid category_id FK
+        text code
+        text name
+        int price_minor "paise"
+        text description
+        int tax_rate_pct
+        text_array tags
+        text_array badges
+        boolean is_jain
+        boolean can_be_jain
+        boolean chefs_special
+        int spice_level "0..3"
+        boolean available
+        boolean sold_out
+        uuid image_asset_id FK "nullable"
+        uuid video_asset_id FK "nullable"
+        jsonb nutrition "display-only"
+        int version "optimistic concurrency"
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    modifier_group {
+        uuid id PK
+        uuid restaurant_id FK
+        text name
+        int min_select
+        int max_select
+    }
+    modifier {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid group_id FK
+        text label
+        int price_delta_minor
+    }
+    menu_item_modifier_group {
+        uuid menu_item_id FK
+        uuid group_id FK
+        int sort_order
+    }
+    recipe {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid menu_item_id FK "unique"
+    }
+    recipe_line {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid recipe_id FK
+        uuid ingredient_id FK
+        numeric qty
+    }
+    ingredient {
+        uuid id PK
+        uuid restaurant_id FK
+        text name
+        text unit "kg|L|pcs"
+        numeric stock
+        numeric low_threshold
+        int cost_per_unit_minor
+        uuid supplier_id FK "nullable"
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    supplier {
+        uuid id PK
+        uuid restaurant_id FK
+        text name
+        text phone
+        text email
+    }
+
+    restaurant_table {
+        uuid id PK
+        uuid restaurant_id FK
+        text code "T01"
+        text label
+        int seats
+        text zone "Garden|Indoor|Patio|Bar"
+        text status
+        uuid waiter_membership_id FK "nullable"
+        int guests
+        timestamptz seated_at
+        int version
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    orders {
+        uuid id PK
+        uuid restaurant_id FK
+        text code "ORD-00123, unique per restaurant"
+        uuid table_id FK
+        uuid waiter_membership_id FK
+        uuid customer_id FK "nullable"
+        text source "guest|staff"
+        text status "new|preparing|ready|served"
+        int subtotal_minor
+        int discount_pct
+        int tax_minor
+        int total_minor
+        boolean paid
+        boolean voided
+        boolean comp
+        timestamptz placed_at
+        int version
+        timestamptz updated_at
+    }
+    order_line {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid order_id FK
+        uuid menu_item_id FK "nullable provenance"
+        text item_name "snapshot"
+        int unit_price_minor "snapshot"
+        int qty
+        uuid category_id FK
+        int seat
+        text note
+    }
+    order_line_modifier {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid order_line_id FK
+        uuid modifier_id FK "nullable"
+        text label "snapshot"
+        int price_delta_minor "snapshot"
+    }
+    service_request {
+        uuid id PK
+        uuid restaurant_id FK
+        text code
+        uuid table_id FK
+        text type "waiter|water|bill|assistance|cleanup"
+        text status "pending|claimed|resolved"
+        uuid claimed_by_membership_id FK "nullable"
+        text note
+        timestamptz created_at
+    }
+
+    stock_movement {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid ingredient_id FK
+        numeric delta "signed"
+        text reason "order|purchase|wastage|adjust"
+        uuid ref_id "polymorphic"
+        timestamptz created_at
+    }
+    purchase_order {
+        uuid id PK
+        uuid restaurant_id FK
+        text code
+        uuid supplier_id FK
+        text status "draft|ordered|received"
+        timestamptz created_at
+        timestamptz received_at
+    }
+    purchase_order_line {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid purchase_order_id FK
+        uuid ingredient_id FK
+        numeric qty
+        int cost_minor
+    }
+    wastage {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid ingredient_id FK
+        numeric qty
+        text reason
+        timestamptz created_at
+    }
+
+    customer {
+        uuid id PK
+        uuid org_id FK "CRM is org-wide"
+        text name
+        text phone "unique per org"
+        text tier "Bronze|Silver|Gold (cached)"
+        int points "cached balance"
+        int visits
+        int lifetime_spend_minor
+        text_array tags
+        timestamptz last_visit
+        timestamptz joined_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    customer_outlet {
+        uuid customer_id FK
+        uuid restaurant_id FK
+        int visits
+        timestamptz first_visit
+        timestamptz last_visit
+    }
+    loyalty_ledger {
+        uuid id PK
+        uuid org_id FK
+        uuid customer_id FK
+        uuid order_id FK "nullable"
+        int points_delta "signed"
+        text reason "earn|redeem|adjust|expire"
+        timestamptz created_at
+    }
+    reservation {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid customer_id FK "nullable"
+        text name
+        text phone
+        int party_size
+        timestamptz at
+        uuid table_id FK "nullable"
+        text status "booked|seated|completed|cancelled|no-show"
+        text notes
+        timestamptz created_at
+    }
+    waitlist {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid customer_id FK "nullable"
+        text name
+        text phone
+        int party_size
+        int quoted_mins
+        text status "waiting|notified|seated|left"
+        timestamptz added_at
+    }
+    feedback {
+        uuid id PK
+        uuid restaurant_id FK
+        uuid order_id FK "nullable"
+        uuid table_id FK "nullable"
+        int rating "1..5"
+        text comment
+        boolean routed_to_public
+        timestamptz created_at
+    }
+    audit_log {
+        uuid id PK
+        uuid restaurant_id FK
+        text type "void|comp|discount|merge|transfer|price-change|role-change"
+        uuid order_id FK "nullable"
+        uuid table_id FK "nullable"
+        uuid actor_membership_id FK "nullable"
+        int amount_minor "nullable"
+        text reason
+        jsonb before "nullable"
+        jsonb after "nullable"
+        timestamptz created_at
+    }
+
+    subscription {
+        uuid id PK
+        uuid org_id FK "unique"
+        text package "web-menu|classic|cinematic|signature"
+        timestamptz started_at
+        timestamptz renewal_at
+        boolean auto_renew
+        int gst_pct
+        text status "active|past_due|suspended"
+    }
+    invoice {
+        uuid id PK
+        text code "INV-0001"
+        uuid org_id FK
+        uuid subscription_id FK "nullable"
+        text description
+        int base_minor
+        int gst_minor
+        int total_minor
+        text status "paid|due|failed"
+        text razorpay_id "nullable"
+        timestamptz issued_at
+        timestamptz paid_at
+    }
+    payment_event {
+        uuid id PK
+        text razorpay_event_id "unique - idempotency guard"
+        uuid invoice_id FK "nullable"
+        text kind "order.paid|payment.captured"
+        jsonb payload
+        timestamptz received_at
+    }

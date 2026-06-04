@@ -1,0 +1,79 @@
+name: backend-ci
+
+# Lint + Django checks + pytest for the Relish restaurant-OS backend.
+#   - lint-and-sqlite: fast gate (ruff, system check, migration-drift, SQLite tests).
+#   - postgres: full suite against real PostgreSQL, exercising the RLS backstop +
+#     Postgres-only behaviour (partial indexes, FOR UPDATE on joins, etc.).
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  lint-and-sqlite:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Django system check
+        run: python manage.py check
+      - name: Migration drift gate
+        run: python manage.py makemigrations --check --dry-run
+      - name: OpenAPI schema gate (zero warnings)
+        run: python manage.py spectacular --color --file /tmp/schema.yml --validate --fail-on-warn
+      - name: Run tests (SQLite)
+        run: pytest
+
+  postgres:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: relish
+          POSTGRES_PASSWORD: relish
+          POSTGRES_DB: relish
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U relish"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://relish:relish@localhost:5432/relish
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Apply migrations (Postgres)
+        run: python manage.py migrate
+      - name: Run tests (Postgres + RLS proof)
+        run: pytest

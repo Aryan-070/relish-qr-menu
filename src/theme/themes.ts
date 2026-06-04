@@ -1,7 +1,7 @@
 // Tri-theme UI system: warm (refined fine-dining), hybrid (refined-brutalist),
 // brutalist (full editorial). One component contract, three skins — selected at runtime.
 
-export type UiTheme = 'warm' | 'hybrid' | 'brutalist' | 'editorial'
+export type UiTheme = 'warm' | 'hybrid' | 'brutalist' | 'editorial' | 'table-theory'
 
 // Dietary / tag / chef / spice pill styling — theme-aware so the chips read
 // soft & rounded in warm, hard-edged & monospaced in hybrid/brutalist.
@@ -76,6 +76,8 @@ const JETBRAINS = "'JetBrains Mono', 'Courier New', monospace" // brutalist body
 const SATOSHI = "'Satoshi', system-ui, sans-serif"       // editorial UI / nav / pills (Fontshare)
 const GENERAL = "'General Sans', system-ui, sans-serif"  // editorial body / description (Fontshare)
 const GEIST_MONO = "'Geist Mono', 'JetBrains Mono', monospace" // editorial price / numerals
+const LORA = "'Lora', Georgia, serif"                    // The Table Theory display serif
+const INTER = "'Inter', system-ui, sans-serif"           // The Table Theory body
 
 export const THEMES: Record<UiTheme, ThemeTokens> = {
   warm: {
@@ -230,9 +232,50 @@ export const THEMES: Record<UiTheme, ThemeTokens> = {
     navStyle: 'pill',
     videoFilter: 'saturate(1.06) contrast(1.02) brightness(1.02) sepia(0.08)',
   },
+  // The Table Theory — QSR café brand. Forest Green leads, Cream rests the eye
+  // (60/30/10), Sage/Teal punctuate, Ink anchors text. Serif display (Lora) over a
+  // neutral grotesque body (Inter). Quiet, warm, editorial — never loud.
+  'table-theory': {
+    pill: { radius: 999, font: INTER, transform: 'uppercase', bracket: false, monochrome: false, monoInk: '#1A1A1A' },
+    label: 'Table Theory',
+    bg: '#F5EFE2',          // Cream surface
+    cardBg: '#FBF7EC',      // Raised cream
+    ink: '#1A1A1A',         // Ink text
+    inkSoft: '#4A4742',
+    accent: '#0B4A2F',      // Forest Green — primary
+    accent2: '#8FB39A',     // Sage — secondary accent
+    cardRadius: 18,
+    cardBorder: '1px solid #E3D9CA',
+    cardShadow: '0 6px 28px rgba(11,74,47,0.08)',
+    cardSeparator: 'shadow',
+    ruleColor: '#E3D9CA',
+    thumbRadius: 14,
+    thumbBorder: '1px solid #E3D9CA',
+    titleFont: LORA,
+    titleTransform: 'none',
+    titleWeight: 600,
+    titleSize: 16.5,
+    titleSpacing: '-0.005em',
+    descFont: INTER,
+    descColor: '#4A4742',
+    accentFont: LORA,
+    priceFont: GEIST_MONO,
+    priceWeight: 600,
+    priceSize: 14.5,
+    priceColor: '#0B4A2F',  // Forest prices
+    addShape: 'pill',
+    addLabel: '+',
+    headerFont: LORA,
+    headerTransform: 'none',
+    headerSize: 30,
+    headerColor: '#0B4A2F',
+    headerSpacing: '-0.015em',
+    navStyle: 'pill',
+    videoFilter: 'saturate(0.96) contrast(1.01) brightness(1.02)',
+  },
 }
 
-export const THEME_ORDER: UiTheme[] = ['warm', 'hybrid', 'brutalist', 'editorial']
+export const THEME_ORDER: UiTheme[] = ['warm', 'hybrid', 'brutalist', 'editorial', 'table-theory']
 
 // ── shadcn / Cult UI / Watermelon token bridge ──────────────────────────────
 // Derive the shadcn CSS-variable set from a theme's tokens. Injected onto :root

@@ -71,7 +71,7 @@ function haystack(item: MenuItem): string {
   return `${item.name} ${item.description} ${item.tags.join(' ')}`.toLowerCase()
 }
 
-function detectAllergens(item: MenuItem): Allergen[] {
+export function detectAllergens(item: MenuItem): Allergen[] {
   const hay = haystack(item)
   return ALLERGEN_PATTERNS.filter(([, re]) => re.test(hay)).map(([a]) => a)
 }

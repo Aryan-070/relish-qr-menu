@@ -1,0 +1,15 @@
+# Relish — Python dependencies (aggregator)
+#
+# The backend lives in backend/. This root file lets you install everything from
+# the repo root with a single command:
+#
+#   python3 -m venv backend/.venv && source backend/.venv/bin/activate
+#   pip install -r requirements.txt          # runtime only
+#   pip install -r requirements-dev.txt      # + test/lint/type tooling (see below)
+#
+# Runtime deps (Django, DRF, Channels, Celery, psycopg2, …):
+-r backend/requirements.txt
+
+# For the full dev toolchain (pytest, ruff, mypy, model-bakery, freezegun) use:
+#   pip install -r backend/requirements-dev.txt
+# (kept separate so production images stay lean.)

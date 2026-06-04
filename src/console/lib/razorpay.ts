@@ -1,25 +1,23 @@
 // Browser-side Razorpay Checkout helper.
 //
 // This module is part of the app `tsc` build, so it must stay strictly valid
-// browser TypeScript: no Node APIs, no `any` (except the unavoidable Window
-// global below). All secret-bearing work happens in the Vercel serverless
-// functions under `api/razorpay/`.
+// browser TypeScript: no Node APIs, no `any`. The Razorpay script loader and
+// the typed `window.Razorpay` accessor live in `lib/payments/razorpayScript.ts`.
+// All secret-bearing work happens in the Vercel serverless functions under
+// `api/razorpay/`.
 //
 // It is inert until `VITE_RAZORPAY_KEY_ID` is set — `isRazorpayConfigured`
 // gates any UI that would call `startRenewalPayment`.
 
-declare global {
-  interface Window {
-    Razorpay?: new (opts: unknown) => { open: () => void }
-  }
-}
+import {
+  getRazorpayConstructor,
+  loadRazorpayCheckoutScript,
+} from '../../lib/payments/razorpayScript'
 
 /** True only when the publishable Razorpay key is configured at build time. */
 export const isRazorpayConfigured: boolean = Boolean(
   import.meta.env.VITE_RAZORPAY_KEY_ID,
 )
-
-const CHECKOUT_SRC = 'https://checkout.razorpay.com/v1/checkout.js'
 
 interface CreateOrderResponse {
   orderId: string
@@ -32,45 +30,6 @@ interface StartRenewalPaymentOptions {
   customerEmail?: string
   onSuccess: () => void | Promise<void>
   onDismiss?: () => void
-}
-
-let checkoutScriptPromise: Promise<void> | null = null
-
-/** Inject the Razorpay Checkout <script> once and resolve when it has loaded. */
-function loadCheckoutScript(): Promise<void> {
-  if (window.Razorpay) {
-    return Promise.resolve()
-  }
-
-  if (checkoutScriptPromise) {
-    return checkoutScriptPromise
-  }
-
-  checkoutScriptPromise = new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[src="${CHECKOUT_SRC}"]`,
-    )
-
-    if (existing) {
-      existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', () =>
-        reject(new Error('Failed to load Razorpay Checkout script')),
-      )
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = CHECKOUT_SRC
-    script.async = true
-    script.addEventListener('load', () => resolve())
-    script.addEventListener('error', () => {
-      checkoutScriptPromise = null
-      reject(new Error('Failed to load Razorpay Checkout script'))
-    })
-    document.body.appendChild(script)
-  })
-
-  return checkoutScriptPromise
 }
 
 /**
@@ -107,13 +66,14 @@ export async function startRenewalPayment(
     throw new Error('Razorpay order response missing orderId')
   }
 
-  await loadCheckoutScript()
+  await loadRazorpayCheckoutScript()
 
-  if (!window.Razorpay) {
+  const Razorpay = getRazorpayConstructor()
+  if (!Razorpay) {
     throw new Error('Razorpay Checkout failed to initialise')
   }
 
-  const checkout = new window.Razorpay({
+  const checkout = new Razorpay({
     key: keyId,
     order_id: orderId,
     amount: opts.amountPaise,
