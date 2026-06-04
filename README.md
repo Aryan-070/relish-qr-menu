@@ -53,10 +53,71 @@ Open Chrome DevTools → Device toolbar → iPhone 14 Pro (393 × 852) for the i
 
 | File | What it covers |
 |------|---------------|
-| [`TEAM_GUIDE.md`](./TEAM_GUIDE.md) | **Start here.** Complete guide — vision, every file explained, what we tried and failed, known issues, full roadmap, media production workflow |
+| [`SETUP.md`](./SETUP.md) | **Local setup — start here to run it.** Frontend + backend + Postgres, env vars, DB script, verification matrix, troubleshooting |
+| [`TEAM_GUIDE.md`](./TEAM_GUIDE.md) | Complete guide — vision, every file explained, what we tried and failed, known issues, full roadmap, media production workflow |
 | [`HANDOFF.md`](./HANDOFF.md) | Session-level handoff — current state snapshot, files actively edited, immediate next steps |
+| [`backend/README.md`](./backend/README.md) | Backend conventions — tenancy, money units, tests, API docs |
 | [`docs/DEPLOY-STEPS.md`](./docs/DEPLOY-STEPS.md) | Click-by-click: deploy to Vercel, connect Supabase + Razorpay |
 | [`docs/`](./docs) | Deployment guide + commercial kit (brochure, pricing, comparison) |
+
+---
+
+## Repository Structure
+
+Top-level layout. The repo is a **monorepo**: a Vite React SPA at the root and a
+Django backend under [`backend/`](./backend).
+
+```
+relish-qr-menu/
+├── src/                  Frontend application (React + TS) — see breakdown below
+├── backend/              Django + DRF + Postgres API — see breakdown below
+├── api/                  Vercel serverless functions (Razorpay order creation)
+├── public/              Static assets served as-is (committed, optimized media)
+├── scripts/             Build/media + db-setup tooling (Node .mjs + db-setup.sh)
+├── docs/                Architecture, deployment, engineering notes, commercial kit
+├── supabase/            Legacy Supabase SQL migrations (pre-Django backend)
+├── prompts/ pitch/ commercial/   Sales/marketing collateral + PDF generators
+├── index.html           SPA entry; vite.config.ts / tsconfig*.json / tailwind.config.js   build config
+├── eslint.config.js     ESLint flat config (lints src/)
+├── vitest.config.ts     Vitest (jsdom) test config
+├── requirements.txt     Python deps aggregator → backend/requirements*.txt
+├── SETUP.md             Local setup guide (this repo's how-to-run)
+└── vercel.json render.yaml   Host configs (Vercel frontend / Render backend)
+```
+
+### Frontend — `src/`
+
+| Path | Responsibility |
+|------|----------------|
+| `src/main.tsx`, `App.tsx` | SPA bootstrap + top-level routing between surfaces. |
+| `src/screens/` | Full-screen guest surfaces (Landing, Menu, Checkout, ServicePanel) and `screens/qsr/` (the QR ordering / staff cockpit flow). |
+| `src/console/` | Role-based **Staff Console** — `views/` (floor, menu CRUD, billing, CRM, inventory), `store/` (ops reducer), `lib/` (API clients, formatting). |
+| `src/components/` | Shared UI atoms + `components/ui/` shadcn/Cult primitives. |
+| `src/hooks/` | Data/lifecycle hooks — `useSession` (guest QR session), `useOrder`, `usePublicMenu`, `useStaffSessions`. |
+| `src/lib/` | Framework-agnostic logic — `money`, `tax`, `split`, `promos`, `payments/` (gateway abstraction + Razorpay), `api/` (typed fetch clients). |
+| `src/theme/` | Theme engine (`ThemeContext`, token sets for the 7 skins). |
+| `src/i18n/` | English/Hindi translation provider (`useT`). |
+| `src/data/` | Static demo menu + ops seed data. |
+| `src/animations/`, `src/integrations/` | Framer/GSAP variants; mock aggregator (Zomato/Swiggy) adapters. |
+
+### Backend — `backend/`
+
+Django project; each app is a bounded context. Money is integer **paise**; every
+tenant-scoped model extends `common.models.TenantScopedModel` and auto-filters via
+`TenantManager`.
+
+| App / path | Responsibility |
+|------------|----------------|
+| `config/` | Settings (django-environ), URL routing, ASGI/WSGI, Celery app. |
+| `common/` | Multi-tenancy primitives (`TenantScopedModel`, `TenantManager`, `TenantMiddleware`), `versioning.py` (optimistic-lock helpers), health, exception handler. |
+| `accounts/` | Custom email `User`, Memberships/Roles/Orgs, JWT auth, staff & OTP endpoints. |
+| `menu/` | Menu CRUD (categories, items, modifiers) with optimistic concurrency. |
+| `ops/` | Floor (tables, service requests) + orders + governance audit. |
+| `dining/` | Guest dining sessions (QR), per-device ordering authority, checks. |
+| `billing/` | Razorpay (constant-time idempotent webhook), invoices, subscriptions. |
+| `crm/`, `inventory/`, `theming/`, `assets/`, `public/` | Loyalty/customers, stock, per-tenant theming, media, cached public menu. |
+| `realtime/` | Channels WebSocket consumers (live KDS / waiter sync). |
+| `*/migrations/`, `*/tests/` | Schema migrations and pytest suites per app. |
 
 ---
 
