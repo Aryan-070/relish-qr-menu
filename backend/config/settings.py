@@ -122,6 +122,17 @@ DATABASES = {
 }
 DATABASES["default"].setdefault("ATOMIC_REQUESTS", False)
 
+# Persistent connections — the baseline "pool" for psycopg2 / Django 4.2 (no
+# native pool). Each worker reuses a DB connection for DB_CONN_MAX_AGE seconds
+# instead of reconnecting per request; CONN_HEALTH_CHECKS revalidates a reused
+# connection so a server-dropped socket is rebuilt rather than erroring. For
+# true pooling under high concurrency, front Postgres with PgBouncer and set
+# DISABLE_SERVER_SIDE_CURSORS=True (see backend/.env.example).
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool(
+    "DB_CONN_HEALTH_CHECKS", default=True
+)
+
 # Routes a promoted tenant's data-plane queries to its dedicated DB connection
 # (per TenantShard.connection_alias). Inert while only "default" exists — it
 # never queries the DB in the hot path and returns None (default routing) until
