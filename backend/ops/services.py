@@ -87,6 +87,10 @@ def place_order(
     waiter_membership_id: Any | None = None,
     source: str = "staff",
     lines: Iterable[Mapping[str, Any]],
+    session_id: Any | None = None,
+    participant_id: Any | None = None,
+    confirmation: str = "confirmed",
+    idempotency_key: str = "",
 ) -> Order:
     """Create an order, computing every money field server-side.
 
@@ -144,6 +148,10 @@ def place_order(
         code=next_order_code(restaurant_id),
         table_id=table_id,
         waiter_membership_id=waiter_membership_id,
+        session_id=session_id,
+        participant_id=participant_id,
+        confirmation=confirmation,
+        idempotency_key=idempotency_key,
         source=source,
         status="new",
         subtotal_minor=subtotal_minor,
@@ -156,6 +164,7 @@ def place_order(
         order_line = OrderLine.objects.create(
             restaurant_id=restaurant_id,
             order=order,
+            participant_id=participant_id,
             menu_item=line["menu_item"],
             item_name=line["menu_item"].name,
             unit_price_minor=line["unit_price"],

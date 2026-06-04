@@ -1,0 +1,28 @@
+"""URL routes for the dining-session slice (mounted under ``/api/dining/``)."""
+from __future__ import annotations
+
+from django.urls import path
+
+from .views import (
+    JoinView,
+    SessionCloseView,
+    SessionConfirmView,
+    SessionContactView,
+    SessionDetailView,
+    SessionOrderView,
+    SessionPromoteView,
+    SessionRequestBillView,
+)
+
+app_name = "dining"
+
+urlpatterns = [
+    path("join/", JoinView.as_view(), name="join"),
+    path("sessions/<uuid:pk>/", SessionDetailView.as_view(), name="session-detail"),
+    path("sessions/<uuid:pk>/orders/", SessionOrderView.as_view(), name="session-orders"),
+    path("sessions/<uuid:pk>/contact/", SessionContactView.as_view(), name="session-contact"),
+    path("sessions/<uuid:pk>/promote/", SessionPromoteView.as_view(), name="session-promote"),
+    path("sessions/<uuid:pk>/confirm/", SessionConfirmView.as_view(), name="session-confirm"),
+    path("sessions/<uuid:pk>/request-bill/", SessionRequestBillView.as_view(), name="session-request-bill"),
+    path("sessions/<uuid:pk>/close/", SessionCloseView.as_view(), name="session-close"),
+]

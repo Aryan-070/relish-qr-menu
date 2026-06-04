@@ -33,6 +33,15 @@ ORDER_STATUS_CHOICES = (
     ("served", "Served"),
 )
 ORDER_SOURCE_CHOICES = (("guest", "Guest"), ("staff", "Staff"))
+# Confirmation gate: a guest-submitted order in ``waiter_confirm`` mode lands as
+# ``pending_confirmation`` and only enters the kitchen pipeline once a staffer
+# fires it (``confirmed``). Staff- and leader/auto-fire orders are born
+# ``confirmed`` so existing flows are unchanged.
+ORDER_CONFIRMATION_CHOICES = (
+    ("draft", "Draft"),
+    ("pending_confirmation", "Pending confirmation"),
+    ("confirmed", "Confirmed"),
+)
 REQUEST_TYPE_CHOICES = (
     ("waiter", "Waiter"),
     ("water", "Water"),
@@ -105,6 +114,27 @@ class Order(TenantScopedModel):
     )
     # FK to crm.Customer arrives with the CRM increment; interim nullable UUID.
     customer_id = models.UUIDField(null=True, blank=True)
+    # Dining-session linkage (guest QR flow). Nullable so staff/POS orders that
+    # never join a session keep working unchanged.
+    session = models.ForeignKey(
+        "dining.DiningSession",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
+    participant = models.ForeignKey(
+        "dining.GuestDevice",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
+    confirmation = models.CharField(
+        max_length=20, choices=ORDER_CONFIRMATION_CHOICES, default="confirmed"
+    )
+    # Per-(session) idempotency key for guest order submission; "" for staff.
+    idempotency_key = models.CharField(max_length=80, blank=True, default="")
     source = models.CharField(
         max_length=10, choices=ORDER_SOURCE_CHOICES, default="staff"
     )
@@ -126,6 +156,13 @@ class Order(TenantScopedModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["restaurant_id", "code"], name="uniq_order_restaurant_code"
+            ),
+            # A non-empty idempotency key is unique within its session, so a
+            # double-tapped "place order" yields one order, not two.
+            models.UniqueConstraint(
+                fields=["session", "idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="uniq_order_session_idempotency_key",
             ),
         ]
         indexes = [
@@ -149,6 +186,14 @@ class OrderLine(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="lines")
     menu_item = models.ForeignKey(
         "menu.MenuItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order_lines",
+    )
+    # The guest device that added this line — drives per-seat / split-bill.
+    participant = models.ForeignKey(
+        "dining.GuestDevice",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
