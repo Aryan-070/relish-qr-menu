@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useOrder } from '../../hooks/useOrder'
 import { useSession, readSessionParamsFromUrl } from '../../hooks/useSession'
@@ -69,7 +69,8 @@ function QsrAppInner() {
   // Joins/polls the table session when the URL has a QR (r + t); otherwise inert.
   const session = useSession()
   // Backend menu (for resolving cart lines to real MenuItem UUIDs at order time).
-  const menu = usePublicMenu(readSessionParamsFromUrl()?.restaurantId)
+  const sessionParams = useMemo(() => readSessionParamsFromUrl(), [])
+  const menu = usePublicMenu(sessionParams?.restaurantId)
   const { tokens: t } = useTheme()
   const [view, setView] = useState<QsrView>('guest')
   const [entered, setEntered] = useState(false)

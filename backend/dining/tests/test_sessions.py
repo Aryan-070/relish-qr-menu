@@ -235,6 +235,26 @@ def test_auto_fire_confirms_immediately() -> None:
     assert order.confirmation == "confirmed"
 
 
+# ── availability ──────────────────────────────────────────────────────────────
+def test_sold_out_item_is_rejected() -> None:
+    _org, restaurant = _make_tenant("so", "SO1")
+    table = _make_table(restaurant)
+    item = _make_item(restaurant)
+    item.sold_out = True
+    item.save(update_fields=["sold_out"])
+    joined = _join(restaurant, table)
+    _set_mode(joined["session_id"], "auto_fire")
+
+    guest = APIClient()
+    resp = guest.post(
+        f"/api/dining/sessions/{joined['session_id']}/orders/",
+        {"lines": [{"menu_item_id": str(item.id), "qty": 1}]},
+        format="json",
+        HTTP_X_DEVICE_TOKEN=joined["device_token"],
+    )
+    assert resp.status_code == 400  # server enforces sold_out, not just the UI
+
+
 # ── epoch / turnover guard ────────────────────────────────────────────────────
 def test_turnover_increments_epoch_and_kills_stale_token() -> None:
     org, restaurant = _make_tenant("g", "G1")

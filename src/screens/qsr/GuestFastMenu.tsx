@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Sparkles, Leaf, Flame, ShoppingBag, Tag, Mail } from 'lucide-react'
 import { categories, matchesDietFilters, type QsrMenuItem, type Craving, type QsrMood, type DietFilter } from '../../data/qsrMenu'
@@ -42,6 +42,9 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
   const { orderItems, addItem, addCombo, total, count } = order
   const [placing, setPlacing] = useState(false)
   const [placedMsg, setPlacedMsg] = useState<string | null>(null)
+  // Synchronous guard so a fast double-tap can't fire two submissions before
+  // the `placing` state re-render disables the button.
+  const placeInFlight = useRef(false)
 
   // Ordering authority comes from the backend session (when present). With no
   // session (offline prototype) the cart behaves as before — anyone can place.
@@ -69,27 +72,38 @@ export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
   // order against the live session. Only wired when the device may order and the
   // backend menu has loaded (otherwise the sheet keeps its prototype behaviour).
   const canPlaceToBackend = sessionActive && canOrder && Boolean(menuMap)
+  const flash = (msg: string) => {
+    setPlacedMsg(msg)
+    window.setTimeout(() => setPlacedMsg(null), 3000)
+  }
   const handlePlace = async () => {
-    if (!session || !menuMap) return
-    const { lines, skipped } = cartToOrderLines(orderItems, menuMap)
+    if (!session || !menuMap || placeInFlight.current) return
+    const { lines, routedToServer } = cartToOrderLines(orderItems, menuMap)
     if (lines.length === 0) {
-      setPlacedMsg('These items aren’t orderable right now.')
-      window.setTimeout(() => setPlacedMsg(null), 2800)
+      flash(
+        routedToServer > 0
+          ? 'Combos & customised items — please ask your server to add them.'
+          : 'These items aren’t available right now.',
+      )
       return
     }
+    placeInFlight.current = true
     setPlacing(true)
     try {
       await session.submitOrder(lines, crypto.randomUUID())
+      // Clear the whole cart so submitted items can't be re-sent (double order);
+      // the message tells the guest to mention any combo/customised items.
       order.clear()
       setReviewOpen(false)
       const base =
         mode === 'waiter_confirm' ? 'Sent to your server to confirm.' : 'Order placed!'
-      setPlacedMsg(skipped > 0 ? `${base} (${skipped} item(s) skipped)` : base)
+      const extra = routedToServer > 0 ? ' Ask your server about combos/customised items.' : ''
+      flash(base + extra)
     } catch {
-      setPlacedMsg('Could not place the order — please try again.')
+      flash('Could not place the order — please try again.')
     } finally {
       setPlacing(false)
-      window.setTimeout(() => setPlacedMsg(null), 3000)
+      placeInFlight.current = false
     }
   }
 

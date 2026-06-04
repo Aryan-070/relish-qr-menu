@@ -1,25 +1,31 @@
 /**
  * Maps the local QSR cart to backend order lines for real submission.
  *
- * The cart keys plain lines by the static qsrMenu item id (== backend
- * ``code``); combo lines are keyed ``combo:<id>`` and expand to their component
- * items. Each line resolves to a backend ``MenuItem`` UUID via the public-menu
- * ``code → item`` map; anything unresolved or unavailable is counted as skipped
- * (the caller can surface that). Modifier selections ride along as a note in v1
- * — full backend modifier wiring lands with the menu-detail rewire.
+ * v1 only submits **plain, unmodified** items, each resolved to a real backend
+ * ``MenuItem`` by ``code`` (== the static qsrMenu item id). Two cases are
+ * deliberately NOT auto-submitted because the backend can't yet price them
+ * correctly, and silently charging a different amount than the guest saw would
+ * be wrong:
+ *   - **combos** — the backend has no bundle-discount concept, so expanding to
+ *     components would bill the à-la-carte sum (an overcharge vs the shown
+ *     combo price);
+ *   - **modified / build-your-own lines** — modifier price deltas aren't yet
+ *     resolved to backend modifier ids, so they'd bill at the base price.
+ * Both are returned as ``routedToServer`` so the UI can tell the guest to have
+ * their server add them. (Tracked for the backend combo/modifier increment.)
  */
-import { recommendationPaths } from '../../data/qsrMenu'
 import type { OrderItem } from '../../hooks/useOrder'
 import type { OrderLineInput } from '../../lib/api/dining'
 import type { PublicMenuItem } from '../../lib/api/publicMenu'
 
 const COMBO_PREFIX = 'combo:'
-const COMBO_ITEM_IDS = new Map(recommendationPaths.map(p => [p.id, p.itemIds]))
 
 export interface MappedOrder {
   lines: OrderLineInput[]
-  /** Cart lines that could not be resolved to an available backend item. */
-  skipped: number
+  /** Lines that need the server (combos / modified items) — not auto-submitted. */
+  routedToServer: number
+  /** Plain lines whose item is unavailable / sold out / not on the backend. */
+  unavailable: number
 }
 
 function isOrderable(item: PublicMenuItem | undefined): item is PublicMenuItem {
@@ -31,35 +37,22 @@ export function cartToOrderLines(
   byCode: Map<string, PublicMenuItem>,
 ): MappedOrder {
   const lines: OrderLineInput[] = []
-  let skipped = 0
+  let routedToServer = 0
+  let unavailable = 0
 
   for (const line of orderItems) {
-    const id = line.item.id
-    if (id.startsWith(COMBO_PREFIX)) {
-      const componentIds = COMBO_ITEM_IDS.get(id.slice(COMBO_PREFIX.length)) ?? []
-      const resolved = componentIds
-        .map(code => byCode.get(code))
-        .filter(isOrderable)
-      if (resolved.length === 0) {
-        skipped += 1
-        continue
-      }
-      for (const backend of resolved) {
-        lines.push({ menu_item_id: backend.id, qty: line.quantity })
-      }
+    // Combos and modifier-bearing lines can't be priced correctly yet.
+    if (line.item.id.startsWith(COMBO_PREFIX) || line.modifiers.length > 0) {
+      routedToServer += 1
+      continue
+    }
+    const backend = byCode.get(line.item.id)
+    if (isOrderable(backend)) {
+      lines.push({ menu_item_id: backend.id, qty: line.quantity })
     } else {
-      const backend = byCode.get(id)
-      if (isOrderable(backend)) {
-        lines.push({
-          menu_item_id: backend.id,
-          qty: line.quantity,
-          note: line.label || undefined,
-        })
-      } else {
-        skipped += 1
-      }
+      unavailable += 1
     }
   }
 
-  return { lines, skipped }
+  return { lines, routedToServer, unavailable }
 }

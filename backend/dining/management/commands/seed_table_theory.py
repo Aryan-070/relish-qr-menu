@@ -111,14 +111,19 @@ class Command(BaseCommand):
         restaurant.published = True
         restaurant.active = True
         restaurant.save(update_fields=["published", "active"])
-        Subscription.objects.get_or_create(
+        # Idempotent on org (NOT on status) so a re-run after a lapse reactivates
+        # the existing subscription rather than stacking duplicate ACTIVE rows.
+        subscription, _ = Subscription.objects.get_or_create(
             org_id=org.id,
-            status=Subscription.Status.ACTIVE,
             defaults={
                 "package": Subscription.Package.SIGNATURE,
+                "status": Subscription.Status.ACTIVE,
                 "renewal_at": timezone.now() + timedelta(days=365),
             },
         )
+        if subscription.status != Subscription.Status.ACTIVE:
+            subscription.status = Subscription.Status.ACTIVE
+            subscription.save(update_fields=["status"])
 
         tables = {}
         for code, seats in TABLES:

@@ -24,6 +24,7 @@ from accounts.models import Restaurant
 from billing.services import RazorpayConfigError, RazorpayError
 from common.context import get_current_membership_id
 from common.permissions import IsTenantMember
+from ops.services import OrderError
 from realtime.broadcast import broadcast_order_event, broadcast_session_event
 
 from .models import DiningSession
@@ -186,7 +187,7 @@ class SessionOrderView(APIView):
                 lines=body.validated_data["lines"],
                 idempotency_key=idem,
             )
-        except SessionError as exc:
+        except (SessionError, OrderError) as exc:
             raise ValidationError(str(exc)) from exc
 
         if order.confirmation == "confirmed":

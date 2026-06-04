@@ -54,7 +54,7 @@ def _resolve_menu_item(restaurant_id: Any, menu_item_id: Any) -> MenuItem:
     )
     if item is None or item.deleted_at is not None:
         raise OrderError(f"Menu item {menu_item_id} not found for this restaurant.")
-    if not item.available:
+    if not item.available or item.sold_out:
         raise OrderError(f"Menu item '{item.name}' is not available.")
     return item
 
