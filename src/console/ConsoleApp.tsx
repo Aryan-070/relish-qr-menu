@@ -9,10 +9,11 @@ import { DATE_RANGES, type DateRange, type Role } from './lib/types'
 import { fadeIn } from '../animations/variants'
 import { AdminDashboard } from './views/AdminDashboard'
 import { ReportsCenter } from './views/ReportsCenter'
-import { FloorView } from './views/FloorView'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '../lib/queryClient'
 import { MenuManagerLive } from './views/MenuManagerLive'
+import { FloorLive } from './views/FloorLive'
+import { LoyaltyCrmLive } from './views/LoyaltyCrmLive'
 import { StaffPerformance } from './views/StaffPerformance'
 import { BillingView } from './views/BillingView'
 import { WaiterTables } from './views/WaiterTables'
@@ -22,7 +23,6 @@ import { OrderHistory } from './views/OrderHistory'
 import { KitchenDisplay } from './views/KitchenDisplay'
 import { QrCodes } from './views/QrCodes'
 import { Reservations } from './views/Reservations'
-import { LoyaltyCrm } from './views/LoyaltyCrm'
 import { FeedbackInbox } from './views/FeedbackInbox'
 import { Campaigns } from './views/Campaigns'
 import { Inventory } from './views/Inventory'
@@ -44,7 +44,7 @@ function renderView(view: ConsoleView) {
     case 'reports':
       return <ReportsCenter />
     case 'manager-floor':
-      return <FloorView />
+      return <FloorLive />
     case 'manager-menu':
       return <MenuManagerLive />
     case 'manager-staff':
@@ -66,7 +66,7 @@ function renderView(view: ConsoleView) {
     case 'reservations':
       return <Reservations />
     case 'loyalty':
-      return <LoyaltyCrm />
+      return <LoyaltyCrmLive />
     case 'feedback':
       return <FeedbackInbox />
     case 'campaigns':
