@@ -6,8 +6,10 @@ import { formatMoney } from '../../lib/money'
 import { combosForContext, useQsrWhisper, menuScore, envelopeForContext, type QsrContext } from './useQsrWhisper'
 import { TastePass } from './TastePass'
 import { QsrOrderSheet } from './QsrOrderSheet'
+import { cartToOrderLines } from './orderMapping'
 import type { OrderApi } from './types'
 import type { UseSessionResult } from '../../hooks/useSession'
+import type { PublicMenuItem } from '../../lib/api/publicMenu'
 import { useTheme } from '../../theme/ThemeContext'
 import { panelStyle, headingStyle, sectionTitleStyle, bodyStyle, isHard } from '../../console/lib/skin'
 import { Button } from '../../console/components/Button'
@@ -21,6 +23,8 @@ interface GuestFastMenuProps {
   order: OrderApi
   /** Live dining session (present when reached via a `?r=&t=` QR). */
   session?: UseSessionResult
+  /** Backend menu by code (== qsrMenu id), for resolving real order lines. */
+  menuMap?: Map<string, PublicMenuItem>
 }
 
 const VEG_GREEN = '#2e7d4f'
@@ -33,9 +37,11 @@ const NONVEG_RED = '#c0392b'
  * a craving rail + dietary gate + table mood that live-reorder the grid and
  * drive a concept-aware whisper plus the brand's envelope suggestion.
  */
-export function GuestFastMenu({ order, session }: GuestFastMenuProps) {
+export function GuestFastMenu({ order, session, menuMap }: GuestFastMenuProps) {
   const { tokens: t } = useTheme()
   const { orderItems, addItem, addCombo, total, count } = order
+  const [placing, setPlacing] = useState(false)
+  const [placedMsg, setPlacedMsg] = useState<string | null>(null)
 
   // Ordering authority comes from the backend session (when present). With no
   // session (offline prototype) the cart behaves as before — anyone can place.
@@ -58,6 +64,34 @@ export function GuestFastMenu({ order, session }: GuestFastMenuProps) {
         ? 'Ask your server to start your order.'
         : 'Your server will confirm orders for this table.'
     : undefined
+
+  // Real backend submission: map the cart to backend order lines and place the
+  // order against the live session. Only wired when the device may order and the
+  // backend menu has loaded (otherwise the sheet keeps its prototype behaviour).
+  const canPlaceToBackend = sessionActive && canOrder && Boolean(menuMap)
+  const handlePlace = async () => {
+    if (!session || !menuMap) return
+    const { lines, skipped } = cartToOrderLines(orderItems, menuMap)
+    if (lines.length === 0) {
+      setPlacedMsg('These items aren’t orderable right now.')
+      window.setTimeout(() => setPlacedMsg(null), 2800)
+      return
+    }
+    setPlacing(true)
+    try {
+      await session.submitOrder(lines, crypto.randomUUID())
+      order.clear()
+      setReviewOpen(false)
+      const base =
+        mode === 'waiter_confirm' ? 'Sent to your server to confirm.' : 'Order placed!'
+      setPlacedMsg(skipped > 0 ? `${base} (${skipped} item(s) skipped)` : base)
+    } catch {
+      setPlacedMsg('Could not place the order — please try again.')
+    } finally {
+      setPlacing(false)
+      window.setTimeout(() => setPlacedMsg(null), 3000)
+    }
+  }
 
   const [cravings, setCravings] = useState<ReadonlySet<Craving>>(new Set())
   const [dietary, setDietary] = useState<ReadonlySet<DietFilter>>(new Set())
@@ -300,13 +334,27 @@ export function GuestFastMenu({ order, session }: GuestFastMenuProps) {
         </div>
       </div>
 
+      {placedMsg && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 16 }}
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[70] px-4 py-2.5 rounded-full text-[13px] font-medium shadow-lg"
+          style={{ background: t.accent, color: '#fff', fontFamily: t.descFont }}
+          role="status"
+        >
+          {placedMsg}
+        </motion.div>
+      )}
+
       <QsrOrderSheet
         open={reviewOpen}
         order={order}
         onClose={() => setReviewOpen(false)}
-        ctaLabel={ctaLabel}
-        ctaDisabled={sessionActive && !canOrder}
+        ctaLabel={placing ? 'Sending…' : ctaLabel}
+        ctaDisabled={(sessionActive && !canOrder) || placing}
         ctaNote={ctaNote}
+        onCta={canPlaceToBackend ? handlePlace : undefined}
       />
     </div>
   )

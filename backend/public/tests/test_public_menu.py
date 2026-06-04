@@ -169,6 +169,7 @@ def test_item_payload_excludes_internal_fields(api_client, public_restaurant):
     resp = api_client.get(_menu_url(public_restaurant.id))
     item = resp.json()["categories"][0]["items"][0]
 
+    # Sensitive / internal fields must never leak.
     for forbidden in (
         "version",
         "restaurant_id",
@@ -176,12 +177,12 @@ def test_item_payload_excludes_internal_fields(api_client, public_restaurant):
         "created_at",
         "updated_at",
         "tax_rate_pct",
-        "code",
     ):
         assert forbidden not in item, f"leaked internal field: {forbidden}"
 
-    # Spot-check that the expected safe fields ARE present.
-    for expected in ("id", "name", "price_minor", "is_jain", "modifier_groups"):
+    # Safe fields ARE present. `code` is an intentional public SKU the guest
+    # client maps cart lines by (it is not sensitive — unlike cost/tax/version).
+    for expected in ("id", "code", "name", "price_minor", "is_jain", "modifier_groups"):
         assert expected in item
 
 

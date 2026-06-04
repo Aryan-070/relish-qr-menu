@@ -24,6 +24,7 @@ from .serializers import (
 # unlisted (internal) attribute.
 _SAFE_ITEM_FIELDS: tuple[str, ...] = (
     "id",
+    "code",
     "name",
     "price_minor",
     "description",
@@ -42,7 +43,7 @@ _SAFE_ITEM_FIELDS: tuple[str, ...] = (
 
 # Cache namespace + version. Bump ``_CACHE_VERSION`` to invalidate every cached
 # menu at once (e.g. after a payload-shape change).
-_CACHE_VERSION = "v1"
+_CACHE_VERSION = "v2"
 
 
 def public_menu_cache_key(restaurant_id: Any) -> str:

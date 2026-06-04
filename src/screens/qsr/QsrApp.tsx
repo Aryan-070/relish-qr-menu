@@ -1,7 +1,8 @@
 import { lazy, Suspense, useState } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useOrder } from '../../hooks/useOrder'
-import { useSession } from '../../hooks/useSession'
+import { useSession, readSessionParamsFromUrl } from '../../hooks/useSession'
+import { usePublicMenu } from '../../hooks/usePublicMenu'
 import { queryClient } from '../../lib/queryClient'
 import { useTheme } from '../../theme/ThemeContext'
 import { SegmentedControl } from '../../console/components/SegmentedControl'
@@ -67,6 +68,8 @@ function QsrAppInner() {
   const order = useOrder('relish.qsr.cart.v1')
   // Joins/polls the table session when the URL has a QR (r + t); otherwise inert.
   const session = useSession()
+  // Backend menu (for resolving cart lines to real MenuItem UUIDs at order time).
+  const menu = usePublicMenu(readSessionParamsFromUrl()?.restaurantId)
   const { tokens: t } = useTheme()
   const [view, setView] = useState<QsrView>('guest')
   const [entered, setEntered] = useState(false)
@@ -158,7 +161,7 @@ function QsrAppInner() {
           {view === 'waiter' ? (
             <WaiterCopilot order={order} session={session} />
           ) : (
-            <GuestFastMenu order={order} session={session} />
+            <GuestFastMenu order={order} session={session} menuMap={menu.byCode} />
           )}
         </div>
       </main>

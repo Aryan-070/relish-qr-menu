@@ -33,6 +33,7 @@ class PublicMenuItemSerializer(serializers.Serializer):
     """A guest-facing menu item — safe display fields only."""
 
     id = serializers.UUIDField(read_only=True)
+    code = serializers.CharField(read_only=True)
     name = serializers.CharField(read_only=True)
     price_minor = serializers.IntegerField(read_only=True)
     description = serializers.CharField(read_only=True, allow_blank=True)
