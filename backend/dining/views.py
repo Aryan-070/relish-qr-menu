@@ -27,7 +27,8 @@ from common.permissions import IsTenantMember
 from ops.services import OrderError
 from realtime.broadcast import broadcast_order_event, broadcast_session_event
 
-from .models import DiningSession
+from .constants import LIVE_SESSION_STATUSES
+from .models import DiningSession, GuestDevice
 from .payments import (
     CheckPaymentError,
     create_check_payment,
@@ -143,6 +144,23 @@ class JoinView(APIView):
         )
 
 
+class SessionListView(APIView):
+    """Staff: list the tenant's live dining sessions (the floor cockpit feed)."""
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    @extend_schema(responses={200: DiningSessionSerializer(many=True)}, tags=["dining"])
+    def get(self, request: Request) -> Response:
+        # TenantManager scopes to the JWT's restaurant_id automatically.
+        sessions = (
+            DiningSession.objects.filter(status__in=LIVE_SESSION_STATUSES)
+            .select_related("table", "tab")
+            .prefetch_related("devices", "orders__lines__modifiers")
+            .order_by("table__code")
+        )
+        return Response({"results": DiningSessionSerializer(sessions, many=True).data})
+
+
 class SessionDetailView(APIView):
     """GET the live session snapshot (the polling endpoint)."""
 
@@ -241,7 +259,11 @@ class SessionPromoteView(APIView):
         session = _get_session_or_404(pk)
         s = PromoteSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        device = find_device(session, s.validated_data["device_token"])
+        device_id = s.validated_data.get("device_id")
+        if device_id is not None:
+            device = GuestDevice.all_objects.filter(session=session, id=device_id).first()
+        else:
+            device = find_device(session, s.validated_data["device_token"])
         if device is None:
             raise NotFound("Device not found in session.")
         try:

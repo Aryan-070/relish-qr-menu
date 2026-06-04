@@ -235,6 +235,29 @@ def test_auto_fire_confirms_immediately() -> None:
     assert order.confirmation == "confirmed"
 
 
+# ── staff floor cockpit ───────────────────────────────────────────────────────
+def test_staff_lists_live_sessions() -> None:
+    org, restaurant = _make_tenant("sl", "SL1")
+    table = _make_table(restaurant)
+    joined = _join(restaurant, table)
+
+    staff = _staff_client(org, restaurant)
+    resp = staff.get("/api/dining/sessions/")
+    assert resp.status_code == 200, resp.content
+    results = resp.data["results"]
+    assert len(results) == 1
+    assert results[0]["id"] == joined["session_id"]
+    assert results[0]["table_code"] == "T1"
+
+
+def test_session_list_requires_staff() -> None:
+    _org, restaurant = _make_tenant("sl2", "SL2")
+    table = _make_table(restaurant)
+    _join(restaurant, table)
+    # No JWT → rejected (no tenant bound).
+    assert APIClient().get("/api/dining/sessions/").status_code in (401, 403)
+
+
 # ── availability ──────────────────────────────────────────────────────────────
 def test_sold_out_item_is_rejected() -> None:
     _org, restaurant = _make_tenant("so", "SO1")

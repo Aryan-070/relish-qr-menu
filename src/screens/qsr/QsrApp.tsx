@@ -7,8 +7,8 @@ import { queryClient } from '../../lib/queryClient'
 import { useTheme } from '../../theme/ThemeContext'
 import { SegmentedControl } from '../../console/components/SegmentedControl'
 import { headingStyle, bodyStyle } from '../../console/lib/skin'
-import { WaiterCopilot } from './WaiterCopilot'
 import { GuestFastMenu } from './GuestFastMenu'
+import { StaffCockpit } from './StaffCockpit'
 import { SessionBanner } from './SessionBanner'
 
 // Three.js landing heroes are lazy-loaded so the WebGL/R3F bundle only ships
@@ -160,7 +160,7 @@ function QsrAppInner() {
       <main className="flex-1 min-h-0 w-full">
         <div className="mx-auto w-full max-w-screen-xl h-full">
           {view === 'waiter' ? (
-            <WaiterCopilot order={order} session={session} />
+            <StaffCockpit />
           ) : (
             <GuestFastMenu order={order} session={session} menuMap={menu.byCode} />
           )}

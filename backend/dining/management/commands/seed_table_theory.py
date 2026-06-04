@@ -14,13 +14,24 @@ from __future__ import annotations
 import math
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from accounts.models import Organization, Restaurant
+from accounts.constants import MEMBERSHIP_ACTIVE, ROLE_ADMIN
+from accounts.models import (
+    Membership,
+    MembershipOutlet,
+    Organization,
+    Restaurant,
+    Role,
+)
 from billing.models import Subscription
 from menu.models import MenuCategory, MenuItem
 from ops.models import RestaurantTable
+
+STAFF_EMAIL = "staff@tabletheory.test"
+STAFF_PASSWORD = "TableTheory#2026"  # noqa: S105 - demo seed credential only.
 
 # category_code -> (name, sort_order, [(item_code, item_name, rupees), ...])
 MENU: dict[str, tuple[str, int, list[tuple[str, str, int]]]] = {
@@ -199,8 +210,34 @@ class Command(BaseCommand):
             )
             item_count += created
 
+        # A staff user wired to this restaurant so the floor cockpit can log in
+        # (admin system role → all perms; IsTenantMember only needs the org bind).
+        user_model = get_user_model()
+        user, created = user_model.objects.get_or_create(email=STAFF_EMAIL)
+        if created:
+            user.set_password(STAFF_PASSWORD)
+            user.save(update_fields=["password"])
+        admin_role = Role.objects.get(key=ROLE_ADMIN, org__isnull=True)
+        membership, _ = Membership.objects.get_or_create(
+            org=org,
+            user=user,
+            defaults={
+                "role": admin_role,
+                "display_name": "Floor Manager",
+                "email": STAFF_EMAIL,
+                "status": MEMBERSHIP_ACTIVE,
+                "active": True,
+            },
+        )
+        MembershipOutlet.objects.get_or_create(
+            membership=membership,
+            restaurant=restaurant,
+            defaults={"is_primary": True},
+        )
+
         self.stdout.write(self.style.SUCCESS("Seeded The Table Theory."))
         self.stdout.write(f"  restaurant_id = {restaurant.id}")
+        self.stdout.write(f"  staff login   = {STAFF_EMAIL} / {STAFF_PASSWORD}")
         self.stdout.write(f"  table T1 id   = {tables['T1'].id}")
         self.stdout.write(f"  menu items    = {MenuItem.all_objects.filter(restaurant_id=restaurant.id).count()} ({item_count} new)")
         self.stdout.write(

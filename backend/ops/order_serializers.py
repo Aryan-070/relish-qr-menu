@@ -61,6 +61,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "customer_id",
             "source",
             "status",
+            "confirmation",
             "subtotal_minor",
             "discount_pct",
             "tax_minor",

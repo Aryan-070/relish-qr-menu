@@ -10,6 +10,7 @@ from .views import (
     SessionContactView,
     SessionDetailView,
     SessionDisputeView,
+    SessionListView,
     SessionOrderView,
     SessionPayView,
     SessionPromoteView,
@@ -21,6 +22,7 @@ app_name = "dining"
 
 urlpatterns = [
     path("join/", JoinView.as_view(), name="join"),
+    path("sessions/", SessionListView.as_view(), name="session-list"),
     path("sessions/<uuid:pk>/", SessionDetailView.as_view(), name="session-detail"),
     path("sessions/<uuid:pk>/orders/", SessionOrderView.as_view(), name="session-orders"),
     path("sessions/<uuid:pk>/contact/", SessionContactView.as_view(), name="session-contact"),

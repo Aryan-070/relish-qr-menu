@@ -38,6 +38,7 @@ export interface SessionOrder {
   id: string
   code: string
   status: string
+  confirmation: 'draft' | 'pending_confirmation' | 'confirmed'
   total_minor: number
   lines: SessionOrderLine[]
 }
@@ -45,6 +46,8 @@ export interface SessionOrder {
 export interface DiningSessionView {
   id: string
   table: string
+  table_code: string
+  table_label: string
   status: SessionStatus
   epoch: number
   order_confirmation_mode: OrderConfirmationMode
@@ -93,6 +96,11 @@ export function getSession(sessionId: string, deviceToken: string | null): Promi
   return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/`, { deviceToken })
 }
 
+/** Staff: list the tenant's live dining sessions (the floor cockpit feed). */
+export function listSessions(): Promise<{ results: DiningSessionView[] }> {
+  return apiFetch<{ results: DiningSessionView[] }>('/dining/sessions/')
+}
+
 /** Submit an order as a joined device, honoring the session's policy. */
 export function submitSessionOrder(
   sessionId: string,
@@ -123,14 +131,15 @@ export function submitContact(
 }
 
 // ── Staff actions (JWT) ───────────────────────────────────────────────────────
+/** Staff promotes a device (by its id from the snapshot) to session leader. */
 export function promoteDevice(
   sessionId: string,
-  deviceToken: string,
+  deviceId: string,
   version?: number,
 ): Promise<DiningSessionView> {
   return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/promote/`, {
     method: 'POST',
-    body: { device_token: deviceToken, version },
+    body: { device_id: deviceId, version },
   })
 }
 

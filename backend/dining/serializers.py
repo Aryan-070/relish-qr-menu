@@ -52,12 +52,16 @@ class DiningSessionSerializer(serializers.ModelSerializer):
     # the server-authoritative "may I order?" flag so the UI never has to guess.
     me = serializers.SerializerMethodField()
     can_order = serializers.SerializerMethodField()
+    table_code = serializers.CharField(source="table.code", read_only=True)
+    table_label = serializers.CharField(source="table.label", read_only=True)
 
     class Meta:
         model = DiningSession
         fields = [
             "id",
             "table",
+            "table_code",
+            "table_label",
             "status",
             "epoch",
             "order_confirmation_mode",
@@ -115,8 +119,16 @@ class JoinResultSerializer(serializers.Serializer):
 
 
 class PromoteSerializer(serializers.Serializer):
-    device_token = serializers.UUIDField()
+    # Staff promote by device id (visible in the snapshot); device_token is a
+    # fallback for callers that hold the token directly.
+    device_id = serializers.UUIDField(required=False)
+    device_token = serializers.UUIDField(required=False)
     version = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+
+    def validate(self, attrs: dict) -> dict:
+        if not attrs.get("device_id") and not attrs.get("device_token"):
+            raise serializers.ValidationError("device_id or device_token is required.")
+        return attrs
 
 
 class ConfirmOrdersSerializer(serializers.Serializer):
