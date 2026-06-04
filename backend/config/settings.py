@@ -248,8 +248,14 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ── CORS ────────────────────────────────────────────────────────────────────
+from corsheaders.defaults import default_headers  # noqa: E402
+
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
+# Guest dining traffic sends an opaque device token + an order idempotency key;
+# both are custom headers and must be allowlisted for the browser preflight to
+# pass (otherwise the cross-origin GET/POST is silently cancelled after OPTIONS).
+CORS_ALLOW_HEADERS = (*default_headers, "x-device-token", "idempotency-key")
 
 # ── Cache / Channels (Redis when REDIS_URL set, else in-memory) ─────────────
 REDIS_URL = env("REDIS_URL", default="")

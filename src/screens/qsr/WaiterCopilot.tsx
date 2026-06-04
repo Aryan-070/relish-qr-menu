@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft,
@@ -10,6 +10,7 @@ import {
   Users,
   Flame,
   Leaf,
+  Mail,
 } from 'lucide-react'
 import { useTheme } from '../../theme/ThemeContext'
 import { panelStyle, sectionTitleStyle, bodyStyle, isHard } from '../../console/lib/skin'
@@ -17,53 +18,73 @@ import { Button } from '../../console/components/Button'
 import { AnimatedNumber } from '../../components/ui/animated-number'
 import { fadeUp, stagger } from '../../animations/variants'
 import { cn } from '../../console/lib/format'
-import { getCategoryForItem, type MenuItem } from '../../data/menu'
+import { getCategoryForItem, type QsrMenuItem, type Craving, type QsrMood, type DietFilter } from '../../data/qsrMenu'
 import { formatMoney } from '../../lib/money'
 import { QSR_TABLES, type QsrTable } from './qsrTables'
-import { buildShortlist, useWhisper, type TableContext } from './useWhisper'
+import { buildShortlist, useQsrWhisper, envelopeForContext, type QsrContext } from './useQsrWhisper'
+import { TastePass } from './TastePass'
 import type { OrderApi } from './types'
+import type { UseSessionResult } from '../../hooks/useSession'
 
-const MOODS = ['Light & Fresh', 'Cheesy & Comforting', 'Spicy', 'Italian', 'Mexican', 'Dessert'] as const
-const PARTY_SIZES = ['Just me', 'Two people', 'Family / group', 'Kids'] as const
-
-const JAIN_GREEN = '#2e7d32'
+const VEG_GREEN = '#2e7d4f'
 const SPICE_RED = '#c0392b'
 const SUCCESS_GREEN = '#2e7d32'
 
 interface WaiterCopilotProps {
   order: OrderApi
+  /** Live dining session (present when this device reached /qsr via a QR). */
+  session?: UseSessionResult
 }
 
 /**
  * Waiter Copilot — the no-hardware pitch on the waiter's own phone.
- * Tap a table → set party/mood with two chips → the menu collapses to the ~12
- * dishes that matter → tap to build the order → read the one whisper line aloud
- * → fire to the kitchen. AI does only the whisper; everything else is tapping.
- * A cockpit: fast, glanceable, theme-aware, responsive (two-pane on lg).
+ * Tap a table → set the Taste Pass (craving / diet / mood) → the menu collapses
+ * to the ~12 dishes that matter → tap to build the order → read the one whisper
+ * line aloud (and the matching envelope) → fire to the kitchen. AI does only the
+ * whisper; everything else is tapping. A cockpit: fast, glanceable, theme-aware.
  */
-export function WaiterCopilot({ order }: WaiterCopilotProps) {
+export function WaiterCopilot({ order, session }: WaiterCopilotProps) {
   const { tokens: t } = useTheme()
   const { orderItems, addItem, addCombo, updateQuantity, clear, total, count } = order
+  // A live backend session is present only when this device reached /qsr via a
+  // QR. The full staff session cockpit (promote / batch-confirm / close) lives
+  // in the authenticated console (Phase 5); here we surface its presence.
+  const liveSession = session?.enabled && session.session ? session.session : null
 
   const [table, setTable] = useState<QsrTable | null>(null)
-  const [mood, setMood] = useState<string | null>(null)
-  const [partySize, setPartySize] = useState<string | null>(null)
-  const [jainOnly, setJainOnly] = useState(false)
+  const [mood, setMood] = useState<QsrMood | null>(null)
+  const [cravings, setCravings] = useState<ReadonlySet<Craving>>(new Set())
+  const [dietary, setDietary] = useState<ReadonlySet<DietFilter>>(new Set())
   const [suppressed, setSuppressed] = useState<ReadonlySet<string>>(new Set())
   const [fired, setFired] = useState<string | null>(null)
 
-  const ctx: TableContext = useMemo(() => ({ mood, partySize, jainOnly }), [mood, partySize, jainOnly])
+  const toggleCraving = useCallback((c: Craving) => {
+    setCravings(prev => { const next = new Set(prev); next.has(c) ? next.delete(c) : next.add(c); return next })
+  }, [])
+  const toggleDietary = useCallback((d: DietFilter) => {
+    setDietary(prev => {
+      const next = new Set(prev)
+      if (next.has(d)) { next.delete(d); return next }
+      next.add(d)
+      if (d === 'veg') next.delete('nonveg')
+      if (d === 'nonveg') next.delete('veg')
+      return next
+    })
+  }, [])
+
+  const ctx: QsrContext = useMemo(() => ({ mood, cravings, dietary }), [mood, cravings, dietary])
   const shortlist = useMemo(() => buildShortlist(ctx, 12), [ctx])
   const cartItemIds = useMemo(() => orderItems.map(o => o.item.id), [orderItems])
-  const whisper = useWhisper(cartItemIds, ctx, suppressed)
+  const whisper = useQsrWhisper(cartItemIds, ctx, suppressed)
+  const envelope = envelopeForContext(ctx)
 
   const radius = isHard(t) ? 0 : 999
 
   const openTable = (tbl: QsrTable) => {
     setTable(tbl)
     setMood(null)
-    setPartySize(null)
-    setJainOnly(false)
+    setCravings(new Set())
+    setDietary(new Set())
     setSuppressed(new Set())
     clear()
   }
@@ -98,6 +119,12 @@ export function WaiterCopilot({ order }: WaiterCopilotProps) {
           <h2 className="font-bold text-[22px]" style={{ ...sectionTitleStyle(t), color: t.accent }}>
             Tap a table to take the order
           </h2>
+          {liveSession && (
+            <p className="text-[11px] mt-1" style={{ ...bodyStyle(t), color: t.descColor }}>
+              Live session active · {liveSession.party_size} at the table ·{' '}
+              {liveSession.orders.length} order{liveSession.orders.length === 1 ? '' : 's'}
+            </p>
+          )}
         </div>
         <motion.div
           variants={stagger}
@@ -119,12 +146,7 @@ export function WaiterCopilot({ order }: WaiterCopilotProps) {
                 </span>
                 <span
                   className="text-[11px] px-2 py-0.5"
-                  style={{
-                    ...bodyStyle(t),
-                    background: `${t.accent}1A`,
-                    color: t.accent,
-                    borderRadius: radius,
-                  }}
+                  style={{ ...bodyStyle(t), background: `${t.accent}1A`, color: t.accent, borderRadius: radius }}
                 >
                   {tbl.zone}
                 </span>
@@ -143,13 +165,9 @@ export function WaiterCopilot({ order }: WaiterCopilotProps) {
   return (
     <div className="flex flex-col h-full relative px-4 sm:px-6" style={{ background: t.bg }}>
       <div className="flex flex-col lg:grid lg:grid-cols-[1fr_minmax(320px,380px)] lg:gap-6 lg:items-start flex-1 min-h-0">
-        {/* LEFT pane: header + chips + shortlist (scrolls) */}
+        {/* LEFT pane: header + Taste Pass + shortlist (scrolls) */}
         <div className="flex flex-col min-h-0 flex-1 lg:h-full">
-          {/* Header */}
-          <div
-            className="flex-shrink-0 flex items-center gap-3 py-3"
-            style={{ borderBottom: `1.5px solid ${t.ruleColor}` }}
-          >
+          <div className="flex-shrink-0 flex items-center gap-3 py-3" style={{ borderBottom: `1.5px solid ${t.ruleColor}` }}>
             <button
               onClick={() => setTable(null)}
               className="w-9 h-9 flex items-center justify-center flex-shrink-0"
@@ -168,22 +186,22 @@ export function WaiterCopilot({ order }: WaiterCopilotProps) {
             </div>
           </div>
 
-          {/* Two-chip context (walk-up) */}
-          <div className="flex-shrink-0 py-3 flex flex-col gap-2" style={{ borderBottom: `1px solid ${t.ruleColor}` }}>
-            <ChipRow label="Mood" options={MOODS} value={mood} onPick={setMood} />
-            <ChipRow label="Party" options={PARTY_SIZES} value={partySize} onPick={setPartySize} />
-            <button
-              onClick={() => setJainOnly(v => !v)}
-              className="self-start text-[12px] px-3 py-1.5 flex items-center gap-1.5 transition-colors"
-              style={{
-                ...bodyStyle(t),
-                background: jainOnly ? t.accent : `${JAIN_GREEN}1F`,
-                color: jainOnly ? '#fff' : JAIN_GREEN,
-                borderRadius: radius,
-              }}
-            >
-              <Leaf size={13} /> Jain only {jainOnly ? '· on' : ''}
-            </button>
+          {/* Taste Pass — the walk-up context (craving / diet / mood) */}
+          <div className="flex-shrink-0 py-3" style={{ borderBottom: `1px solid ${t.ruleColor}` }}>
+            <TastePass
+              cravings={cravings}
+              onToggleCraving={toggleCraving}
+              dietary={dietary}
+              onToggleDietary={toggleDietary}
+              mood={mood}
+              onSetMood={setMood}
+            />
+            {envelope && (
+              <p className="mt-2.5 text-[11.5px] flex items-center gap-1.5" style={bodyStyle(t)}>
+                <Mail size={13} style={{ color: t.accent }} />
+                <span>Bring <span style={{ fontFamily: t.accentFont, color: t.accent }}>{envelope.name}</span> to this table.</span>
+              </p>
+            )}
           </div>
 
           {/* Collapsed shortlist — render instantly, no entrance animation */}
@@ -239,6 +257,12 @@ export function WaiterCopilot({ order }: WaiterCopilotProps) {
             </div>
           )}
 
+          {orderItems.length === 0 && (
+            <p className="px-4 pt-4 text-[12px]" style={{ ...bodyStyle(t), color: t.descColor }}>
+              No items yet — tap a dish to build the order.
+            </p>
+          )}
+
           {/* The one whisper line — prominent, high-contrast accent surface */}
           <AnimatePresence mode="wait">
             {whisper && (
@@ -278,13 +302,7 @@ export function WaiterCopilot({ order }: WaiterCopilotProps) {
             <div className="flex-1">
               <p className="text-[11px]" style={{ ...bodyStyle(t), color: t.descColor }}>{count} items</p>
               <span className="font-bold text-[20px] leading-none" style={{ fontFamily: t.priceFont, color: t.priceColor }}>
-                <AnimatedNumber
-                  value={total}
-                  format={(v) => formatMoney(Math.round(v))}
-                  stiffness={200}
-                  damping={26}
-                  mass={0.6}
-                />
+                <AnimatedNumber value={total} format={(v) => formatMoney(Math.round(v))} stiffness={200} damping={26} mass={0.6} />
               </span>
             </div>
             <Button variant="primary" size="md" onClick={fire} disabled={count === 0} aria-label="Fire to kitchen">
@@ -313,47 +331,8 @@ export function WaiterCopilot({ order }: WaiterCopilotProps) {
   )
 }
 
-// ── Small presentational pieces ──────────────────────────────────────────────
-
-interface ChipRowProps {
-  label: string
-  options: readonly string[]
-  value: string | null
-  onPick: (value: string | null) => void
-}
-
-function ChipRow({ label, options, value, onPick }: ChipRowProps) {
-  const { tokens: t } = useTheme()
-  const radius = isHard(t) ? 0 : 999
-  return (
-    <div className="flex items-start gap-2">
-      <span className="text-[11px] w-12 flex-shrink-0 pt-1.5" style={{ ...bodyStyle(t), color: t.descColor }}>{label}</span>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map(opt => {
-          const active = value === opt
-          return (
-            <button
-              key={opt}
-              onClick={() => onPick(active ? null : opt)}
-              className="text-[12px] px-3 py-1.5 whitespace-nowrap transition-colors active:scale-[0.97]"
-              style={{
-                ...bodyStyle(t),
-                background: active ? t.accent : `${t.accent}1A`,
-                color: active ? '#fff' : t.accent,
-                borderRadius: radius,
-              }}
-            >
-              {opt}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 interface ShortlistRowProps {
-  item: MenuItem
+  item: QsrMenuItem
   onAdd: () => void
 }
 
@@ -366,13 +345,20 @@ function ShortlistRow({ item, onAdd }: ShortlistRowProps) {
       className={cn('w-full text-left p-3 flex items-center gap-3 transition-transform active:scale-[0.98]')}
       style={panelStyle(t)}
     >
+      <span
+        aria-hidden
+        className="inline-flex items-center justify-center w-3 h-3 rounded-[2px] flex-shrink-0"
+        style={{ border: `1.5px solid ${item.isVeg ? VEG_GREEN : SPICE_RED}` }}
+      >
+        <span className="block w-1.5 h-1.5 rounded-full" style={{ background: item.isVeg ? VEG_GREEN : SPICE_RED }} />
+      </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="font-semibold text-[15px] truncate" style={{ ...sectionTitleStyle(t), color: t.ink }}>
             {item.name}
           </span>
           {item.chefsSpecial && <Sparkles size={13} style={{ color: t.accent }} />}
-          {item.isJain && <Leaf size={12} style={{ color: JAIN_GREEN }} />}
+          {item.dietary?.includes('vegan') && <Leaf size={12} style={{ color: VEG_GREEN }} />}
           {typeof item.spiceLevel === 'number' && item.spiceLevel > 0 && (
             <span className="flex">
               {Array.from({ length: item.spiceLevel }).map((_, i) => (

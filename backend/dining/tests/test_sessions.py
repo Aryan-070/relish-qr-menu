@@ -267,6 +267,33 @@ def test_turnover_increments_epoch_and_kills_stale_token() -> None:
     assert find_device(new_session, first["device_token"]) is None
 
 
+# ── snapshot contract (me / can_order — the frontend relies on these) ─────────
+def test_session_snapshot_exposes_me_and_can_order() -> None:
+    org, restaurant = _make_tenant("i", "I1")
+    table = _make_table(restaurant)
+    joined = _join(restaurant, table)
+    _set_mode(joined["session_id"], "leader")
+
+    guest = APIClient()
+    url = f"/api/dining/sessions/{joined['session_id']}/"
+
+    before = guest.get(url, HTTP_X_DEVICE_TOKEN=joined["device_token"])
+    assert before.status_code == 200, before.content
+    assert before.data["me"]["role"] == "participant"
+    assert before.data["can_order"] is False  # not yet the leader
+
+    staff = _staff_client(org, restaurant)
+    staff.post(
+        f"/api/dining/sessions/{joined['session_id']}/promote/",
+        {"device_token": joined["device_token"]},
+        format="json",
+    )
+
+    after = guest.get(url, HTTP_X_DEVICE_TOKEN=joined["device_token"])
+    assert after.data["me"]["role"] == "leader"
+    assert after.data["can_order"] is True
+
+
 # ── idempotency ───────────────────────────────────────────────────────────────
 def test_idempotent_submit_yields_one_order() -> None:
     _org, restaurant = _make_tenant("h", "H1")
