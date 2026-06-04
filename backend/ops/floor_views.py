@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db.models import F
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status, viewsets
@@ -79,6 +80,25 @@ def _client_version(data: Any) -> int | None:
         return int(raw)
     except (TypeError, ValueError):
         return None
+
+
+def _apply_versioned(pk: Any, client_version: int | None, fields: dict[str, Any]) -> bool:
+    """Atomically apply ``fields`` to a table and bump its ``version``.
+
+    This is a compare-and-swap: when ``client_version`` is supplied, the UPDATE
+    is guarded by ``WHERE version = client_version`` so exactly one of N racing
+    writers can win (the rest match zero rows → caller raises 409). A plain
+    read-compare-then-``save()`` has a TOCTOU window where two writers both pass
+    the in-Python check and both write — this closes it at the database, on both
+    SQLite and Postgres (no row lock required). ``client_version=None`` keeps the
+    legacy "no optimistic guard" behaviour (last write wins).
+
+    Returns ``True`` when a row was updated.
+    """
+    qs = RestaurantTable.objects.filter(pk=pk)
+    if client_version is not None:
+        qs = qs.filter(version=client_version)
+    return qs.update(version=F("version") + 1, updated_at=timezone.now(), **fields) > 0
 
 
 def _table_payload(table: RestaurantTable) -> dict[str, Any]:
@@ -145,25 +165,27 @@ class TableViewSet(viewsets.ModelViewSet):
         instance.soft_delete()
 
     def update(self, request: Any, *args: Any, **kwargs: Any) -> Response:
-        """Update with optimistic concurrency + a ``table_event`` broadcast."""
+        """Update with optimistic concurrency + a ``table_event`` broadcast.
+
+        The version check and the write are a single atomic compare-and-swap
+        (see ``_apply_versioned``) so concurrent updates can't both win.
+        """
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
-
-        client_version = _client_version(request.data)
-        if client_version is not None and client_version != instance.version:
-            raise StaleVersionError()
 
         serializer = self.get_serializer(
             instance, data=request.data, partial=partial
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save(version=instance.version + 1)
 
-        if getattr(instance, "_prefetched_objects_cache", None):
-            instance._prefetched_objects_cache = {}
+        fields = dict(serializer.validated_data)
+        fields.pop("version", None)
+        if not _apply_versioned(instance.pk, _client_version(request.data), fields):
+            raise StaleVersionError()
 
+        instance.refresh_from_db()
         self._broadcast(instance)
-        return Response(serializer.data)
+        return Response(TableSerializer(instance).data)
 
     @extend_schema(request=SeatTableSerializer, responses=TableSerializer)
     @action(detail=True, methods=["post"])
@@ -174,16 +196,17 @@ class TableViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        self._check_version(table, data.get("version"))
-
-        table.status = "seated"
-        table.guests = data["guests"]
-        table.seated_at = timezone.now()
+        fields: dict[str, Any] = {
+            "status": "seated",
+            "guests": data["guests"],
+            "seated_at": timezone.now(),
+        }
         if "waiter_membership_id" in data:
-            table.waiter_membership_id = data["waiter_membership_id"]
-        table.version += 1
-        table.save()
+            fields["waiter_membership_id"] = data["waiter_membership_id"]
+        if not _apply_versioned(table.pk, data.get("version"), fields):
+            raise StaleVersionError()
 
+        table.refresh_from_db()
         self._broadcast(table)
         return Response(TableSerializer(table).data)
 
@@ -192,15 +215,16 @@ class TableViewSet(viewsets.ModelViewSet):
     def clear(self, request: Any, *args: Any, **kwargs: Any) -> Response:
         """Clear a table: status='available', guests=0, waiter+seated_at null."""
         table = self.get_object()
-        self._check_version(table, _client_version(request.data))
+        fields = {
+            "status": "available",
+            "guests": 0,
+            "waiter_membership": None,
+            "seated_at": None,
+        }
+        if not _apply_versioned(table.pk, _client_version(request.data), fields):
+            raise StaleVersionError()
 
-        table.status = "available"
-        table.guests = 0
-        table.waiter_membership = None
-        table.seated_at = None
-        table.version += 1
-        table.save()
-
+        table.refresh_from_db()
         self._broadcast(table)
         return Response(TableSerializer(table).data)
 
@@ -225,20 +249,14 @@ class TableViewSet(viewsets.ModelViewSet):
         if new_status not in valid:
             raise ValidationError({"status": "Invalid table status."})
 
-        self._check_version(table, _client_version(request.data))
+        if not _apply_versioned(
+            table.pk, _client_version(request.data), {"status": new_status}
+        ):
+            raise StaleVersionError()
 
-        table.status = new_status
-        table.version += 1
-        table.save()
-
+        table.refresh_from_db()
         self._broadcast(table)
         return Response(TableSerializer(table).data)
-
-    @staticmethod
-    def _check_version(table: RestaurantTable, client_version: Any) -> None:
-        """Reject the mutation when a supplied ``version`` is stale."""
-        if client_version is not None and client_version != table.version:
-            raise StaleVersionError()
 
     @staticmethod
     def _broadcast(table: RestaurantTable) -> None:
