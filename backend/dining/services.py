@@ -283,9 +283,16 @@ def close_session(*, session: DiningSession) -> DiningSession:
     return session
 
 
-def recompute_check(session: DiningSession) -> Check | None:
-    """Recompute the check totals from this session's non-voided orders."""
-    check = getattr(session, "tab", None)
+def recompute_check(
+    session: DiningSession, check: Check | None = None
+) -> Check | None:
+    """Recompute the check totals from this session's non-voided orders.
+
+    Pass ``check`` to operate on an already-fetched (e.g. row-locked) instance;
+    otherwise the session's related check is used.
+    """
+    if check is None:
+        check = getattr(session, "tab", None)
     if check is None:
         return None
     orders = Order.all_objects.filter(session=session, voided=False)

@@ -16,6 +16,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from billing.models import Invoice, PaymentEvent
+from billing.signals import payment_event_applied
 
 RAZORPAY_ORDERS_URL = "https://api.razorpay.com/v1/orders"
 _ORDER_TIMEOUT_SECONDS = 15
@@ -102,6 +103,14 @@ def record_and_apply_event(event_id: str, kind: str, payload: dict[str, Any]) ->
                 if isinstance(entity_id, str) and entity_id:
                     invoice.razorpay_id = entity_id
                 invoice.save(update_fields=["status", "paid_at", "razorpay_id"])
+
+        # Notify downstream slices (e.g. dining checks) exactly once — but only
+        # AFTER this transaction commits, so a receiver error can never roll back
+        # the durable idempotency record (which would let a Razorpay retry
+        # double-apply). The PaymentEvent row is the source of "applied once".
+        transaction.on_commit(
+            lambda: payment_event_applied.send(sender=None, payload=payload)
+        )
         return True
 
 

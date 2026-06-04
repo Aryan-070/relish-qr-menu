@@ -18,6 +18,7 @@ import {
   confirmOrders,
   getSession,
   joinSession,
+  payCheck,
   promoteDevice,
   requestBill,
   submitContact,
@@ -25,6 +26,7 @@ import {
   type DeviceRole,
   type DiningSessionView,
   type OrderLineInput,
+  type PayResult,
 } from '../lib/api/dining'
 
 interface StoredSession {
@@ -87,6 +89,8 @@ export interface UseSessionResult {
   submitOrder: (lines: OrderLineInput[], idempotencyKey?: string) => Promise<void>
   captureContact: (phone: string, name?: string) => Promise<void>
   askForBill: () => Promise<void>
+  /** Create a Razorpay order for the bill — hand the result to checkout. */
+  pay: () => Promise<PayResult>
   // Staff actions (require a staff JWT in storage)
   promote: (deviceToken: string, version?: number) => Promise<void>
   confirm: (orderIds: string[]) => Promise<void>
@@ -182,6 +186,13 @@ export function useSession(params?: { restaurantId: string; tableId: string } | 
     refetch()
   }, [stored, refetch])
 
+  const pay = useCallback(async (): Promise<PayResult> => {
+    if (!stored) throw new Error('No active session.')
+    const result = await payCheck(stored.sessionId, stored.deviceToken)
+    refetch()
+    return result
+  }, [stored, refetch])
+
   const promote = useCallback(
     async (token: string, version?: number) => {
       if (!stored) throw new Error('No active session.')
@@ -220,6 +231,7 @@ export function useSession(params?: { restaurantId: string; tableId: string } | 
     submitOrder,
     captureContact,
     askForBill,
+    pay,
     promote,
     confirm,
     endSession,

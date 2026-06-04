@@ -148,5 +148,16 @@ class Check(TenantScopedModel):
     )
     razorpay_order_id = models.CharField(max_length=80, blank=True)
 
+    class Meta:
+        constraints = [
+            # Razorpay order ids are globally unique; enforce it for the non-empty
+            # values so the webhook's fallback lookup is an indexed, unambiguous hit.
+            models.UniqueConstraint(
+                fields=["razorpay_order_id"],
+                condition=~models.Q(razorpay_order_id=""),
+                name="uniq_check_razorpay_order_id",
+            ),
+        ]
+
     def __str__(self) -> str:
         return f"check:{self.session_id}({self.status})"

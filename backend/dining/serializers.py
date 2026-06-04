@@ -126,3 +126,17 @@ class ConfirmOrdersSerializer(serializers.Serializer):
 class ContactSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20)
     name = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+
+
+class PayResultSerializer(serializers.Serializer):
+    """The Razorpay order to hand to the client checkout (amounts server-set)."""
+
+    order_id = serializers.CharField()
+    amount_minor = serializers.IntegerField()
+    currency = serializers.CharField()
+
+
+class DisputeSerializer(serializers.Serializer):
+    reason = serializers.CharField(
+        max_length=300, required=False, allow_blank=True, default=""
+    )

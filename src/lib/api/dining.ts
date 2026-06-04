@@ -151,3 +151,33 @@ export function requestBill(sessionId: string, deviceToken: string | null): Prom
 export function closeSession(sessionId: string): Promise<DiningSessionView> {
   return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/close/`, { method: 'POST' })
 }
+
+// ── Payment & liability (Phase 3) ─────────────────────────────────────────────
+export interface PayResult {
+  order_id: string
+  amount_minor: number
+  currency: string
+}
+
+/** Create a Razorpay order for the session's bill (device or staff). */
+export function payCheck(sessionId: string, deviceToken: string | null): Promise<PayResult> {
+  return apiFetch<PayResult>(`/dining/sessions/${sessionId}/pay/`, {
+    method: 'POST',
+    deviceToken,
+  })
+}
+
+/** Staff: settle the bill in cash / at the counter (audited). */
+export function settleCheckCash(sessionId: string): Promise<DiningSessionView> {
+  return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/settle-cash/`, {
+    method: 'POST',
+  })
+}
+
+/** Staff: flag the bill disputed (walkout / contested); audited. */
+export function disputeCheck(sessionId: string, reason?: string): Promise<DiningSessionView> {
+  return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/dispute/`, {
+    method: 'POST',
+    body: { reason },
+  })
+}

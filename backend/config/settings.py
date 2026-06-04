@@ -203,6 +203,7 @@ REST_FRAMEWORK = {
         "public_menu": "120/min",
         "razorpay_order": "30/min",
         "dining_join": "60/min",
+        "dining_pay": "6/min",
     },
     "EXCEPTION_HANDLER": "common.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",

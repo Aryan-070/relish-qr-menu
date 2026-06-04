@@ -9,9 +9,12 @@ from .views import (
     SessionConfirmView,
     SessionContactView,
     SessionDetailView,
+    SessionDisputeView,
     SessionOrderView,
+    SessionPayView,
     SessionPromoteView,
     SessionRequestBillView,
+    SessionSettleCashView,
 )
 
 app_name = "dining"
@@ -24,5 +27,8 @@ urlpatterns = [
     path("sessions/<uuid:pk>/promote/", SessionPromoteView.as_view(), name="session-promote"),
     path("sessions/<uuid:pk>/confirm/", SessionConfirmView.as_view(), name="session-confirm"),
     path("sessions/<uuid:pk>/request-bill/", SessionRequestBillView.as_view(), name="session-request-bill"),
+    path("sessions/<uuid:pk>/pay/", SessionPayView.as_view(), name="session-pay"),
+    path("sessions/<uuid:pk>/settle-cash/", SessionSettleCashView.as_view(), name="session-settle-cash"),
+    path("sessions/<uuid:pk>/dispute/", SessionDisputeView.as_view(), name="session-dispute"),
     path("sessions/<uuid:pk>/close/", SessionCloseView.as_view(), name="session-close"),
 ]

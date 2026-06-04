@@ -8,6 +8,7 @@ classes + services, never by trusting the client.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from drf_spectacular.utils import extend_schema
@@ -20,17 +21,27 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import Restaurant
+from billing.services import RazorpayConfigError, RazorpayError
+from common.context import get_current_membership_id
 from common.permissions import IsTenantMember
 from realtime.broadcast import broadcast_order_event
 
 from .models import DiningSession
+from .payments import (
+    CheckPaymentError,
+    create_check_payment,
+    mark_check_disputed,
+    settle_check_cash,
+)
 from .permissions import CanSubmitOrder, IsSessionParticipant
 from .serializers import (
     ConfirmOrdersSerializer,
     ContactSerializer,
     DiningSessionSerializer,
+    DisputeSerializer,
     JoinResultSerializer,
     JoinSessionSerializer,
+    PayResultSerializer,
     PromoteSerializer,
 )
 from .services import (
@@ -46,11 +57,19 @@ from .services import (
     touch_device,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class SessionStaleVersionError(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_detail = "This session was modified by someone else. Reload and retry."
     default_code = "stale_version"
+
+
+class PaymentUnavailableError(APIException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = "Online payment is not available right now."
+    default_code = "payment_unavailable"
 
 
 def _order_event_payload(order: Any) -> dict[str, Any]:
@@ -276,4 +295,59 @@ class SessionCloseView(APIView):
     def post(self, request: Request, pk: Any) -> Response:
         session = _get_session_or_404(pk)
         close_session(session=session)
+        return _session_response(session)
+
+
+class SessionPayView(APIView):
+    """Create a Razorpay order for the session's bill (device or staff)."""
+
+    permission_classes = [IsSessionParticipant]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "dining_pay"
+
+    @extend_schema(responses={200: PayResultSerializer}, tags=["dining"])
+    def post(self, request: Request, pk: Any) -> Response:
+        session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
+        try:
+            result = create_check_payment(session)
+        except CheckPaymentError as exc:
+            raise ValidationError(str(exc)) from exc
+        except (RazorpayConfigError, RazorpayError) as exc:
+            # Never surface internal gateway detail to the client.
+            logger.warning("Razorpay order creation failed for session %s: %s", pk, exc)
+            raise PaymentUnavailableError() from exc
+        return Response(PayResultSerializer(result).data)
+
+
+class SessionSettleCashView(APIView):
+    """Staff settles the bill in cash / at the counter (audited)."""
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    @extend_schema(tags=["dining"])
+    def post(self, request: Request, pk: Any) -> Response:
+        session = _get_session_or_404(pk)
+        try:
+            settle_check_cash(session, get_current_membership_id())
+        except CheckPaymentError as exc:
+            raise ValidationError(str(exc)) from exc
+        return _session_response(session)
+
+
+class SessionDisputeView(APIView):
+    """Staff flags the bill disputed (walkout / contested); audited."""
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    @extend_schema(request=DisputeSerializer, tags=["dining"])
+    def post(self, request: Request, pk: Any) -> Response:
+        session = _get_session_or_404(pk)
+        s = DisputeSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        try:
+            mark_check_disputed(
+                session, get_current_membership_id(), s.validated_data["reason"]
+            )
+        except CheckPaymentError as exc:
+            raise ValidationError(str(exc)) from exc
         return _session_response(session)

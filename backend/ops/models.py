@@ -62,6 +62,8 @@ AUDIT_TYPE_CHOICES = (
     ("transfer", "Transfer"),
     ("price-change", "Price change"),
     ("role-change", "Role change"),
+    ("payment", "Payment"),
+    ("dispute", "Dispute"),
 )
 
 
