@@ -64,7 +64,18 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
           background: bg,
         }}
       >
-        {!imgErr ? (
+        {imgErr ? (
+          <CategoryIcon categoryId={catId} size={30} color={t.accent} />
+        ) : item.imageUrl ? (
+          // Operator-set image (path or URL) — shown directly; icon on error.
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={() => setImgErr(true)}
+          />
+        ) : (
           <LqipVideo
             renditions={dishVideo.renditions}
             poster={dishVideo.poster}
@@ -75,8 +86,6 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
             videoClassName="w-full h-full object-cover"
             onError={() => setImgErr(true)}
           />
-        ) : (
-          <CategoryIcon categoryId={catId} size={30} color={t.accent} />
         )}
       </div>
 

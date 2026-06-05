@@ -33,6 +33,7 @@ import { StaffManagement } from './views/StaffManagement'
 import { PasswordApprovals } from './views/PasswordApprovals'
 import { PasswordChangeRequestView } from './views/PasswordChangeRequestView'
 import { AppearanceSettings } from './views/AppearanceSettings'
+import { LiveTables } from './views/LiveTables'
 import { Roster } from './views/Roster'
 import { GroupDashboard } from './views/GroupDashboard'
 import { useAuth } from './auth/AuthContext'
@@ -91,6 +92,8 @@ function renderView(view: ConsoleView) {
       return <PasswordChangeRequestView />
     case 'appearance':
       return <AppearanceSettings />
+    case 'live-tables':
+      return <LiveTables />
     case 'roster':
       return <Roster />
     case 'group':

@@ -12,8 +12,17 @@ export interface PublicMenuItem {
   code: string
   name: string
   price_minor: number
+  description?: string
+  tags?: string[]
+  badges?: string[]
+  is_jain?: boolean
+  can_be_jain?: boolean
+  chefs_special?: boolean
+  spice_level?: number
   available: boolean
   sold_out: boolean
+  image_url?: string
+  video_url?: string
 }
 
 export interface PublicMenuCategory {

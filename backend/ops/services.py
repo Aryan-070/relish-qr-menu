@@ -112,6 +112,7 @@ def place_order(
     lines: Iterable[Mapping[str, Any]],
     session_id: Any | None = None,
     participant_id: Any | None = None,
+    customer_id: Any | None = None,
     confirmation: str = "confirmed",
     idempotency_key: str = "",
 ) -> Order:
@@ -173,6 +174,7 @@ def place_order(
         waiter_membership_id=waiter_membership_id,
         session_id=session_id,
         participant_id=participant_id,
+        customer_id=customer_id,
         confirmation=confirmation,
         idempotency_key=idempotency_key,
         source=source,

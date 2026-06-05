@@ -32,6 +32,8 @@ from .constants import (
     DEVICE_ROLE_CHOICES,
     LIVE_SESSION_STATUSES,
     ORDER_CONFIRMATION_MODE_CHOICES,
+    SERVICE_REQUEST_STATUS_CHOICES,
+    SERVICE_REQUEST_TYPE_CHOICES,
     SESSION_STATUS_CHOICES,
 )
 
@@ -161,3 +163,45 @@ class Check(TenantScopedModel):
 
     def __str__(self) -> str:
         return f"check:{self.session_id}({self.status})"
+
+
+class ServiceRequest(TenantScopedModel):
+    """A guest-raised request for staff attention (call waiter / water / bill).
+
+    Raised by a joined :class:`GuestDevice` (device-token gated) and surfaced on
+    the staff Service Queue / KDS via the realtime broadcast. ``device`` is
+    nullable so a request survives device cleanup; ``table_id`` is denormalized
+    off the session for a cheap floor lookup.
+    """
+
+    session = models.ForeignKey(
+        DiningSession, on_delete=models.CASCADE, related_name="service_requests"
+    )
+    device = models.ForeignKey(
+        GuestDevice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="service_requests",
+    )
+    table_id = models.UUIDField(db_index=True)
+    kind = models.CharField(
+        max_length=16, choices=SERVICE_REQUEST_TYPE_CHOICES, default="waiter"
+    )
+    status = models.CharField(
+        max_length=12, choices=SERVICE_REQUEST_STATUS_CHOICES, default="pending"
+    )
+    note = models.CharField(max_length=300, blank=True)
+    #: Membership that claimed it (nullable UUID — interim, mirrors ops.Order).
+    claimed_by_id = models.UUIDField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["restaurant_id", "status"]),
+            models.Index(fields=["session", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"service:{self.table_id}:{self.kind}({self.status})"

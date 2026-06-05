@@ -30,6 +30,7 @@ const emptyDraft = (categoryId: string): MenuItemDraft => ({
   isJain: false,
   available: true,
   soldOut: false,
+  imageUrl: '',
 })
 
 /**
@@ -171,7 +172,7 @@ function ItemFormModal({
   const { tokens: t } = useTheme()
   const [draft, setDraft] = useState<MenuItemDraft>(
     item
-      ? { name: item.name, price: item.price, categoryId: item.categoryId, description: item.description, spiceLevel: item.spiceLevel, isJain: item.isJain, available: item.available, soldOut: item.soldOut }
+      ? { name: item.name, price: item.price, categoryId: item.categoryId, description: item.description, spiceLevel: item.spiceLevel, isJain: item.isJain, available: item.available, soldOut: item.soldOut, imageUrl: item.imageUrl }
       : emptyDraft(categories[0]?.id ?? ''),
   )
   const [error, setError] = useState<string | null>(null)
@@ -209,6 +210,18 @@ function ItemFormModal({
         </div>
         <Field label="Description">
           <textarea value={draft.description} onChange={e => set('description', e.target.value)} rows={2} className="w-full px-3 py-2.5 text-[14px]" style={inputStyle} />
+        </Field>
+        <Field label="Image URL or path">
+          <input
+            value={draft.imageUrl}
+            onChange={e => set('imageUrl', e.target.value)}
+            placeholder="https://…/dish.jpg or /assets/dishes/x.webp"
+            className="w-full px-3 py-2.5 text-[14px]"
+            style={inputStyle}
+          />
+          {draft.imageUrl.trim() !== '' && (
+            <img src={draft.imageUrl} alt="" style={{ height: 56, width: 56, objectFit: 'cover', borderRadius: 8, marginTop: 8 }} />
+          )}
         </Field>
         <div className="flex flex-wrap gap-4 text-[13px]" style={bodyStyle(t)}>
           <label className="flex items-center gap-2"><input type="checkbox" checked={draft.available} onChange={e => set('available', e.target.checked)} /> Visible</label>

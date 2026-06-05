@@ -11,8 +11,8 @@ from rest_framework import serializers
 
 from ops.order_serializers import OrderSerializer
 
-from .constants import ORDER_CONFIRMATION_MODE_CHOICES
-from .models import Check, DiningSession, GuestDevice
+from .constants import ORDER_CONFIRMATION_MODE_CHOICES, SERVICE_REQUEST_TYPE_CHOICES
+from .models import Check, DiningSession, GuestDevice, ServiceRequest
 
 _MODE_VALUES = [value for value, _label in ORDER_CONFIRMATION_MODE_CHOICES]
 
@@ -150,5 +150,27 @@ class PayResultSerializer(serializers.Serializer):
 
 class DisputeSerializer(serializers.Serializer):
     reason = serializers.CharField(
+        max_length=300, required=False, allow_blank=True, default=""
+    )
+
+
+class ServiceRequestSerializer(serializers.ModelSerializer):
+    """Read view of a guest service request for the staff queue / KDS."""
+
+    table = serializers.UUIDField(source="table_id", read_only=True)
+
+    class Meta:
+        model = ServiceRequest
+        fields = ["id", "session", "table", "kind", "status", "note", "created_at", "resolved_at"]
+        read_only_fields = fields
+
+
+class ServiceRequestCreateSerializer(serializers.Serializer):
+    """Guest input to raise a service request."""
+
+    kind = serializers.ChoiceField(
+        choices=[v for v, _ in SERVICE_REQUEST_TYPE_CHOICES], default="waiter"
+    )
+    note = serializers.CharField(
         max_length=300, required=False, allow_blank=True, default=""
     )

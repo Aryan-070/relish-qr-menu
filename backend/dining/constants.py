@@ -23,9 +23,24 @@ ORDER_CONFIRMATION_MODE_CHOICES = (
     ("leader", "Leader"),                # only the waiter-anointed leader orders
     ("waiter_confirm", "Waiter confirm"),  # anyone carts; waiter fires a batch
 )
-#: Robust default — bill integrity without putting the waiter on the critical
-#: path of every order (LLM-council recommendation).
-DEFAULT_ORDER_CONFIRMATION_MODE = "waiter_confirm"
+#: Default policy: leader-only — the waiter anoints a host who places the table's
+#: orders; everyone else browses (tightest control against accidental/abusive
+#: ordering). Operators can relax a session to ``waiter_confirm``/``auto_fire``.
+DEFAULT_ORDER_CONFIRMATION_MODE = "leader"
+
+# ── Service requests (guest "call waiter" / water / bill / …) ────────────────
+SERVICE_REQUEST_TYPE_CHOICES = (
+    ("waiter", "Call waiter"),
+    ("water", "Water"),
+    ("bill", "Bill"),
+    ("assistance", "Assistance"),
+    ("cleanup", "Cleanup"),
+)
+SERVICE_REQUEST_STATUS_CHOICES = (
+    ("pending", "Pending"),
+    ("claimed", "Claimed"),
+    ("resolved", "Resolved"),
+)
 
 # ── Device role within a session ─────────────────────────────────────────────
 DEVICE_ROLE_CHOICES = (

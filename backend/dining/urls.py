@@ -5,6 +5,8 @@ from django.urls import path
 
 from .views import (
     JoinView,
+    ServiceRequestActionView,
+    ServiceRequestListView,
     SessionCloseView,
     SessionConfirmView,
     SessionContactView,
@@ -15,6 +17,7 @@ from .views import (
     SessionPayView,
     SessionPromoteView,
     SessionRequestBillView,
+    SessionServiceRequestView,
     SessionSettleCashView,
 )
 
@@ -29,6 +32,9 @@ urlpatterns = [
     path("sessions/<uuid:pk>/promote/", SessionPromoteView.as_view(), name="session-promote"),
     path("sessions/<uuid:pk>/confirm/", SessionConfirmView.as_view(), name="session-confirm"),
     path("sessions/<uuid:pk>/request-bill/", SessionRequestBillView.as_view(), name="session-request-bill"),
+    path("sessions/<uuid:pk>/service-request/", SessionServiceRequestView.as_view(), name="session-service-request"),
+    path("service-requests/", ServiceRequestListView.as_view(), name="service-request-list"),
+    path("service-requests/<uuid:pk>/<str:action>/", ServiceRequestActionView.as_view(), name="service-request-action"),
     path("sessions/<uuid:pk>/pay/", SessionPayView.as_view(), name="session-pay"),
     path("sessions/<uuid:pk>/settle-cash/", SessionSettleCashView.as_view(), name="session-settle-cash"),
     path("sessions/<uuid:pk>/dispute/", SessionDisputeView.as_view(), name="session-dispute"),

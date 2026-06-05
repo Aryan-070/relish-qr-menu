@@ -19,11 +19,55 @@ from ops.models import Order, RestaurantTable
 from ops.services import place_order
 
 from .constants import LIVE_SESSION_STATUSES
-from .models import Check, DiningSession, GuestDevice
+from .models import Check, DiningSession, GuestDevice, ServiceRequest
 
 
 class SessionError(Exception):
     """Raised when a session action is invalid (closed, wrong table, etc.)."""
+
+
+@transaction.atomic
+def create_service_request(
+    *, session: DiningSession, device: GuestDevice | None, kind: str, note: str = ""
+) -> ServiceRequest:
+    """Raise a guest service request (call waiter / water / bill / …).
+
+    Collapses a duplicate: if the device already has a pending request of the
+    same kind, that one is returned rather than stacking another.
+    """
+    if not session.is_live:
+        raise SessionError("This session is no longer live.")
+    if device is not None:
+        existing = ServiceRequest.objects.filter(
+            session=session, device=device, kind=kind, status="pending"
+        ).first()
+        if existing is not None:
+            return existing
+    return ServiceRequest.objects.create(
+        restaurant_id=session.restaurant_id,
+        session=session,
+        device=device,
+        table_id=session.table_id,
+        kind=kind,
+        note=note,
+        status="pending",
+    )
+
+
+@transaction.atomic
+def set_service_request_status(
+    *, request_obj: ServiceRequest, status: str, membership_id: Any = None
+) -> ServiceRequest:
+    """Staff transitions a request to ``claimed`` / ``resolved``."""
+    request_obj.status = status
+    if status == "claimed" and membership_id:
+        request_obj.claimed_by_id = membership_id
+    if status == "resolved":
+        request_obj.resolved_at = timezone.now()
+    request_obj.save(
+        update_fields=["status", "claimed_by_id", "resolved_at", "updated_at"]
+    )
+    return request_obj
 
 
 # ── Join / presence ──────────────────────────────────────────────────────────
@@ -161,6 +205,8 @@ def submit_order(
             lines=lines,
             session_id=session.id,
             participant_id=device.id,
+            # Link to the CRM customer if this device already shared contact.
+            customer_id=device.customer_id,
             confirmation=confirmation,
             idempotency_key=idempotency_key,
         )
@@ -242,6 +288,12 @@ def attach_customer(
     device.customer = customer
     device.is_payer = True
     device.save(update_fields=["customer", "is_payer", "updated_at"])
+
+    # Backfill orders this device already placed this session so they surface in
+    # CRM under the now-linked customer (they were anonymous at creation time).
+    Order.all_objects.filter(
+        session=session, participant_id=device.id, customer_id__isnull=True
+    ).update(customer_id=customer.id)
 
     check = getattr(session, "tab", None)
     if check is not None and check.liable_customer_id is None:

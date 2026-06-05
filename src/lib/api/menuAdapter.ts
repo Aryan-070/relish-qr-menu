@@ -10,17 +10,29 @@
 import type { Category, MenuItem } from '../../data/menu'
 import type { PublicMenuItem, PublicMenuResponse } from './publicMenu'
 
+function clampSpice(n: number | undefined): MenuItem['spiceLevel'] {
+  if (n === 1 || n === 2 || n === 3) return n
+  return 0
+}
+
 function adaptItem(item: PublicMenuItem): MenuItem {
+  const tags = [...(item.tags ?? [])]
+  if (item.sold_out || !item.available) tags.push('sold-out')
   return {
     id: item.id,
     name: item.name,
+    // price_minor is paise; the consumer MenuItem.price is whole rupees.
     price: Math.round(item.price_minor / 100),
-    description: '',
-    isJain: false,
-    canBeJain: false,
-    tags: item.sold_out || !item.available ? ['sold-out'] : [],
+    // Display this directly on the card; falls back to the bundled manifest.
+    imageUrl: item.image_url || undefined,
+    description: item.description ?? '',
+    isJain: item.is_jain ?? false,
+    canBeJain: item.can_be_jain ?? false,
+    tags,
     pairings: {},
     customizations: [],
+    chefsSpecial: item.chefs_special || undefined,
+    spiceLevel: clampSpice(item.spice_level),
   }
 }
 

@@ -16,6 +16,7 @@ import { ApiError, wsBaseUrl } from '../lib/api/client'
 import {
   closeSession,
   confirmOrders,
+  createServiceRequest,
   getSession,
   joinSession,
   payCheck,
@@ -27,6 +28,7 @@ import {
   type DiningSessionView,
   type OrderLineInput,
   type PayResult,
+  type ServiceRequestKind,
 } from '../lib/api/dining'
 
 interface StoredSession {
@@ -88,6 +90,7 @@ export interface UseSessionResult {
   // Guest actions
   submitOrder: (lines: OrderLineInput[], idempotencyKey?: string) => Promise<void>
   captureContact: (phone: string, name?: string) => Promise<void>
+  requestService: (kind: ServiceRequestKind, note?: string) => Promise<void>
   askForBill: () => Promise<void>
   /** Create a Razorpay order for the bill — hand the result to checkout. */
   pay: () => Promise<PayResult>
@@ -215,6 +218,14 @@ export function useSession(params?: { restaurantId: string; tableId: string } | 
     [stored, refetch],
   )
 
+  const requestService = useCallback(
+    async (kind: ServiceRequestKind, note?: string) => {
+      if (!stored) throw new Error('No active session.')
+      await createServiceRequest(stored.sessionId, stored.deviceToken, kind, note)
+    },
+    [stored],
+  )
+
   const askForBill = useCallback(async () => {
     if (!stored) throw new Error('No active session.')
     await requestBill(stored.sessionId, stored.deviceToken)
@@ -265,6 +276,7 @@ export function useSession(params?: { restaurantId: string; tableId: string } | 
     refetch,
     submitOrder,
     captureContact,
+    requestService,
     askForBill,
     pay,
     promote,

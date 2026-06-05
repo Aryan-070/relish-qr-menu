@@ -26,10 +26,14 @@ from common.context import get_current_membership_id
 from common.permissions import IsTenantMember
 from ops.order_serializers import OrderSerializer, PlaceOrderSerializer
 from ops.services import OrderError
-from realtime.broadcast import broadcast_order_event, broadcast_session_event
+from realtime.broadcast import (
+    broadcast_order_event,
+    broadcast_service_request_event,
+    broadcast_session_event,
+)
 
 from .constants import LIVE_SESSION_STATUSES
-from .models import DiningSession, GuestDevice
+from .models import DiningSession, GuestDevice, ServiceRequest
 from .payments import (
     CheckPaymentError,
     create_check_payment,
@@ -46,16 +50,20 @@ from .serializers import (
     JoinSessionSerializer,
     PayResultSerializer,
     PromoteSerializer,
+    ServiceRequestCreateSerializer,
+    ServiceRequestSerializer,
 )
 from .services import (
     SessionError,
     attach_customer,
     close_session,
     confirm_orders,
+    create_service_request,
     find_device,
     join_session,
     promote_device,
     request_bill,
+    set_service_request_status,
     submit_order,
     touch_device,
 )
@@ -333,6 +341,88 @@ class SessionRequestBillView(APIView):
             raise ValidationError(str(exc)) from exc
         broadcast_session_event(session.id, "bill_requested", None)
         return _session_response(session, device)
+
+
+def _service_request_payload(req: ServiceRequest) -> dict[str, Any]:
+    return {
+        "id": str(req.id),
+        "session_id": str(req.session_id),
+        "table_id": str(req.table_id),
+        "kind": req.kind,
+        "status": req.status,
+        "note": req.note,
+    }
+
+
+class SessionServiceRequestView(APIView):
+    """A joined device raises a service request (call waiter / water / bill)."""
+
+    authentication_classes: list = []
+    permission_classes = [IsSessionParticipant]
+
+    @extend_schema(
+        request=ServiceRequestCreateSerializer,
+        responses={201: ServiceRequestSerializer},
+        tags=["dining"],
+    )
+    def post(self, request: Request, pk: Any) -> Response:
+        session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
+        device = getattr(request, "dining_device", None)
+        s = ServiceRequestCreateSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        try:
+            req = create_service_request(
+                session=session,
+                device=device,
+                kind=s.validated_data["kind"],
+                note=s.validated_data.get("note", ""),
+            )
+        except SessionError as exc:
+            raise ValidationError(str(exc)) from exc
+        broadcast_service_request_event(
+            session.restaurant_id, _service_request_payload(req)
+        )
+        broadcast_session_event(session.id, "service_requested", _service_request_payload(req))
+        return Response(
+            ServiceRequestSerializer(req).data, status=status.HTTP_201_CREATED
+        )
+
+
+class ServiceRequestListView(APIView):
+    """Staff: list open (pending/claimed) service requests for the tenant."""
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    @extend_schema(responses={200: ServiceRequestSerializer(many=True)}, tags=["dining"])
+    def get(self, request: Request) -> Response:
+        # TenantManager scopes to the JWT's restaurant_id automatically.
+        requests = ServiceRequest.objects.filter(
+            status__in=["pending", "claimed"]
+        ).order_by("created_at")
+        return Response({"results": ServiceRequestSerializer(requests, many=True).data})
+
+
+class ServiceRequestActionView(APIView):
+    """Staff claims or resolves a service request."""
+
+    permission_classes = [IsAuthenticated, IsTenantMember]
+
+    @extend_schema(request=None, responses={200: ServiceRequestSerializer}, tags=["dining"])
+    def post(self, request: Request, pk: Any, action: str) -> Response:
+        if action not in ("claim", "resolve"):
+            raise ValidationError("Unknown action.")
+        req = ServiceRequest.objects.filter(pk=pk).first()
+        if req is None:
+            raise NotFound("Service request not found.")
+        req = set_service_request_status(
+            request_obj=req,
+            status="claimed" if action == "claim" else "resolved",
+            membership_id=get_current_membership_id(),
+        )
+        broadcast_service_request_event(
+            req.restaurant_id, _service_request_payload(req)
+        )
+        return Response(ServiceRequestSerializer(req).data)
 
 
 class SessionCloseView(APIView):

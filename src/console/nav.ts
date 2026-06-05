@@ -47,6 +47,7 @@ export type ConsoleView =
   | 'inventory'
   | 'promotions'
   | 'cash-loss'
+  | 'live-tables'
   | 'staff-admin'
   | 'staff-management'
   | 'password-approvals'
@@ -74,6 +75,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const NAV: Record<Role, NavItem[]> = {
   admin: [
     { view: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { view: 'live-tables', label: 'Live Tables', icon: BellRing },
     { view: 'reports', label: 'Reports', icon: BarChart3 },
     { view: 'records', label: 'Records', icon: History },
     { view: 'manager-menu', label: 'Menu', icon: UtensilsCrossed },
@@ -96,6 +98,7 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
   manager: [
     { view: 'manager-floor', label: 'Floor', icon: LayoutGrid },
+    { view: 'live-tables', label: 'Live Tables', icon: BellRing },
     { view: 'kds', label: 'Kitchen', icon: ChefHat },
     { view: 'reservations', label: 'Reservations', icon: CalendarCheck },
     { view: 'manager-menu', label: 'Menu', icon: UtensilsCrossed },
@@ -115,6 +118,7 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
   waiter: [
     { view: 'waiter-tables', label: 'My Tables', icon: LayoutGrid },
+    { view: 'live-tables', label: 'Live Tables', icon: BellRing },
     { view: 'kds', label: 'Kitchen', icon: ChefHat },
     { view: 'waiter-queue', label: 'Service Queue', icon: BellRing, badge: 'pending-requests' },
     { view: 'reservations', label: 'Reservations', icon: CalendarCheck },

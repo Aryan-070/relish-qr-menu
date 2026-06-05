@@ -91,9 +91,15 @@ export function joinSession(input: {
   return apiFetch<JoinResult>('/dining/join/', { method: 'POST', body: input, staff: false })
 }
 
-/** Poll the live session snapshot (device token OR staff JWT). */
+/** Poll the live session snapshot (device token OR staff JWT).
+ *  When a device token is present we authenticate as that guest device and must
+ *  NOT also send a staff JWT — otherwise the backend treats the poll as staff
+ *  (device=None) and reports can_order=false. */
 export function getSession(sessionId: string, deviceToken: string | null): Promise<DiningSessionView> {
-  return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/`, { deviceToken })
+  return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/`, {
+    deviceToken,
+    staff: deviceToken == null,
+  })
 }
 
 /** Staff: list the tenant's live dining sessions (the floor cockpit feed). */
@@ -127,6 +133,50 @@ export function submitContact(
     method: 'POST',
     body: input,
     deviceToken,
+    staff: deviceToken == null,
+  })
+}
+
+export type ServiceRequestKind = 'waiter' | 'water' | 'bill' | 'assistance' | 'cleanup'
+
+export interface ServiceRequestView {
+  id: string
+  session: string
+  table: string
+  kind: ServiceRequestKind
+  status: 'pending' | 'claimed' | 'resolved'
+  note: string
+  created_at: string
+  resolved_at: string | null
+}
+
+/** Guest raises a service request (call waiter / water / bill) for the table. */
+export function createServiceRequest(
+  sessionId: string,
+  deviceToken: string,
+  kind: ServiceRequestKind,
+  note?: string,
+): Promise<ServiceRequestView> {
+  return apiFetch<ServiceRequestView>(`/dining/sessions/${sessionId}/service-request/`, {
+    method: 'POST',
+    body: { kind, note },
+    deviceToken,
+    staff: false,
+  })
+}
+
+/** Staff: list open (pending/claimed) service requests for the tenant. */
+export function listServiceRequests(): Promise<{ results: ServiceRequestView[] }> {
+  return apiFetch<{ results: ServiceRequestView[] }>('/dining/service-requests/')
+}
+
+/** Staff: claim or resolve a service request. */
+export function actOnServiceRequest(
+  id: string,
+  action: 'claim' | 'resolve',
+): Promise<ServiceRequestView> {
+  return apiFetch<ServiceRequestView>(`/dining/service-requests/${id}/${action}/`, {
+    method: 'POST',
   })
 }
 
@@ -154,6 +204,7 @@ export function requestBill(sessionId: string, deviceToken: string | null): Prom
   return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/request-bill/`, {
     method: 'POST',
     deviceToken,
+    staff: deviceToken == null,
   })
 }
 
@@ -173,6 +224,7 @@ export function payCheck(sessionId: string, deviceToken: string | null): Promise
   return apiFetch<PayResult>(`/dining/sessions/${sessionId}/pay/`, {
     method: 'POST',
     deviceToken,
+    staff: deviceToken == null,
   })
 }
 

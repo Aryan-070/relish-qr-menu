@@ -1,51 +1,65 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Trash2, Plus, Minus, MessageSquare, CheckCircle2 } from 'lucide-react'
+import { X, Trash2, Plus, Minus, MessageSquare, CheckCircle2, Lock } from 'lucide-react'
 import { type OrderItem } from '../hooks/useOrder'
 import { Price } from '../components/atoms/Price'
 import { AnimatedNumber } from '../components/ui/animated-number'
 import { formatMoney } from '../lib/money'
 import { useT } from '../i18n'
 import { btnPrimary, btnIcon, btnStep } from '../animations/variants'
+import type { SessionOrder } from '../lib/api/dining'
 
 interface OrderPanelProps {
   open: boolean
   items: OrderItem[]
   total: number
+  /** Orders already submitted this session (persisted) — shown read-only. */
+  placedOrders?: SessionOrder[]
+  /** When false, the Place Order CTA is disabled (browse-only / not allowed). */
+  canPlaceOrder?: boolean
+  /** Why ordering is disabled (shown under the CTA). */
+  gateMessage?: string | null
+  /** Transient submit error. */
+  errorMessage?: string | null
   onClose: () => void
   onRemove: (lineId: string) => void
   onUpdateQty: (lineId: string, delta: number) => void
   onUpdateNote: (lineId: string, note: string) => void
-  /** Commit the cart to the kitchen (scan-to-order). */
-  onPlaceOrder?: () => void
+  /** Commit the cart to the kitchen (scan-to-order). May be async. */
+  onPlaceOrder?: () => void | Promise<void>
   /** Open the pay-at-table checkout for the current bill. */
   onCheckout?: () => void
-  onWaiter: () => void
 }
 
 export function OrderPanel({
   open,
   items,
   total,
+  placedOrders = [],
+  canPlaceOrder = true,
+  gateMessage = null,
+  errorMessage = null,
   onClose,
   onRemove,
   onUpdateQty,
   onUpdateNote,
   onPlaceOrder,
   onCheckout,
-  onWaiter,
 }: OrderPanelProps) {
   const [noteOpen, setNoteOpen] = useState<string | null>(null)
   const [orderSent, setOrderSent] = useState(false)
   const tr = useT()
 
-  const handlePlaceOrder = () => {
+  // Placing an order must never clear the cart or hijack the waiter flow — it
+  // just commits, then settles the button back. The parent decides what to clear.
+  const handlePlaceOrder = async () => {
+    if (!canPlaceOrder) return
     setOrderSent(true)
-    onPlaceOrder?.()
-    setTimeout(() => {
-      setOrderSent(false)
-      onWaiter()
-    }, 750)
+    try {
+      await onPlaceOrder?.()
+    } finally {
+      setTimeout(() => setOrderSent(false), 750)
+    }
   }
 
   return (
@@ -113,6 +127,33 @@ export function OrderPanel({
 
             {/* Items list */}
             <div className="flex-1 overflow-y-auto px-5 py-3">
+              {/* Already-ordered (persisted from the dining session) */}
+              {placedOrders.length > 0 && (
+                <div className="mb-4">
+                  <p className="font-inter text-[11px] uppercase tracking-widest mb-2" style={{ color: 'var(--mute)' }}>
+                    Your orders so far
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {placedOrders.flatMap(o =>
+                      o.lines.map(line => (
+                        <div
+                          key={`${o.id}-${line.id}`}
+                          className="flex items-center justify-between rounded-xl px-3 py-2"
+                          style={{ background: 'rgba(79,122,60,0.08)', border: '1px solid rgba(79,122,60,0.25)' }}
+                        >
+                          <span className="font-inter text-[12.5px]" style={{ color: 'var(--ink)' }}>
+                            {line.qty}× {line.item_name}
+                          </span>
+                          <span className="font-inter text-[10.5px] uppercase tracking-wide" style={{ color: 'var(--mute)' }}>
+                            {o.confirmation === 'pending_confirmation' ? 'awaiting server' : o.confirmation === 'confirmed' ? 'in kitchen' : o.status}
+                          </span>
+                        </div>
+                      )),
+                    )}
+                  </div>
+                </div>
+              )}
+
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <span className="text-4xl opacity-30">🛍️</span>
@@ -271,25 +312,28 @@ export function OrderPanel({
                 {/* CTAs */}
                 <div className="flex gap-3">
                   <motion.button
-                    whileTap={!orderSent ? btnPrimary.tap : undefined}
+                    whileTap={!orderSent && canPlaceOrder ? btnPrimary.tap : undefined}
                     onClick={handlePlaceOrder}
-                    disabled={orderSent}
+                    disabled={orderSent || !canPlaceOrder}
                     className="w-full py-3.5 rounded-full font-inter font-semibold text-[13.5px] relative overflow-hidden flex items-center justify-center gap-2 select-none"
                     style={{
-                      background: 'linear-gradient(135deg, #A52030, #7A0E1E)',
-                      color: '#FFF8EA',
-                      boxShadow: '0 4px 16px rgba(139,16,36,0.28)',
+                      background: canPlaceOrder ? 'linear-gradient(135deg, #A52030, #7A0E1E)' : 'rgba(42,30,30,0.18)',
+                      color: canPlaceOrder ? '#FFF8EA' : 'var(--ink-soft)',
+                      boxShadow: canPlaceOrder ? '0 4px 16px rgba(139,16,36,0.28)' : 'none',
                       minHeight: 44,
+                      cursor: canPlaceOrder ? 'pointer' : 'not-allowed',
                     }}
                   >
                     {/* ambient shimmer */}
-                    <span
-                      className="absolute inset-0 pointer-events-none"
-                      style={{
-                        background: 'linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.12) 50%, transparent 80%)',
-                        animation: 'shine-sweep 4s ease-in-out 0.5s infinite',
-                      }}
-                    />
+                    {canPlaceOrder && (
+                      <span
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background: 'linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.12) 50%, transparent 80%)',
+                          animation: 'shine-sweep 4s ease-in-out 0.5s infinite',
+                        }}
+                      />
+                    )}
                     <AnimatePresence mode="wait">
                       {orderSent ? (
                         <motion.span
@@ -301,7 +345,7 @@ export function OrderPanel({
                           className="flex items-center gap-2 relative z-10"
                         >
                           <CheckCircle2 size={18} />
-                          <span>{tr('order.callingWaiter')}</span>
+                          <span>Sending order…</span>
                         </motion.span>
                       ) : (
                         <motion.span
@@ -309,14 +353,25 @@ export function OrderPanel({
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="relative z-10"
+                          className="relative z-10 flex items-center gap-2"
                         >
+                          {!canPlaceOrder && <Lock size={15} />}
                           {tr('action.placeOrder')}
                         </motion.span>
                       )}
                     </AnimatePresence>
                   </motion.button>
                 </div>
+                {!canPlaceOrder && gateMessage && (
+                  <p className="font-inter text-center text-[11.5px] mt-2.5" style={{ color: 'var(--ink-soft)' }}>
+                    {gateMessage}
+                  </p>
+                )}
+                {errorMessage && (
+                  <p className="font-inter text-center text-[11.5px] mt-2.5" style={{ color: '#b3141b' }}>
+                    {errorMessage}
+                  </p>
+                )}
                 {onCheckout && (
                   <motion.button
                     whileTap={btnIcon.tap}

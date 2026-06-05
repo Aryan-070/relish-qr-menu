@@ -20,6 +20,16 @@ import { VARIANTS, DEFAULT_LANDING_VARIANT, type LandingVariant } from './data/l
 import { queryClient } from './lib/queryClient'
 import { useConsumerMenu } from './hooks/useConsumerMenu'
 import { useApplyThemeConfig } from './theme/useThemeConfig'
+import { useSession } from './hooks/useSession'
+import { ApiError } from './lib/api/client'
+import type { OrderLineInput } from './lib/api/dining'
+
+/** Raw `?t=` table id from the URL (a real table UUID from the QR), or null. */
+function tableParamFromUrl(): string | null {
+  if (typeof window === 'undefined') return null
+  const t = new URLSearchParams(window.location.search).get('t')
+  return t && t.length > 0 ? t : null
+}
 
 // The table this guest is seated at — read from the scanned QR's `?t=` param,
 // falling back to a fixed demo table. Resolved once at load (a scan is a full
@@ -95,6 +105,19 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
   // uses the bundled static menu (the MenuDataProvider falls back to static).
   const consumer = useConsumerMenu(demo ? null : restaurantId)
 
+  // Real ordering runs through the backend dining session — but only on the root
+  // storefront with a real table QR (`?t=`). Demo stays fully offline; the root
+  // without a table is browse-only (menu visible, ordering disabled).
+  const tableId = tableParamFromUrl()
+  const sessionParams = !demo && restaurantId && tableId ? { restaurantId, tableId } : null
+  const dining = useSession(sessionParams)
+  const orderingMode: 'demo' | 'session' | 'browse' = demo
+    ? 'demo'
+    : sessionParams
+      ? 'session'
+      : 'browse'
+  const [orderError, setOrderError] = useState<string | null>(null)
+
   const [screen, setScreen] = useState<Screen>('cover')
   const [landingVariant, setLandingVariant] = useState<LandingVariant>(DEFAULT_LANDING_VARIANT)
 
@@ -133,7 +156,16 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
   const goToMenu = () => setScreen('menu')
   const goBackFromRecommend = () => setScreen('menu')
   const goToRecommend = () => setScreen('recommend')
-  const openWaiter = () => { setServiceInitialView(undefined); setWaiterOpen(true); flashIsland('waiter') }
+  const openWaiter = () => {
+    setServiceInitialView(undefined)
+    setWaiterOpen(true)
+    flashIsland('waiter')
+    // On the real storefront this actually notifies staff (a backend service
+    // request that lands on the Service Queue / KDS). Demo stays local-only.
+    if (orderingMode === 'session') {
+      void dining.requestService('waiter').catch(() => {/* best-effort; UI already flashed */})
+    }
+  }
   const handleItemTap = (item: MenuItem) => setSelectedItem(item)
 
   const handleAddToOrder = (item: MenuItem, modifiers: SelectedModifier[]) => {
@@ -167,8 +199,42 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
 
   const handleAddConfirmDone = () => setAddingItem(null)
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (orderItems.length === 0) return
+    setOrderError(null)
+
+    // Root + real table QR → submit through the backend dining session. The
+    // server enforces the table's ordering policy (leader-only by default) and
+    // recomputes all money; on success we clear only the now-submitted cart.
+    if (orderingMode === 'session') {
+      const lines: OrderLineInput[] = orderItems.map(o => ({
+        menu_item_id: o.item.id,
+        qty: o.quantity,
+        note: [o.label, o.note].filter(Boolean).join(' · ') || undefined,
+      }))
+      try {
+        await dining.submitOrder(lines)
+        clear()
+        flashIsland('placed')
+      } catch (e) {
+        setOrderError(
+          e instanceof ApiError && e.status === 403
+            ? "Your server hasn't enabled ordering for this table yet — please ask them."
+            : e instanceof ApiError
+              ? (e.body?.detail ?? 'Could not place the order.')
+              : 'Could not place the order — please try again.',
+        )
+      }
+      return
+    }
+
+    // Root with no table QR — nothing to order against.
+    if (orderingMode === 'browse') {
+      setOrderError('Scan the QR at your table to place an order.')
+      return
+    }
+
+    // Demo route: the offline localStorage ops-store path (unchanged).
     const lines: OrderLine[] = orderItems.map(o => ({
       itemId: o.item.id,
       name: o.item.name,
@@ -196,6 +262,20 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
     flashIsland('placed')
     if (activeCustomerId) ops.adjustPoints(activeCustomerId, Math.floor(total / 10))
   }
+
+  // Whether the Place Order CTA is enabled, plus the contextual message shown
+  // when it isn't (browse-only, or leader-only and this device isn't allowed).
+  const canPlaceOrder =
+    orderingMode === 'demo' || (orderingMode === 'session' && dining.canOrder)
+  const orderGateMessage: string | null =
+    orderingMode === 'browse'
+      ? 'Scan the QR at your table to order.'
+      : orderingMode === 'session' && !dining.canOrder
+        ? dining.joining
+          ? 'Connecting to your table…'
+          : "Your server hasn't started ordering for this table yet — please ask them."
+        : null
+  const placedOrders = orderingMode === 'session' ? dining.session?.orders ?? [] : []
 
   const handleOpenCheckout = () => {
     if (orderItems.length === 0) return
@@ -291,13 +371,16 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
         open={orderOpen}
         items={orderItems}
         total={total}
+        placedOrders={placedOrders}
+        canPlaceOrder={canPlaceOrder}
+        gateMessage={orderGateMessage}
+        errorMessage={orderError}
         onClose={() => setOrderOpen(false)}
         onRemove={removeItem}
         onUpdateQty={updateQuantity}
         onUpdateNote={updateNote}
         onPlaceOrder={handlePlaceOrder}
         onCheckout={handleOpenCheckout}
-        onWaiter={() => { setOrderOpen(false); clear(); setTimeout(openWaiter, 80) }}
       />
 
       <Checkout

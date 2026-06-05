@@ -123,12 +123,13 @@ def test_join_unknown_table_rejected() -> None:
     assert resp.status_code == 400
 
 
-# ── waiter_confirm (default) ──────────────────────────────────────────────────
+# ── waiter_confirm ────────────────────────────────────────────────────────────
 def test_waiter_confirm_order_pends_then_staff_fires() -> None:
     org, restaurant = _make_tenant("c", "C1")
     table = _make_table(restaurant)
     item = _make_item(restaurant)
-    joined = _join(restaurant, table)  # default mode == waiter_confirm
+    joined = _join(restaurant, table)
+    _set_mode(joined["session_id"], "waiter_confirm")
 
     guest = APIClient()
     resp = guest.post(
@@ -335,6 +336,80 @@ def test_session_snapshot_exposes_me_and_can_order() -> None:
     after = guest.get(url, HTTP_X_DEVICE_TOKEN=joined["device_token"])
     assert after.data["me"]["role"] == "leader"
     assert after.data["can_order"] is True
+
+
+# ── service requests (call waiter / water / bill) ─────────────────────────────
+def test_guest_service_request_then_staff_claims_and_resolves() -> None:
+    org, restaurant = _make_tenant("sr", "SR1")
+    table = _make_table(restaurant)
+    joined = _join(restaurant, table)
+
+    guest = APIClient()
+    created = guest.post(
+        f"/api/dining/sessions/{joined['session_id']}/service-request/",
+        {"kind": "waiter", "note": "need cutlery"},
+        format="json",
+        HTTP_X_DEVICE_TOKEN=joined["device_token"],
+    )
+    assert created.status_code == 201, created.content
+    req_id = created.data["id"]
+    assert created.data["kind"] == "waiter"
+    assert created.data["status"] == "pending"
+
+    staff = _staff_client(org, restaurant)
+    listed = staff.get("/api/dining/service-requests/")
+    assert listed.status_code == 200, listed.content
+    assert any(r["id"] == req_id for r in listed.data["results"])
+
+    claimed = staff.post(f"/api/dining/service-requests/{req_id}/claim/")
+    assert claimed.status_code == 200, claimed.content
+    assert claimed.data["status"] == "claimed"
+
+    resolved = staff.post(f"/api/dining/service-requests/{req_id}/resolve/")
+    assert resolved.status_code == 200
+    assert resolved.data["status"] == "resolved"
+    # Resolved requests drop off the open queue.
+    assert all(r["id"] != req_id for r in staff.get("/api/dining/service-requests/").data["results"])
+
+
+def test_duplicate_pending_service_request_is_collapsed() -> None:
+    _org, restaurant = _make_tenant("sr2", "SR2")
+    table = _make_table(restaurant)
+    joined = _join(restaurant, table)
+    guest = APIClient()
+    url = f"/api/dining/sessions/{joined['session_id']}/service-request/"
+    a = guest.post(url, {"kind": "water"}, format="json", HTTP_X_DEVICE_TOKEN=joined["device_token"])
+    b = guest.post(url, {"kind": "water"}, format="json", HTTP_X_DEVICE_TOKEN=joined["device_token"])
+    assert a.data["id"] == b.data["id"]
+
+
+# ── CRM linkage: contact capture backfills the order's customer ───────────────
+def test_contact_capture_links_existing_orders_to_customer() -> None:
+    _org, restaurant = _make_tenant("crm", "CRM1")
+    table = _make_table(restaurant)
+    item = _make_item(restaurant)
+    joined = _join(restaurant, table)
+    _set_mode(joined["session_id"], "auto_fire")
+
+    guest = APIClient()
+    guest.post(
+        f"/api/dining/sessions/{joined['session_id']}/orders/",
+        {"lines": [{"menu_item_id": str(item.id), "qty": 1}]},
+        format="json",
+        HTTP_X_DEVICE_TOKEN=joined["device_token"],
+    )
+    order = Order.all_objects.get(session_id=joined["session_id"])
+    assert order.customer_id is None  # anonymous at creation
+
+    contact = guest.post(
+        f"/api/dining/sessions/{joined['session_id']}/contact/",
+        {"phone": "+919812345678", "name": "Asha"},
+        format="json",
+        HTTP_X_DEVICE_TOKEN=joined["device_token"],
+    )
+    assert contact.status_code == 200, contact.content
+    order.refresh_from_db()
+    assert order.customer_id is not None  # backfilled to the enrolled customer
 
 
 # ── idempotency ───────────────────────────────────────────────────────────────
