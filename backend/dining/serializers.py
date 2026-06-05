@@ -7,6 +7,7 @@ accept references only, never money.
 """
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema_serializer
 from rest_framework import serializers
 
 from ops.order_serializers import OrderSerializer
@@ -154,8 +155,13 @@ class DisputeSerializer(serializers.Serializer):
     )
 
 
+@extend_schema_serializer(component_name="DiningServiceRequest")
 class ServiceRequestSerializer(serializers.ModelSerializer):
-    """Read view of a guest service request for the staff queue / KDS."""
+    """Read view of a guest service request for the staff queue / KDS.
+
+    A distinct schema component name avoids colliding with the separate
+    ``ops.floor_serializers.ServiceRequestSerializer`` in the OpenAPI schema.
+    """
 
     table = serializers.UUIDField(source="table_id", read_only=True)
 
