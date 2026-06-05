@@ -338,7 +338,13 @@ def test_session_snapshot_exposes_me_and_can_order() -> None:
     assert after.data["can_order"] is True
 
 
-# ── service requests (call waiter / water / bill) ─────────────────────────────
+# ── service requests (guest call lands on the shared ops queue) ───────────────
+def _request_ids(resp) -> list:
+    body = resp.data
+    rows = body["results"] if isinstance(body, dict) and "results" in body else body
+    return [r["id"] for r in rows]
+
+
 def test_guest_service_request_then_staff_claims_and_resolves() -> None:
     org, restaurant = _make_tenant("sr", "SR1")
     table = _make_table(restaurant)
@@ -353,23 +359,25 @@ def test_guest_service_request_then_staff_claims_and_resolves() -> None:
     )
     assert created.status_code == 201, created.content
     req_id = created.data["id"]
-    assert created.data["kind"] == "waiter"
+    assert created.data["type"] == "waiter"
     assert created.data["status"] == "pending"
+    assert "need cutlery" in created.data["note"]  # guest note carried through
 
+    # Staff work it via the shared ops floor queue (one surface).
     staff = _staff_client(org, restaurant)
-    listed = staff.get("/api/dining/service-requests/")
+    listed = staff.get("/api/ops/requests/")
     assert listed.status_code == 200, listed.content
-    assert any(r["id"] == req_id for r in listed.data["results"])
+    assert req_id in _request_ids(listed)
 
-    claimed = staff.post(f"/api/dining/service-requests/{req_id}/claim/")
+    claimed = staff.post(f"/api/ops/requests/{req_id}/claim/")
     assert claimed.status_code == 200, claimed.content
     assert claimed.data["status"] == "claimed"
 
-    resolved = staff.post(f"/api/dining/service-requests/{req_id}/resolve/")
+    resolved = staff.post(f"/api/ops/requests/{req_id}/resolve/")
     assert resolved.status_code == 200
     assert resolved.data["status"] == "resolved"
-    # Resolved requests drop off the open queue.
-    assert all(r["id"] != req_id for r in staff.get("/api/dining/service-requests/").data["results"])
+    # Resolved requests drop off the active queue.
+    assert req_id not in _request_ids(staff.get("/api/ops/requests/"))
 
 
 def test_duplicate_pending_service_request_is_collapsed() -> None:

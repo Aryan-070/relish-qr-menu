@@ -15,59 +15,45 @@ from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from ops.models import Order, RestaurantTable
+from ops.models import Order, RestaurantTable, ServiceRequest
+from ops.services import create_service_request as _ops_create_service_request
 from ops.services import place_order
 
 from .constants import LIVE_SESSION_STATUSES
-from .models import Check, DiningSession, GuestDevice, ServiceRequest
+from .models import Check, DiningSession, GuestDevice
 
 
 class SessionError(Exception):
     """Raised when a session action is invalid (closed, wrong table, etc.)."""
 
 
-@transaction.atomic
 def create_service_request(
     *, session: DiningSession, device: GuestDevice | None, kind: str, note: str = ""
 ) -> ServiceRequest:
-    """Raise a guest service request (call waiter / water / bill / …).
+    """Raise a guest service request on the shared ``ops.ServiceRequest`` queue.
 
-    Collapses a duplicate: if the device already has a pending request of the
-    same kind, that one is returned rather than stacking another.
+    Guest calls land on the same model the staff floor cockpit reads, so there is
+    one service-request surface. Collapses a duplicate pending request of the
+    same kind on the table, and carries the guest's name into the note for staff.
     """
     if not session.is_live:
         raise SessionError("This session is no longer live.")
-    if device is not None:
-        existing = ServiceRequest.objects.filter(
-            session=session, device=device, kind=kind, status="pending"
-        ).first()
-        if existing is not None:
-            return existing
-    return ServiceRequest.objects.create(
+
+    existing = ServiceRequest.objects.filter(
         restaurant_id=session.restaurant_id,
-        session=session,
-        device=device,
         table_id=session.table_id,
-        kind=kind,
-        note=note,
+        type=kind,
         status="pending",
-    )
+    ).first()
+    if existing is not None:
+        return existing
 
-
-@transaction.atomic
-def set_service_request_status(
-    *, request_obj: ServiceRequest, status: str, membership_id: Any = None
-) -> ServiceRequest:
-    """Staff transitions a request to ``claimed`` / ``resolved``."""
-    request_obj.status = status
-    if status == "claimed" and membership_id:
-        request_obj.claimed_by_id = membership_id
-    if status == "resolved":
-        request_obj.resolved_at = timezone.now()
-    request_obj.save(
-        update_fields=["status", "claimed_by_id", "resolved_at", "updated_at"]
+    who = (device.display_name or "Guest") if device is not None else "Guest"
+    full_note = f"{who}: {note}" if note else f"{who} (from QR)"
+    table = RestaurantTable.all_objects.get(pk=session.table_id)
+    return _ops_create_service_request(
+        restaurant_id=session.restaurant_id, table=table, type=kind, note=full_note
     )
-    return request_obj
 
 
 # ── Join / presence ──────────────────────────────────────────────────────────

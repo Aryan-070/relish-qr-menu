@@ -268,10 +268,6 @@ SPECTACULAR_SETTINGS = {
     # (SetPermissionsSerializer) — name it once to avoid a collision warning.
     "ENUM_NAME_OVERRIDES": {
         "PermissionKeyEnum": "accounts.constants.PERMISSION_KEYS",
-        # ops.ServiceRequest (floor) and dining.ServiceRequest (guest) share the
-        # same pending/claimed/resolved status set — name it once so the two
-        # identical "status" enums don't collide in the schema.
-        "ServiceRequestStatusEnum": "ops.models.REQUEST_STATUS_CHOICES",
     },
 }
 

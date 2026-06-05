@@ -7,13 +7,13 @@ accept references only, never money.
 """
 from __future__ import annotations
 
-from drf_spectacular.utils import extend_schema_serializer
 from rest_framework import serializers
 
+from ops.models import REQUEST_TYPE_CHOICES
 from ops.order_serializers import OrderSerializer
 
-from .constants import ORDER_CONFIRMATION_MODE_CHOICES, SERVICE_REQUEST_TYPE_CHOICES
-from .models import Check, DiningSession, GuestDevice, ServiceRequest
+from .constants import ORDER_CONFIRMATION_MODE_CHOICES
+from .models import Check, DiningSession, GuestDevice
 
 _MODE_VALUES = [value for value, _label in ORDER_CONFIRMATION_MODE_CHOICES]
 
@@ -155,27 +155,11 @@ class DisputeSerializer(serializers.Serializer):
     )
 
 
-@extend_schema_serializer(component_name="DiningServiceRequest")
-class ServiceRequestSerializer(serializers.ModelSerializer):
-    """Read view of a guest service request for the staff queue / KDS.
-
-    A distinct schema component name avoids colliding with the separate
-    ``ops.floor_serializers.ServiceRequestSerializer`` in the OpenAPI schema.
-    """
-
-    table = serializers.UUIDField(source="table_id", read_only=True)
-
-    class Meta:
-        model = ServiceRequest
-        fields = ["id", "session", "table", "kind", "status", "note", "created_at", "resolved_at"]
-        read_only_fields = fields
-
-
 class ServiceRequestCreateSerializer(serializers.Serializer):
-    """Guest input to raise a service request."""
+    """Guest input to raise a service request (lands on ops.ServiceRequest)."""
 
     kind = serializers.ChoiceField(
-        choices=[v for v, _ in SERVICE_REQUEST_TYPE_CHOICES], default="waiter"
+        choices=[v for v, _ in REQUEST_TYPE_CHOICES], default="waiter"
     )
     note = serializers.CharField(
         max_length=300, required=False, allow_blank=True, default=""

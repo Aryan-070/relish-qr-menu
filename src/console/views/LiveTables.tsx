@@ -6,13 +6,12 @@ import { Button } from '../components/Button'
 import { EmptyState } from '../components/EmptyState'
 import { useToast } from '../components/Toast'
 import { ApiError } from '../../lib/api/client'
+import { confirmOrders, listSessions, promoteDevice } from '../../lib/api/dining'
 import {
-  actOnServiceRequest,
-  confirmOrders,
+  claimServiceRequest,
   listServiceRequests,
-  listSessions,
-  promoteDevice,
-} from '../../lib/api/dining'
+  resolveServiceRequest,
+} from '../lib/serviceRequestsApi'
 
 const SESSIONS_KEY = ['live-sessions']
 const REQUESTS_KEY = ['live-service-requests']
@@ -46,13 +45,14 @@ export function LiveTables() {
     onError: onErr,
   })
   const act = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'claim' | 'resolve' }) => actOnServiceRequest(id, action),
+    mutationFn: ({ id, action }: { id: string; action: 'claim' | 'resolve' }) =>
+      action === 'claim' ? claimServiceRequest(id) : resolveServiceRequest(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: REQUESTS_KEY }),
     onError: onErr,
   })
 
   const sessionList = sessions.data?.results ?? []
-  const requestList = requests.data?.results ?? []
+  const requestList = requests.data ?? []
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,7 +66,7 @@ export function LiveTables() {
               <div key={r.id} className="flex items-center justify-between rounded-xl px-3 py-2"
                 style={{ border: `1px solid ${t.ruleColor}` }}>
                 <span className="text-[13px]" style={{ color: t.ink, fontFamily: t.descFont }}>
-                  <span className="capitalize font-semibold">{r.kind}</span>
+                  <span className="capitalize font-semibold">{r.type}</span>
                   {r.note ? ` — ${r.note}` : ''} · {r.status}
                 </span>
                 <div className="flex gap-2">

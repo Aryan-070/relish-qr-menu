@@ -139,18 +139,19 @@ export function submitContact(
 
 export type ServiceRequestKind = 'waiter' | 'water' | 'bill' | 'assistance' | 'cleanup'
 
+/** The created service request (shape mirrors ops.ServiceRequest). */
 export interface ServiceRequestView {
   id: string
-  session: string
+  code: string
   table: string
-  kind: ServiceRequestKind
+  type: ServiceRequestKind
   status: 'pending' | 'claimed' | 'resolved'
   note: string
   created_at: string
-  resolved_at: string | null
 }
 
-/** Guest raises a service request (call waiter / water / bill) for the table. */
+/** Guest raises a service request (call waiter / water / bill). It lands on the
+ *  shared ops.ServiceRequest queue; staff work it via the ops floor endpoints. */
 export function createServiceRequest(
   sessionId: string,
   deviceToken: string,
@@ -162,21 +163,6 @@ export function createServiceRequest(
     body: { kind, note },
     deviceToken,
     staff: false,
-  })
-}
-
-/** Staff: list open (pending/claimed) service requests for the tenant. */
-export function listServiceRequests(): Promise<{ results: ServiceRequestView[] }> {
-  return apiFetch<{ results: ServiceRequestView[] }>('/dining/service-requests/')
-}
-
-/** Staff: claim or resolve a service request. */
-export function actOnServiceRequest(
-  id: string,
-  action: 'claim' | 'resolve',
-): Promise<ServiceRequestView> {
-  return apiFetch<ServiceRequestView>(`/dining/service-requests/${id}/${action}/`, {
-    method: 'POST',
   })
 }
 

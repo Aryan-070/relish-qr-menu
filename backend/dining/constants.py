@@ -28,19 +28,8 @@ ORDER_CONFIRMATION_MODE_CHOICES = (
 #: ordering). Operators can relax a session to ``waiter_confirm``/``auto_fire``.
 DEFAULT_ORDER_CONFIRMATION_MODE = "leader"
 
-# ── Service requests (guest "call waiter" / water / bill / …) ────────────────
-SERVICE_REQUEST_TYPE_CHOICES = (
-    ("waiter", "Call waiter"),
-    ("water", "Water"),
-    ("bill", "Bill"),
-    ("assistance", "Assistance"),
-    ("cleanup", "Cleanup"),
-)
-SERVICE_REQUEST_STATUS_CHOICES = (
-    ("pending", "Pending"),
-    ("claimed", "Claimed"),
-    ("resolved", "Resolved"),
-)
+# Guest service requests reuse the shared ``ops.ServiceRequest`` model + its
+# ``ops.models.REQUEST_TYPE_CHOICES`` — no dining-specific choice set.
 
 # ── Device role within a session ─────────────────────────────────────────────
 DEVICE_ROLE_CHOICES = (
