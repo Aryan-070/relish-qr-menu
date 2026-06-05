@@ -18,7 +18,9 @@ def api_client():
 
 @pytest.fixture
 def user():
-    return User.objects.create_user(email="owner@relish.test", password=VALID_PASSWORD)
+    return User.objects.create_user(
+        username="owner", email="owner@relish.test", password=VALID_PASSWORD
+    )
 
 
 # --- Manager ----------------------------------------------------------------
@@ -26,7 +28,7 @@ def user():
 
 def test_create_user_normalizes_email_and_hashes_password():
     user = User.objects.create_user(
-        email="Owner@Relish.TEST", password=VALID_PASSWORD
+        username="owner", email="Owner@Relish.TEST", password=VALID_PASSWORD
     )
     # normalize_email lowercases the domain part.
     assert user.email == "Owner@relish.test"
@@ -38,14 +40,19 @@ def test_create_user_normalizes_email_and_hashes_password():
     assert user.is_superuser is False
 
 
-def test_create_user_requires_email():
+def test_create_user_requires_username():
     with pytest.raises(ValueError):
-        User.objects.create_user(email="", password=VALID_PASSWORD)
+        User.objects.create_user(username="", password=VALID_PASSWORD)
+
+
+def test_create_user_allows_missing_email():
+    user = User.objects.create_user(username="rostered", password=VALID_PASSWORD)
+    assert user.email is None
 
 
 def test_create_superuser_sets_flags():
     admin = User.objects.create_superuser(
-        email="admin@relish.test", password=VALID_PASSWORD
+        username="admin", email="admin@relish.test", password=VALID_PASSWORD
     )
     assert admin.is_staff is True
     assert admin.is_superuser is True
@@ -53,49 +60,13 @@ def test_create_superuser_sets_flags():
     assert admin.check_password(VALID_PASSWORD)
 
 
-# --- Signup endpoint --------------------------------------------------------
+# --- Token endpoint (username- or email-based login) ------------------------
 
 
-def test_signup_creates_user(api_client):
-    url = reverse("accounts:signup")
-    resp = api_client.post(
-        url, {"email": "new@relish.test", "password": VALID_PASSWORD}, format="json"
-    )
-    assert resp.status_code == 201
-    assert resp.data["email"] == "new@relish.test"
-    # Password must never be echoed back.
-    assert "password" not in resp.data
-    assert User.objects.filter(email="new@relish.test").exists()
-
-
-def test_signup_rejects_weak_password(api_client):
-    url = reverse("accounts:signup")
-    resp = api_client.post(
-        url, {"email": "weak@relish.test", "password": "123"}, format="json"
-    )
-    assert resp.status_code == 400
-    # Errors flow through common.exceptions.custom_exception_handler, which wraps
-    # them in the {success, error, detail} envelope; field errors live under detail.
-    assert "password" in resp.data["detail"]
-    assert not User.objects.filter(email="weak@relish.test").exists()
-
-
-def test_signup_rejects_duplicate_email(api_client, user):
-    url = reverse("accounts:signup")
-    resp = api_client.post(
-        url, {"email": user.email, "password": VALID_PASSWORD}, format="json"
-    )
-    assert resp.status_code == 400
-    assert "email" in resp.data["detail"]
-
-
-# --- Token endpoint ---------------------------------------------------------
-
-
-def test_token_obtain_returns_pair_with_tenancy_claims(api_client, user):
+def test_token_obtain_by_username(api_client, user):
     url = reverse("accounts:token_obtain_pair")
     resp = api_client.post(
-        url, {"email": user.email, "password": VALID_PASSWORD}, format="json"
+        url, {"username": user.username, "password": VALID_PASSWORD}, format="json"
     )
     assert resp.status_code == 200
     assert "access" in resp.data
@@ -111,12 +82,40 @@ def test_token_obtain_returns_pair_with_tenancy_claims(api_client, user):
     assert decoded["org_id"] is None
 
 
+def test_token_obtain_by_email(api_client, user):
+    """The recovery email is accepted as the login identifier."""
+    url = reverse("accounts:token_obtain_pair")
+    resp = api_client.post(
+        url, {"username": user.email, "password": VALID_PASSWORD}, format="json"
+    )
+    assert resp.status_code == 200
+    assert "access" in resp.data
+
+
 def test_token_obtain_rejects_bad_credentials(api_client, user):
     url = reverse("accounts:token_obtain_pair")
     resp = api_client.post(
-        url, {"email": user.email, "password": "wrong-password"}, format="json"
+        url, {"username": user.username, "password": "wrong-password"}, format="json"
     )
     assert resp.status_code == 401
+
+
+def test_token_obtain_rejects_deactivated_user(api_client, user):
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    url = reverse("accounts:token_obtain_pair")
+    resp = api_client.post(
+        url, {"username": user.username, "password": VALID_PASSWORD}, format="json"
+    )
+    assert resp.status_code == 401
+
+
+def test_signup_route_removed():
+    """Self-registration is intentionally gone (admin/manager create accounts)."""
+    from django.urls import NoReverseMatch
+
+    with pytest.raises(NoReverseMatch):
+        reverse("accounts:signup")
 
 
 # --- Me endpoint ------------------------------------------------------------
@@ -133,5 +132,6 @@ def test_me_returns_current_user(api_client, user):
     url = reverse("accounts:me")
     resp = api_client.get(url)
     assert resp.status_code == 200
+    assert resp.data["username"] == user.username
     assert resp.data["email"] == user.email
     assert resp.data["id"] == str(user.id)

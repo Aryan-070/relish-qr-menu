@@ -27,6 +27,29 @@ class OrderError(Exception):
     """Raised when an order cannot be placed or governed (bad item, etc.)."""
 
 
+def record_price_change(
+    *,
+    restaurant_id: Any,
+    menu_item_id: Any,
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    actor_membership_id: Any | None = None,
+) -> AuditLog:
+    """Append an immutable ``price-change`` audit row for a menu-item edit.
+
+    Called from ``menu.views.MenuItemViewSet`` (lazily, to avoid a menu→ops
+    import cycle) whenever an item's price or tax rate changes.
+    """
+    return AuditLog.objects.create(
+        restaurant_id=restaurant_id,
+        type="price-change",
+        actor_membership_id=actor_membership_id,
+        before=dict(before),
+        after=dict(after),
+        reason=f"menu_item:{menu_item_id}",
+    )
+
+
 def next_order_code(restaurant_id: Any) -> str:
     """Return the next ``ORD-00001`` style code for ``restaurant_id``.
 

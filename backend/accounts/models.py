@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -12,16 +13,31 @@ from common.models import TimeStampedModel
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    """Custom user keyed by email with a UUID primary key.
+    """Custom user keyed by username with a UUID primary key.
 
-    Authentication is email + password (no ``username``). Multi-tenant
+    Authentication is ``username`` + password; ``email`` is optional and used
+    only for recovery. Login also accepts the email as the identifier via
+    ``accounts.auth_backends.UsernameOrEmailBackend``. Multi-tenant
     membership/restaurant/org context is intentionally *not* stored on the
-    user row -- Phase 1 attaches it via a separate ``Membership`` model and
-    surfaces it through JWT claims, keeping this model tenancy-agnostic.
+    user row -- it is attached via a separate ``Membership`` model and
+    surfaced through JWT claims, keeping this model tenancy-agnostic.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(_("email address"), unique=True)
+    username = models.CharField(
+        _("username"),
+        max_length=150,
+        unique=True,
+        help_text=_("Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."),
+        validators=[UnicodeUsernameValidator()],
+    )
+    email = models.EmailField(
+        _("email address"),
+        unique=True,
+        null=True,
+        blank=True,
+        help_text=_("Optional. Used for account recovery."),
+    )
     is_staff = models.BooleanField(
         _("staff status"),
         default=False,
@@ -39,16 +55,16 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = UserManager()
 
-    USERNAME_FIELD = "email"
+    USERNAME_FIELD = "username"
     REQUIRED_FIELDS = []
 
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
-        ordering = ["email"]
+        ordering = ["username"]
 
     def __str__(self):
-        return self.email
+        return self.username
 
 
 # ── Control plane: organization → outlet → routing ──────────────────────────
@@ -333,3 +349,47 @@ class Otp(TimeStampedModel):
 
     def is_valid(self) -> bool:
         return not self.consumed and self.expires_at > timezone.now()
+
+
+class PasswordChangeRequest(TimeStampedModel):
+    """A staff member's pending password change, awaiting admin/manager approval.
+
+    The proposed password is stored only as a Django password hash
+    (``make_password``) -- never plaintext or anything reversible -- so an
+    approver can apply it without ever seeing it. On approval the hash is copied
+    straight onto the user's ``password`` column.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    org = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="password_change_requests",
+    )
+    requester = models.ForeignKey(
+        Membership, on_delete=models.CASCADE, related_name="password_requests"
+    )
+    new_password_hash = models.CharField(max_length=128)
+    status = models.CharField(
+        max_length=16,
+        choices=constants.PWD_REQ_STATUS_CHOICES,
+        default=constants.PWD_REQ_PENDING,
+    )
+    reviewed_by = models.ForeignKey(
+        Membership,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_password_requests",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reason = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["org", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"pwd-request<{self.requester_id}:{self.status}>"

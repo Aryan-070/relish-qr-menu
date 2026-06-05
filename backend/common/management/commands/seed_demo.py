@@ -27,6 +27,7 @@ from ops.models import ORDER_STATUS_CHOICES, Order, OrderLine, RestaurantTable
 from theming.models import RestaurantTheme
 
 DEMO_EMAIL = "demo@relish.test"
+DEMO_USERNAME = "demo"
 DEMO_PASSWORD = "relish-demo-2026"
 DEMO_ORG = "Relish Demo"
 DEMO_OUTLET = "Relish Demo Outlet"
@@ -86,7 +87,9 @@ class Command(BaseCommand):
     # safe to run in the background while the web server is already serving.
     def handle(self, *args, **options) -> None:
         User = get_user_model()
-        user, created = User.objects.get_or_create(email=DEMO_EMAIL)
+        user, created = User.objects.get_or_create(
+            username=DEMO_USERNAME, defaults={"email": DEMO_EMAIL}
+        )
         if created:
             user.set_password(DEMO_PASSWORD)
             user.save(update_fields=["password"])
@@ -122,7 +125,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Demo seeded."))
         self.stdout.write(f"  restaurant_id : {restaurant.id}")
         self.stdout.write(f"  public menu   : /api/public/menu/{restaurant.id}/")
-        self.stdout.write(f"  login         : {DEMO_EMAIL} / {DEMO_PASSWORD}")
+        self.stdout.write(f"  login         : {DEMO_USERNAME} / {DEMO_PASSWORD}")
 
     def _seed_menu(self, restaurant: Restaurant) -> None:
         for code, (name, sort, items) in MENU.items():

@@ -1,7 +1,9 @@
-// Auth foundation for the Staff Console (Phase 6.1).
-// - 'supabase' mode (env configured): real Supabase Auth, session-gated console.
-// - 'demo' mode (no env): no login, the existing localStorage demo runs as-is.
-// This keeps the static demo deployable while wiring real auth behind a flag.
+// Auth for the Staff Console — backed by the Django/DRF backend.
+//
+// The console is always login-gated: there is no unauthenticated path. On mount
+// we hydrate the signed-in identity from `/auth/me/` (using a stored JWT); a
+// successful `signIn` exchanges username/email + password for a token. Role,
+// restaurant and permissions come from the user's *active* membership.
 
 import {
   createContext,
@@ -11,113 +13,125 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
-import { supabase, isSupabaseConfigured } from '../../lib/supabase'
-import { ensureTenant } from '../lib/provisionTenant'
-import type { Role } from '../lib/types'
+import { ApiError, getStaffToken } from '../../lib/api/client'
+import { getMe, isStaffAuthed, staffLogin, staffLogout } from '../../lib/api/auth'
+import type { Permission, Role } from '../lib/types'
 
-export type AuthMode = 'demo' | 'supabase'
 export type AuthStatus = 'loading' | 'ready'
 
 export interface AuthValue {
-  mode: AuthMode
   status: AuthStatus
-  user: User | null
+  isAuthed: boolean
+  /** Active-membership role, normalised to a console role (kitchen/host → waiter). */
   appRole: Role | null
-  /** The signed-in user's restaurant (supabase mode). Null in demo mode or
-   *  before provisioning completes. The ops store keys all sync on this. */
   restaurantId: string | null
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>
-  signOut: () => Promise<void>
+  membershipId: string | null
+  displayName: string | null
+  username: string | null
+  email: string | null
+  permissions: Permission[]
+  signIn: (identifier: string, password: string) => Promise<{ error: string | null }>
+  signOut: () => void
 }
 
 const Ctx = createContext<AuthValue | null>(null)
 
+/** Map a backend role key onto the three console roles (least privilege fallback). */
+function toConsoleRole(role: string | null | undefined): Role | null {
+  if (role === 'admin' || role === 'manager' || role === 'waiter') return role
+  if (role === 'kitchen' || role === 'host') return 'waiter'
+  return role ? 'waiter' : null
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const mode: AuthMode = isSupabaseConfigured ? 'supabase' : 'demo'
-  const [status, setStatus] = useState<AuthStatus>(mode === 'supabase' ? 'loading' : 'ready')
-  const [user, setUser] = useState<User | null>(null)
+  const [status, setStatus] = useState<AuthStatus>(() =>
+    isStaffAuthed() ? 'loading' : 'ready',
+  )
+  const [isAuthed, setIsAuthed] = useState(false)
   const [appRole, setAppRole] = useState<Role | null>(null)
   const [restaurantId, setRestaurantId] = useState<string | null>(null)
+  const [membershipId, setMembershipId] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
+  const [permissions, setPermissions] = useState<Permission[]>([])
 
-  useEffect(() => {
-    if (!supabase) return
-    let active = true
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-      setUser(data.session?.user ?? null)
+  const resetIdentity = () => {
+    setIsAuthed(false)
+    setAppRole(null)
+    setRestaurantId(null)
+    setMembershipId(null)
+    setDisplayName(null)
+    setUsername(null)
+    setEmail(null)
+    setPermissions([])
+  }
+
+  const hydrate = async (): Promise<void> => {
+    try {
+      const me = await getMe()
+      const active = me.active
+      setIsAuthed(true)
+      setUsername(me.username)
+      setEmail(me.email)
+      setDisplayName(active?.org_name ?? me.username)
+      setAppRole(toConsoleRole(active?.role))
+      setRestaurantId(active?.restaurant_id ?? null)
+      setMembershipId(active?.membership_id ?? null)
+      setPermissions((active?.perms as Permission[] | undefined) ?? [])
+    } catch (err) {
+      // 401 (or any failure) → token is stale/absent; drop it and stay signed out.
+      if (err instanceof ApiError && err.status === 401) staffLogout()
+      resetIdentity()
+    } finally {
       setStatus('ready')
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session: Session | null) => {
-      setUser(session?.user ?? null)
-      setStatus('ready')
-    })
-    return () => {
-      active = false
-      sub.subscription.unsubscribe()
     }
-  }, [])
+  }
 
-  // Provision the tenant on first sign-in, then drive the console role +
-  // restaurantId from the user's app_users row (supabase mode). ensureTenant is
-  // idempotent: it creates a restaurant + admin membership + seeds demo data only
-  // when no membership exists yet, otherwise it's a no-op read. Demo mode has no
-  // client, so appRole/restaurantId stay null and the demo switcher governs role.
+  // On mount, hydrate from a stored token if one exists.
   useEffect(() => {
-    if (!supabase) return
-    if (!user) {
-      setAppRole(null)
-      setRestaurantId(null)
+    if (!getStaffToken()) {
+      setStatus('ready')
       return
     }
-    let active = true
-    void (async () => {
-      try {
-        await ensureTenant({ id: user.id, email: user.email })
-      } catch {
-        /* provisioning failed — fall through; membership read below stays null */
-      }
-      if (!active || !supabase) return
-      const { data } = await supabase
-        .from('app_users')
-        .select('role, restaurant_id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (!active) return
-      setAppRole((data?.role as Role | undefined) ?? null)
-      setRestaurantId((data?.restaurant_id as string | undefined) ?? null)
-    })()
-    return () => {
-      active = false
-    }
-  }, [user])
+    void hydrate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const value = useMemo<AuthValue>(
     () => ({
-      mode,
       status,
-      user,
+      isAuthed,
       appRole,
       restaurantId,
-      signIn: async (email, password) => {
-        if (!supabase) return { error: 'Auth is not configured.' }
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        return { error: error?.message ?? null }
+      membershipId,
+      displayName,
+      username,
+      email,
+      permissions,
+      signIn: async (identifier, password) => {
+        try {
+          await staffLogin(identifier, password)
+        } catch (err) {
+          const message =
+            err instanceof ApiError
+              ? err.status === 401
+                ? 'Incorrect username or password.'
+                : (err.body?.detail ?? 'Sign-in failed.')
+              : 'Network error — please try again.'
+          return { error: message }
+        }
+        setStatus('loading')
+        await hydrate()
+        return { error: null }
       },
-      signUp: async (email, password) => {
-        if (!supabase) return { error: 'Auth is not configured.' }
-        const { error } = await supabase.auth.signUp({ email, password })
-        return { error: error?.message ?? null }
-      },
-      signOut: async () => {
-        if (supabase) await supabase.auth.signOut()
-        setUser(null)
-        setAppRole(null)
-        setRestaurantId(null)
+      signOut: () => {
+        staffLogout()
+        resetIdentity()
+        setStatus('ready')
       },
     }),
-    [mode, status, user, appRole, restaurantId],
+    [status, isAuthed, appRole, restaurantId, membershipId, displayName, username, email, permissions],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

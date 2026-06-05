@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
-import { type MenuItem, getCategoryForItem } from '../../data/menu'
+import { type MenuItem } from '../../data/menu'
+import { useMenuData } from '../../data/MenuDataContext'
 import { useTheme } from '../../theme/ThemeContext'
 import { useComponentStyle } from '../../theme/ComponentStyleContext'
 import { TiltCard } from '../fx/TiltCard'
@@ -38,6 +39,7 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
   const { tokens: t } = useTheme()
   const { style: engine } = useComponentStyle()
   const { posterOnly } = useMediaMode()
+  const { getCategoryForItem } = useMenuData()
   const catId = getCategoryForItem(item.id)
   const bg = CATEGORY_BG[catId] ?? CATEGORY_BG.quickbites
   const [imgErr, setImgErr] = useState(false)

@@ -27,6 +27,10 @@ const VIEW_TITLE: Record<ConsoleView, string> = {
   promotions: 'Promotions',
   'cash-loss': 'Cash & Loss',
   'staff-admin': 'Staff Admin',
+  'staff-management': 'Staff Accounts',
+  'password-approvals': 'Password Requests',
+  'password-request': 'My Password',
+  appearance: 'Appearance & Branding',
   roster: 'Roster',
   group: 'Group',
 }

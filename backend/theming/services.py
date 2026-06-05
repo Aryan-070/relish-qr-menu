@@ -11,6 +11,7 @@ from typing import Any
 
 from theming.models import (
     COMPONENT_STYLE_CHOICES,
+    LANDING_VARIANT_CHOICES,
     MEDIA_MODE_CHOICES,
     UI_THEME_CHOICES,
     RestaurantTheme,
@@ -21,9 +22,13 @@ from theming.models import (
 # keys ``public_theme_config`` will ever expose.
 _PUBLIC_FIELDS: tuple[str, ...] = (
     "ui_theme",
+    "landing_variant",
     "component_style",
     "media_mode",
     "token_overrides",
+    "brand_colors",
+    "font_choices",
+    "custom_font",
     "allow_customer_choice",
     "customer_choices",
     "logo_url",
@@ -31,6 +36,7 @@ _PUBLIC_FIELDS: tuple[str, ...] = (
 )
 
 _UI_THEME_VALUES = frozenset(value for value, _ in UI_THEME_CHOICES)
+_LANDING_VARIANT_VALUES = frozenset(value for value, _ in LANDING_VARIANT_CHOICES)
 _COMPONENT_STYLE_VALUES = frozenset(value for value, _ in COMPONENT_STYLE_CHOICES)
 _MEDIA_MODE_VALUES = frozenset(value for value, _ in MEDIA_MODE_CHOICES)
 
@@ -38,6 +44,7 @@ _MEDIA_MODE_VALUES = frozenset(value for value, _ in MEDIA_MODE_CHOICES)
 # that is not a member of the matching set is ignored during publish.
 _ENUM_FIELDS: dict[str, frozenset[str]] = {
     "ui_theme": _UI_THEME_VALUES,
+    "landing_variant": _LANDING_VARIANT_VALUES,
     "component_style": _COMPONENT_STYLE_VALUES,
     "media_mode": _MEDIA_MODE_VALUES,
 }
@@ -45,9 +52,13 @@ _ENUM_FIELDS: dict[str, frozenset[str]] = {
 # A sensible default returned by ``public_theme_config`` when no row exists.
 _DEFAULT_PUBLIC_CONFIG: dict[str, Any] = {
     "ui_theme": "warm",
+    "landing_variant": "signature",
     "component_style": "classic",
     "media_mode": "image",
     "token_overrides": {},
+    "brand_colors": {},
+    "font_choices": {},
+    "custom_font": {},
     "allow_customer_choice": False,
     "customer_choices": [],
     "logo_url": "",

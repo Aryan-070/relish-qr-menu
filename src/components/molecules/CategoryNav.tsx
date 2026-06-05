@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { categories } from '../../data/menu'
+import { useMenuData } from '../../data/MenuDataContext'
 import { useTheme } from '../../theme/ThemeContext'
 import { CategoryIcon } from '../../lib/categoryIcons'
 
@@ -11,6 +11,7 @@ interface CategoryNavProps {
 
 export function CategoryNav({ activeId, onChange }: CategoryNavProps) {
   const { tokens: t } = useTheme()
+  const { categories } = useMenuData()
   const scrollRef = useRef<HTMLDivElement>(null)
   const underline = t.navStyle === 'underline'
 

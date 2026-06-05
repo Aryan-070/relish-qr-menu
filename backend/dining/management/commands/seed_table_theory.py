@@ -31,6 +31,7 @@ from menu.models import MenuCategory, MenuItem
 from ops.models import RestaurantTable
 
 STAFF_EMAIL = "staff@tabletheory.test"
+STAFF_USERNAME = "staff"
 STAFF_PASSWORD = "TableTheory#2026"  # noqa: S105 - demo seed credential only.
 
 # category_code -> (name, sort_order, [(item_code, item_name, rupees), ...])
@@ -213,7 +214,9 @@ class Command(BaseCommand):
         # A staff user wired to this restaurant so the floor cockpit can log in
         # (admin system role → all perms; IsTenantMember only needs the org bind).
         user_model = get_user_model()
-        user, created = user_model.objects.get_or_create(email=STAFF_EMAIL)
+        user, created = user_model.objects.get_or_create(
+            username=STAFF_USERNAME, defaults={"email": STAFF_EMAIL}
+        )
         if created:
             user.set_password(STAFF_PASSWORD)
             user.save(update_fields=["password"])
@@ -237,7 +240,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Seeded The Table Theory."))
         self.stdout.write(f"  restaurant_id = {restaurant.id}")
-        self.stdout.write(f"  staff login   = {STAFF_EMAIL} / {STAFF_PASSWORD}")
+        self.stdout.write(f"  staff login   = {STAFF_USERNAME} / {STAFF_PASSWORD}")
         self.stdout.write(f"  table T1 id   = {tables['T1'].id}")
         self.stdout.write(f"  menu items    = {MenuItem.all_objects.filter(restaurant_id=restaurant.id).count()} ({item_count} new)")
         self.stdout.write(

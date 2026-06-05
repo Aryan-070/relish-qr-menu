@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react'
-import { getCategoryById } from '../../data/menu'
+import { useMenuData } from '../../data/MenuDataContext'
+import { useBrand } from '../../theme/BrandContext'
 import { BellRipple } from '../animations/BellRipple'
 import { useTheme } from '../../theme/ThemeContext'
 import { useT } from '../../i18n'
@@ -13,6 +14,8 @@ interface TopBarProps {
 export function TopBar({ activeCategoryId, onWaiter, onSearch }: TopBarProps) {
   const { tokens: t } = useTheme()
   const tr = useT()
+  const { getCategoryById } = useMenuData()
+  const { logoUrl, displayName } = useBrand()
   const category = getCategoryById(activeCategoryId)
   const hard = t.navStyle === 'underline'
 
@@ -25,19 +28,23 @@ export function TopBar({ activeCategoryId, onWaiter, onSearch }: TopBarProps) {
       }}
     >
     <div className="flex items-center justify-between px-4 py-3 w-full max-w-5xl mx-auto">
-      {/* Logo */}
+      {/* Logo — restaurant image if configured, else the wordmark. */}
       <div className="flex flex-col leading-none">
-        <span
-          className="font-bold uppercase"
-          style={{
-            fontFamily: t.headerFont,
-            fontSize: 18,
-            color: t.headerColor,
-            letterSpacing: t.headerTransform === 'uppercase' ? '0.04em' : '0.18em',
-          }}
-        >
-          RELISH
-        </span>
+        {logoUrl ? (
+          <img src={logoUrl} alt={displayName ?? 'Restaurant'} style={{ height: 28, width: 'auto', objectFit: 'contain' }} />
+        ) : (
+          <span
+            className="font-bold uppercase"
+            style={{
+              fontFamily: t.headerFont,
+              fontSize: 18,
+              color: t.headerColor,
+              letterSpacing: t.headerTransform === 'uppercase' ? '0.04em' : '0.18em',
+            }}
+          >
+            {displayName ? displayName.toUpperCase() : 'RELISH'}
+          </span>
+        )}
         <span
           className="uppercase tracking-widest"
           style={{

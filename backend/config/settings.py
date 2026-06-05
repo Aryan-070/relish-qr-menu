@@ -142,6 +142,13 @@ DATABASE_ROUTERS = ["common.routers.TenantShardRouter"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 
+# Staff log in with a username or their recovery email; the custom backend
+# resolves both. ModelBackend stays as a fallback for the Django admin site.
+AUTHENTICATION_BACKENDS = [
+    "accounts.auth_backends.UsernameOrEmailBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 # ── Password validation ─────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -219,6 +226,7 @@ REST_FRAMEWORK = {
         "razorpay_order": "30/min",
         "dining_join": "60/min",
         "dining_pay": "6/min",
+        "login": "10/min",
     },
     "EXCEPTION_HANDLER": "common.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",

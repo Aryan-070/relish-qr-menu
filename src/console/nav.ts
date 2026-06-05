@@ -20,9 +20,12 @@ import {
   ShieldCheck,
   CalendarClock,
   Building2,
+  UserPlus,
+  KeyRound,
+  Palette,
   type LucideIcon,
 } from 'lucide-react'
-import type { Role } from './lib/types'
+import type { Permission, Role } from './lib/types'
 
 export type ConsoleView =
   | 'admin-dashboard'
@@ -45,6 +48,10 @@ export type ConsoleView =
   | 'promotions'
   | 'cash-loss'
   | 'staff-admin'
+  | 'staff-management'
+  | 'password-approvals'
+  | 'password-request'
+  | 'appearance'
   | 'roster'
   | 'group'
 
@@ -54,6 +61,8 @@ export interface NavItem {
   icon: LucideIcon
   /** Live-count badge source, resolved by the shell. */
   badge?: 'pending-requests'
+  /** Hide this item unless the signed-in user holds this permission. */
+  requires?: Permission
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -69,6 +78,9 @@ export const NAV: Record<Role, NavItem[]> = {
     { view: 'records', label: 'Records', icon: History },
     { view: 'manager-menu', label: 'Menu', icon: UtensilsCrossed },
     { view: 'manager-staff', label: 'Staff', icon: Users },
+    { view: 'staff-management', label: 'Staff Accounts', icon: UserPlus, requires: 'manage-staff' },
+    { view: 'password-approvals', label: 'Password Requests', icon: KeyRound, requires: 'manage-staff' },
+    { view: 'appearance', label: 'Appearance', icon: Palette, requires: 'manage-theme' },
     { view: 'staff-admin', label: 'Staff Admin', icon: ShieldCheck },
     { view: 'roster', label: 'Roster', icon: CalendarClock },
     { view: 'group', label: 'Group', icon: Building2 },
@@ -88,6 +100,9 @@ export const NAV: Record<Role, NavItem[]> = {
     { view: 'reservations', label: 'Reservations', icon: CalendarCheck },
     { view: 'manager-menu', label: 'Menu', icon: UtensilsCrossed },
     { view: 'manager-staff', label: 'Staff', icon: Users },
+    { view: 'staff-management', label: 'Staff Accounts', icon: UserPlus, requires: 'manage-staff' },
+    { view: 'password-approvals', label: 'Password Requests', icon: KeyRound, requires: 'manage-staff' },
+    { view: 'appearance', label: 'Appearance', icon: Palette, requires: 'manage-theme' },
     { view: 'roster', label: 'Roster', icon: CalendarClock },
     { view: 'inventory', label: 'Inventory', icon: Boxes },
     { view: 'loyalty', label: 'Loyalty', icon: Gift },
@@ -105,6 +120,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { view: 'reservations', label: 'Reservations', icon: CalendarCheck },
     { view: 'waiter-billing', label: 'Billing', icon: Receipt },
     { view: 'records', label: 'Records', icon: History },
+    { view: 'password-request', label: 'My Password', icon: KeyRound },
   ],
 }
 

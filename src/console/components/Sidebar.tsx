@@ -5,6 +5,8 @@ import { isHard } from '../lib/skin'
 import { cn } from '../lib/format'
 import { NAV, ROLE_LABEL, type ConsoleView } from '../nav'
 import type { Role } from '../lib/types'
+import { useAuth } from '../auth/AuthContext'
+import { useBrand } from '../../theme/BrandContext'
 
 interface SidebarProps {
   role: Role
@@ -16,7 +18,11 @@ interface SidebarProps {
 
 export function Sidebar({ role, activeView, onNavigate, onExit, pendingCount }: SidebarProps) {
   const { tokens: t } = useTheme()
+  const { permissions } = useAuth()
+  const { logoUrl, displayName } = useBrand()
   const hard = isHard(t)
+  // Hide permission-gated items the signed-in user can't access.
+  const items = NAV[role].filter(item => !item.requires || permissions.includes(item.requires))
   const dark = t.bg === '#F4F4F0' ? '#141414' : '#4a0813'
   const panelBg = hard
     ? dark
@@ -32,15 +38,19 @@ export function Sidebar({ role, activeView, onNavigate, onExit, pendingCount }: 
     >
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-3 md:px-5 h-16 shrink-0" style={{ borderBottom: '1px solid rgba(255,248,234,0.12)' }}>
-        <span
-          className="w-9 h-9 inline-flex items-center justify-center shrink-0"
-          style={{ background: 'rgba(217,160,58,0.22)', borderRadius: hard ? 0 : 10, color: '#E9C77D' }}
-        >
-          <UtensilsCrossed size={18} />
-        </span>
+        {logoUrl ? (
+          <img src={logoUrl} alt={displayName ?? 'Restaurant'} className="h-9 w-9 object-contain shrink-0" />
+        ) : (
+          <span
+            className="w-9 h-9 inline-flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(217,160,58,0.22)', borderRadius: hard ? 0 : 10, color: '#E9C77D' }}
+          >
+            <UtensilsCrossed size={18} />
+          </span>
+        )}
         <div className="hidden md:block min-w-0">
           <p className="text-[15px] leading-tight truncate" style={{ fontFamily: t.headerFont, fontWeight: 700 }}>
-            Relish
+            {displayName ?? 'Relish'}
           </p>
           <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: dim }}>
             Console
@@ -50,7 +60,7 @@ export function Sidebar({ role, activeView, onNavigate, onExit, pendingCount }: 
 
       {/* Nav */}
       <ul className="flex-1 overflow-y-auto py-3 px-2 md:px-3 flex flex-col gap-1">
-        {NAV[role].map(item => {
+        {items.map(item => {
           const active = item.view === activeView
           const Icon = item.icon
           const showBadge = item.badge === 'pending-requests' && pendingCount > 0

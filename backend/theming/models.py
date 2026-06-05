@@ -19,6 +19,18 @@ UI_THEME_CHOICES = (
     ("hybrid", "Hybrid"),
     ("brutalist", "Brutalist"),
     ("editorial", "Editorial"),
+    ("table-theory", "Table Theory"),
+)
+# The 7 consumer landing/cover designs (src/screens/Landing*.tsx). Selected per
+# restaurant and surfaced to the guest app via public_theme_config.
+LANDING_VARIANT_CHOICES = (
+    ("signature", "Signature"),
+    ("classic", "Classic"),
+    ("gastronomique", "Deco"),
+    ("editorial", "Editorial"),
+    ("botanica", "Botanica"),
+    ("cinematic", "Cinema"),
+    ("reel", "Reel"),
 )
 COMPONENT_STYLE_CHOICES = (
     ("classic", "Classic"),
@@ -39,6 +51,9 @@ class RestaurantTheme(TimeStampedModel):
         related_name="theme",
     )
     ui_theme = models.CharField(max_length=20, choices=UI_THEME_CHOICES, default="warm")
+    landing_variant = models.CharField(
+        max_length=20, choices=LANDING_VARIANT_CHOICES, default="signature"
+    )
     component_style = models.CharField(
         max_length=20, choices=COMPONENT_STYLE_CHOICES, default="classic"
     )
@@ -47,6 +62,21 @@ class RestaurantTheme(TimeStampedModel):
     )
     token_overrides = models.JSONField(
         default=dict, blank=True, help_text="Partial ThemeTokens patch (colors/fonts)."
+    )
+    brand_colors = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Brand color overrides: {primary, secondary, accent} as hex.",
+    )
+    font_choices = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Selected font families: {heading, body}.",
+    )
+    custom_font = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="An imported font: {name, url} (woff2/woff).",
     )
     allow_customer_choice = models.BooleanField(default=False)
     customer_choices = models.JSONField(

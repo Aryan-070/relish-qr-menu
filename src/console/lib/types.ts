@@ -72,6 +72,8 @@ export type Permission =
   | 'manage-stock'
   | 'manage-staff'
   | 'view-reports'
+  | 'manage-billing'
+  | 'manage-theme'
 
 export interface Staff {
   id: string // 'W1'

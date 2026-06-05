@@ -77,10 +77,15 @@ def manager_membership(org):
 
 
 def _auth(client: APIClient, membership: Membership, perms: list[str]) -> None:
-    """Mint a JWT carrying the membership's org + the given perms, and attach it."""
+    """Mint a JWT carrying the membership's org/role + the given perms.
+
+    The ``role`` claim mirrors a real login (``RelishTokenObtainPairSerializer``)
+    so the escalation guards in the staff views see the caller's role.
+    """
     token = RefreshToken.for_user(membership.user)
     token["org_id"] = str(membership.org_id)
     token["membership_id"] = str(membership.id)
+    token["role"] = membership.role.key if membership.role_id else None
     token["perms"] = perms
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
 
@@ -239,15 +244,32 @@ def test_patch_changes_role(api_client, org, manager_membership):
         status=MEMBERSHIP_ACTIVE,
     )
     _auth(api_client, manager_membership, ["manage-staff"])
+    # A manager may promote a waiter to manager (a non-admin role).
+    resp = api_client.patch(
+        reverse("accounts:staff_detail", args=[target.id]),
+        {"role_key": ROLE_MANAGER},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.data["role"] == ROLE_MANAGER
+    target.refresh_from_db()
+    assert target.role.key == ROLE_MANAGER
+
+
+def test_manager_cannot_promote_to_admin(api_client, org, manager_membership):
+    target = Membership.objects.create(
+        org=org, role=_system_role(ROLE_WAITER), email="escalate@relish.test",
+        status=MEMBERSHIP_ACTIVE,
+    )
+    _auth(api_client, manager_membership, ["manage-staff"])
     resp = api_client.patch(
         reverse("accounts:staff_detail", args=[target.id]),
         {"role_key": ROLE_ADMIN},
         format="json",
     )
-    assert resp.status_code == 200
-    assert resp.data["role"] == ROLE_ADMIN
+    assert resp.status_code == 400
     target.refresh_from_db()
-    assert target.role.key == ROLE_ADMIN
+    assert target.role.key == ROLE_WAITER
 
 
 def test_deactivate_suspends_membership(api_client, org, manager_membership):
@@ -283,3 +305,109 @@ def test_membership_in_other_org_is_404(api_client, org, manager_membership):
     _auth(api_client, manager_membership, ["manage-staff"])
     resp = api_client.post(reverse("accounts:staff_deactivate", args=[foreign.id]))
     assert resp.status_code == 404
+
+
+# --- Direct account creation (username + password) --------------------------
+
+
+@pytest.fixture
+def admin_membership(org):
+    user = User.objects.create_user(
+        username="admin", email="admin@relish.test", password=VALID_PASSWORD
+    )
+    return Membership.objects.create(
+        org=org,
+        user=user,
+        role=_system_role(ROLE_ADMIN),
+        display_name="Admin",
+        email=user.email,
+        status=MEMBERSHIP_ACTIVE,
+    )
+
+
+def test_manager_can_create_waiter_account(api_client, org, manager_membership, outlet):
+    _auth(api_client, manager_membership, ["manage-staff"])
+    resp = api_client.post(
+        reverse("accounts:staff_create"),
+        {
+            "username": "ravi.waiter",
+            "password": VALID_PASSWORD,
+            "display_name": "Ravi",
+            "role_key": ROLE_WAITER,
+            "outlet_ids": [str(outlet.id)],
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.data
+    assert resp.data["role"] == ROLE_WAITER
+    created = User.objects.get(username="ravi.waiter")
+    assert created.check_password(VALID_PASSWORD)
+    membership = Membership.objects.get(user=created, org=org)
+    assert membership.outlets.count() == 1
+
+
+def test_manager_can_create_manager_account(api_client, org, manager_membership):
+    _auth(api_client, manager_membership, ["manage-staff"])
+    resp = api_client.post(
+        reverse("accounts:staff_create"),
+        {"username": "second.mgr", "password": VALID_PASSWORD, "role_key": ROLE_MANAGER},
+        format="json",
+    )
+    assert resp.status_code == 201
+
+
+def test_manager_cannot_create_admin_account(api_client, org, manager_membership):
+    _auth(api_client, manager_membership, ["manage-staff"])
+    resp = api_client.post(
+        reverse("accounts:staff_create"),
+        {"username": "sneaky.admin", "password": VALID_PASSWORD, "role_key": ROLE_ADMIN},
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert not User.objects.filter(username="sneaky.admin").exists()
+
+
+def test_create_rejects_duplicate_username(api_client, org, manager_membership):
+    User.objects.create_user(username="taken", password=VALID_PASSWORD)
+    _auth(api_client, manager_membership, ["manage-staff"])
+    resp = api_client.post(
+        reverse("accounts:staff_create"),
+        {"username": "taken", "password": VALID_PASSWORD, "role_key": ROLE_WAITER},
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_admin_creates_admin_account(api_client, org, admin_membership):
+    _auth(api_client, admin_membership, ["manage-staff"])
+    resp = api_client.post(
+        reverse("accounts:staff_create"),
+        {"username": "co.admin", "password": VALID_PASSWORD, "role_key": ROLE_ADMIN},
+        format="json",
+    )
+    assert resp.status_code == 201
+
+
+def test_cannot_deactivate_last_admin(api_client, org, admin_membership):
+    _auth(api_client, admin_membership, ["manage-staff"])
+    resp = api_client.post(
+        reverse("accounts:staff_deactivate", args=[admin_membership.id])
+    )
+    assert resp.status_code == 400
+    admin_membership.refresh_from_db()
+    assert admin_membership.active is True
+
+
+def test_deactivate_disables_user_login(api_client, org, admin_membership):
+    target_user = User.objects.create_user(
+        username="leaver", password=VALID_PASSWORD
+    )
+    target = Membership.objects.create(
+        org=org, user=target_user, role=_system_role(ROLE_WAITER),
+        display_name="Leaver", status=MEMBERSHIP_ACTIVE,
+    )
+    _auth(api_client, admin_membership, ["manage-staff"])
+    resp = api_client.post(reverse("accounts:staff_deactivate", args=[target.id]))
+    assert resp.status_code == 200
+    target_user.refresh_from_db()
+    assert target_user.is_active is False

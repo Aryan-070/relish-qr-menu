@@ -210,6 +210,50 @@ def test_update_with_correct_version_bumps_it(editor_client, tenant_a):
     assert item.version == 2
 
 
+def test_price_edit_writes_audit_log(editor_client, tenant_a):
+    from ops.models import AuditLog
+
+    _org, restaurant = tenant_a
+    category = MenuCategory.objects.create(
+        restaurant_id=restaurant.id, code="mains", name="Mains"
+    )
+    item = MenuItem.objects.create(
+        restaurant_id=restaurant.id, category=category, code="dosa",
+        name="Dosa", price_minor=12000,
+    )
+
+    resp = editor_client.patch(
+        f"/api/menu/items/{item.id}/",
+        {"price_minor": 15000, "version": 1},
+        format="json",
+    )
+    assert resp.status_code == 200, resp.data
+
+    audit = AuditLog.objects.get(type="price-change", reason=f"menu_item:{item.id}")
+    assert audit.before["price_minor"] == 12000
+    assert audit.after["price_minor"] == 15000
+    assert str(audit.restaurant_id) == str(restaurant.id)
+
+
+def test_non_price_edit_writes_no_audit(editor_client, tenant_a):
+    from ops.models import AuditLog
+
+    _org, restaurant = tenant_a
+    category = MenuCategory.objects.create(
+        restaurant_id=restaurant.id, code="mains", name="Mains"
+    )
+    item = MenuItem.objects.create(
+        restaurant_id=restaurant.id, category=category, code="dosa",
+        name="Dosa", price_minor=12000,
+    )
+    editor_client.patch(
+        f"/api/menu/items/{item.id}/",
+        {"name": "Plain Dosa", "version": 1},
+        format="json",
+    )
+    assert not AuditLog.objects.filter(type="price-change").exists()
+
+
 # --- Soft delete -------------------------------------------------------------
 
 
