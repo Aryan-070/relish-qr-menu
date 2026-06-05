@@ -170,3 +170,35 @@ class Feedback(TenantScopedModel):
 
     def __str__(self) -> str:
         return f"{self.rating}★"
+
+
+class BirthdayGreeting(TimeStampedModel):
+    """One birthday outreach per customer per year — idempotency + audit.
+
+    The birthday campaign trigger creates one of these for each customer whose
+    birthday falls on the run date; the ``(customer, year)`` unique constraint
+    makes re-running the same day a no-op. A real messaging channel can later
+    consume un-sent rows; for now ``channel`` records how/whether it went out.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    org_id = models.UUIDField(db_index=True)
+    customer = models.ForeignKey(
+        Customer, on_delete=models.CASCADE, related_name="birthday_greetings"
+    )
+    year = models.PositiveIntegerField()
+    channel = models.CharField(max_length=20, default="pending")
+    bonus_points = models.IntegerField(default=0)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["customer", "year"],
+                name="uniq_birthday_greeting_customer_year",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"birthday<{self.customer_id}:{self.year}>"
