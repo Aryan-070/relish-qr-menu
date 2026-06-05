@@ -13,6 +13,7 @@ interface CustomerRow {
   id: string
   name: string
   phone: string
+  birth_date: string | null
   tier: LoyaltyTier
   points: number
   visits: number
@@ -26,6 +27,8 @@ export interface AdminCustomer {
   id: string
   name: string
   phone: string
+  /** Birthday as "DD/MM" (day+month only), or null. */
+  birthday: string | null
   tier: LoyaltyTier
   points: number
   visits: number
@@ -37,11 +40,19 @@ export interface AdminCustomer {
   joinedAt: number
 }
 
+/** "2000-02-29" → "29/02" (day+month only); null when unset/invalid. */
+function toBirthday(iso: string | null): string | null {
+  if (!iso) return null
+  const m = iso.match(/^\d{4}-(\d{2})-(\d{2})$/)
+  return m ? `${m[2]}/${m[1]}` : null
+}
+
 function rowToCustomer(r: CustomerRow): AdminCustomer {
   return {
     id: r.id,
     name: r.name ?? '',
     phone: r.phone ?? '',
+    birthday: toBirthday(r.birth_date ?? null),
     tier: r.tier,
     points: r.points ?? 0,
     visits: r.visits ?? 0,

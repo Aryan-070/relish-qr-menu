@@ -16,7 +16,15 @@ describe('staffApi · listStaff mapping', () => {
       { id: 'm1', display_name: 'Priya N', email: 'priya@t.test', role: 'waiter', status: 'active', active: true },
     ])
     const [s] = await listStaff()
-    expect(s).toEqual({ id: 'm1', name: 'Priya N', email: 'priya@t.test', role: 'waiter', active: true })
+    expect(s).toEqual({ id: 'm1', name: 'Priya N', username: null, email: 'priya@t.test', role: 'waiter', active: true })
+  })
+
+  it('surfaces username when the membership has a linked user', async () => {
+    apiFetch.mockResolvedValueOnce([
+      { id: 'm1', display_name: 'Priya N', username: 'priya', email: 'priya@t.test', role: 'waiter', status: 'active', active: true },
+    ])
+    const [s] = await listStaff()
+    expect(s.username).toBe('priya')
   })
 
   it('falls back to email then "Staff" when display_name is blank', async () => {

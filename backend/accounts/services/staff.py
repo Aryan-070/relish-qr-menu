@@ -15,7 +15,7 @@ import secrets
 from collections.abc import Iterable
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from accounts.constants import (
@@ -25,6 +25,11 @@ from accounts.constants import (
     MEMBERSHIP_INVITED,
     MEMBERSHIP_SUSPENDED,
     PERMISSION_KEYS,
+    ROLE_ADMIN,
+    ROLE_HOST,
+    ROLE_KITCHEN,
+    ROLE_MANAGER,
+    ROLE_WAITER,
 )
 from accounts.models import (
     Invite,
@@ -41,6 +46,10 @@ User = get_user_model()
 
 _INVITE_TOKEN_BYTES = 32
 
+# Roles a manager (not an admin) is allowed to assign / reset / create. Admin is
+# deliberately excluded so a manager cannot escalate themselves or a peer.
+_MANAGER_ASSIGNABLE = frozenset({ROLE_MANAGER, ROLE_WAITER, ROLE_KITCHEN, ROLE_HOST})
+
 
 class StaffError(Exception):
     """Base class for staff-service domain errors."""
@@ -56,6 +65,119 @@ def _system_role(role_key: str) -> Role:
         return Role.objects.get(key=role_key, org__isnull=True)
     except Role.DoesNotExist as exc:
         raise StaffError(f"Unknown role: {role_key!r}.") from exc
+
+
+def assert_can_assign_role(
+    caller_role_key: str | None,
+    target_role_key: str,
+    *,
+    is_superuser: bool = False,
+) -> None:
+    """Guard against privilege escalation when assigning/creating a role.
+
+    Admins (and superusers) may assign any role. Managers may assign every
+    non-admin role but never ``admin``. Anyone else is rejected.
+    """
+    if is_superuser or caller_role_key == ROLE_ADMIN:
+        return
+    if caller_role_key == ROLE_MANAGER:
+        if target_role_key in _MANAGER_ASSIGNABLE:
+            return
+        raise StaffError("Managers cannot assign the admin role.")
+    raise StaffError("You do not have permission to assign roles.")
+
+
+def assert_not_last_admin(org: Organization, membership: Membership) -> None:
+    """Block demoting/deactivating the final active admin of an org."""
+    if not membership.role_id or membership.role.key != ROLE_ADMIN:
+        return
+    active_admins = Membership.objects.filter(
+        org=org,
+        role__key=ROLE_ADMIN,
+        status=MEMBERSHIP_ACTIVE,
+        active=True,
+        deleted_at__isnull=True,
+    ).count()
+    if active_admins <= 1:
+        raise StaffError("Cannot deactivate or demote the last admin.")
+
+
+def blacklist_user_tokens(user) -> None:
+    """Blacklist every outstanding refresh token for ``user`` (best-effort).
+
+    Forces re-login after a deactivation or password change. Only revokes
+    refresh tokens; a live ≤30-min access token expires on its own.
+    """
+    try:
+        from rest_framework_simplejwt.token_blacklist.models import (
+            BlacklistedToken,
+            OutstandingToken,
+        )
+    except ImportError:  # pragma: no cover - blacklist app always installed
+        return
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
+
+
+@transaction.atomic
+def create_staff_account(
+    *,
+    org: Organization,
+    username: str,
+    password: str,
+    display_name: str,
+    role_key: str,
+    outlet_ids: Iterable[str] | None = None,
+    email: str = "",
+    caller_role_key: str | None = None,
+    caller_is_superuser: bool = False,
+) -> Membership:
+    """Directly create a login-ready staff member (username + password).
+
+    Unlike the invite flow this binds a real ``User`` immediately. Enforces the
+    role-escalation guard so a manager cannot mint an admin.
+    """
+    assert_can_assign_role(
+        caller_role_key, role_key, is_superuser=caller_is_superuser
+    )
+    role = _system_role(role_key)
+
+    try:
+        user = User.objects.create_user(
+            username=username, email=email or None, password=password
+        )
+    except IntegrityError as exc:
+        raise StaffError("That username is already taken.") from exc
+
+    membership = Membership.objects.create(
+        org=org,
+        user=user,
+        role=role,
+        display_name=display_name or username,
+        email=email,
+        status=MEMBERSHIP_ACTIVE,
+        active=True,
+    )
+
+    outlet_id_list = list(outlet_ids or [])
+    if outlet_id_list:
+        outlets = list(Restaurant.objects.filter(id__in=outlet_id_list, org=org))
+        if len(outlets) != len(set(outlet_id_list)):
+            raise StaffError(
+                "One or more outlets do not belong to this organization."
+            )
+        MembershipOutlet.objects.bulk_create(
+            [
+                MembershipOutlet(
+                    membership=membership,
+                    restaurant=outlet,
+                    is_primary=(index == 0),
+                )
+                for index, outlet in enumerate(outlets)
+            ]
+        )
+
+    return membership
 
 
 @transaction.atomic
@@ -191,12 +313,30 @@ def set_membership_permissions(
         )
 
 
+@transaction.atomic
 def deactivate_membership(membership: Membership) -> None:
     """Suspend a membership (``status=SUSPENDED``, ``active=False``).
 
-    Note: token-blacklist revocation of any live session lands in a later
-    increment, once refresh tokens are tracked per session.
+    Also deactivates the linked auth user and blacklists their refresh tokens
+    -- but only when this was the user's *last* active membership, so a person
+    who works at another outlet/org keeps their login.
     """
     membership.status = MEMBERSHIP_SUSPENDED
     membership.active = False
     membership.save(update_fields=["status", "active", "updated_at"])
+
+    user = membership.user
+    if user is None:
+        return
+    other_active = (
+        Membership.objects.filter(
+            user=user, status=MEMBERSHIP_ACTIVE, active=True, deleted_at__isnull=True
+        )
+        .exclude(pk=membership.pk)
+        .exists()
+    )
+    if not other_active:
+        if user.is_active:
+            user.is_active = False
+            user.save(update_fields=["is_active"])
+        blacklist_user_tokens(user)

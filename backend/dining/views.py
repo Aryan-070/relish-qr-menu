@@ -24,9 +24,14 @@ from accounts.models import Restaurant
 from billing.services import RazorpayConfigError, RazorpayError
 from common.context import get_current_membership_id
 from common.permissions import IsTenantMember
+from ops.floor_serializers import ServiceRequestSerializer
 from ops.order_serializers import OrderSerializer, PlaceOrderSerializer
 from ops.services import OrderError
-from realtime.broadcast import broadcast_order_event, broadcast_session_event
+from realtime.broadcast import (
+    broadcast_order_event,
+    broadcast_service_request_event,
+    broadcast_session_event,
+)
 
 from .constants import LIVE_SESSION_STATUSES
 from .models import DiningSession, GuestDevice
@@ -46,12 +51,14 @@ from .serializers import (
     JoinSessionSerializer,
     PayResultSerializer,
     PromoteSerializer,
+    ServiceRequestCreateSerializer,
 )
 from .services import (
     SessionError,
     attach_customer,
     close_session,
     confirm_orders,
+    create_service_request,
     find_device,
     join_session,
     promote_device,
@@ -250,6 +257,7 @@ class SessionContactView(APIView):
             org_id=org_id,
             phone=s.validated_data["phone"],
             name=s.validated_data.get("name", ""),
+            birth_date=s.validated_data.get("birth_date"),
         )
         return _session_response(session, device)
 
@@ -333,6 +341,55 @@ class SessionRequestBillView(APIView):
             raise ValidationError(str(exc)) from exc
         broadcast_session_event(session.id, "bill_requested", None)
         return _session_response(session, device)
+
+
+def _service_request_payload(req: Any) -> dict[str, Any]:
+    return {
+        "id": str(req.id),
+        "code": req.code,
+        "table_id": str(req.table_id),
+        "type": req.type,
+        "status": req.status,
+        "note": req.note,
+    }
+
+
+class SessionServiceRequestView(APIView):
+    """A joined device raises a service request (call waiter / water / bill).
+
+    Lands on the shared ``ops.ServiceRequest`` queue the staff floor already
+    reads — staff claim/resolve via the ops floor endpoints (``/api/ops/requests/``).
+    """
+
+    authentication_classes: list = []
+    permission_classes = [IsSessionParticipant]
+
+    @extend_schema(
+        request=ServiceRequestCreateSerializer,
+        responses={201: ServiceRequestSerializer},
+        tags=["dining"],
+    )
+    def post(self, request: Request, pk: Any) -> Response:
+        session = getattr(request, "dining_session", None) or _get_session_or_404(pk)
+        device = getattr(request, "dining_device", None)
+        s = ServiceRequestCreateSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        try:
+            req = create_service_request(
+                session=session,
+                device=device,
+                kind=s.validated_data["kind"],
+                note=s.validated_data.get("note", ""),
+            )
+        except SessionError as exc:
+            raise ValidationError(str(exc)) from exc
+        broadcast_service_request_event(
+            session.restaurant_id, _service_request_payload(req)
+        )
+        broadcast_session_event(session.id, "service_requested", _service_request_payload(req))
+        return Response(
+            ServiceRequestSerializer(req).data, status=status.HTTP_201_CREATED
+        )
 
 
 class SessionCloseView(APIView):

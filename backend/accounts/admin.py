@@ -20,16 +20,16 @@ from accounts.models import (
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    """Email-based admin for the custom user (no username field)."""
+    """Username-based admin for the custom user (email is optional/recovery)."""
 
-    list_display = ("email", "is_staff", "is_active", "date_joined")
+    list_display = ("username", "email", "is_staff", "is_active", "date_joined")
     list_filter = ("is_staff", "is_superuser", "is_active")
-    search_fields = ("email",)
-    ordering = ("email",)
+    search_fields = ("username", "email")
+    ordering = ("username",)
     readonly_fields = ("date_joined", "last_login")
 
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
+        (None, {"fields": ("username", "email", "password")}),
         (_("Permissions"), {
             "fields": (
                 "is_active",
@@ -46,7 +46,14 @@ class UserAdmin(BaseUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "password1", "password2", "is_staff", "is_active"),
+                "fields": (
+                    "username",
+                    "email",
+                    "password1",
+                    "password2",
+                    "is_staff",
+                    "is_active",
+                ),
             },
         ),
     )

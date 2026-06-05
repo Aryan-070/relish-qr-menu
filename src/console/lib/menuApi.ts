@@ -25,6 +25,8 @@ export interface AdminMenuItem {
   isJain: boolean
   available: boolean
   soldOut: boolean
+  /** Image path or URL shown on the guest card (backend `image_url`). */
+  imageUrl: string
   version: number
 }
 
@@ -39,6 +41,7 @@ interface ItemRow {
   is_jain: boolean
   available: boolean
   sold_out: boolean
+  image_url: string
   version: number
 }
 
@@ -59,6 +62,7 @@ function rowToItem(r: ItemRow): AdminMenuItem {
     isJain: r.is_jain ?? false,
     available: r.available ?? true,
     soldOut: r.sold_out ?? false,
+    imageUrl: r.image_url ?? '',
     version: r.version ?? 1,
   }
 }
@@ -73,6 +77,7 @@ export interface MenuItemDraft {
   isJain: boolean
   available: boolean
   soldOut: boolean
+  imageUrl: string
 }
 
 function draftToBody(d: MenuItemDraft): Record<string, unknown> {
@@ -85,6 +90,7 @@ function draftToBody(d: MenuItemDraft): Record<string, unknown> {
     is_jain: d.isJain,
     available: d.available,
     sold_out: d.soldOut,
+    image_url: d.imageUrl,
   }
 }
 

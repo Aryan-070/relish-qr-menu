@@ -2,6 +2,10 @@ export interface MenuItem {
   id: string
   name: string
   price: number
+  /** Optional image path or URL (e.g. "/assets/dishes/x.webp" or an https URL).
+   *  When set, the card shows this directly; otherwise it falls back to the
+   *  bundled video/poster manifest. Sourced from the backend `image_url`. */
+  imageUrl?: string
   description: string
   isJain: boolean
   canBeJain: boolean

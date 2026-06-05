@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
-import { type MenuItem, getCategoryForItem } from '../../data/menu'
+import { type MenuItem } from '../../data/menu'
+import { useMenuData } from '../../data/MenuDataContext'
 import { useTheme } from '../../theme/ThemeContext'
 import { useComponentStyle } from '../../theme/ComponentStyleContext'
 import { TiltCard } from '../fx/TiltCard'
@@ -38,6 +39,7 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
   const { tokens: t } = useTheme()
   const { style: engine } = useComponentStyle()
   const { posterOnly } = useMediaMode()
+  const { getCategoryForItem } = useMenuData()
   const catId = getCategoryForItem(item.id)
   const bg = CATEGORY_BG[catId] ?? CATEGORY_BG.quickbites
   const [imgErr, setImgErr] = useState(false)
@@ -62,7 +64,18 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
           background: bg,
         }}
       >
-        {!imgErr ? (
+        {imgErr ? (
+          <CategoryIcon categoryId={catId} size={30} color={t.accent} />
+        ) : item.imageUrl ? (
+          // Operator-set image (path or URL) — shown directly; icon on error.
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={() => setImgErr(true)}
+          />
+        ) : (
           <LqipVideo
             renditions={dishVideo.renditions}
             poster={dishVideo.poster}
@@ -73,8 +86,6 @@ export function MenuCard({ item, onTap }: MenuCardProps) {
             videoClassName="w-full h-full object-cover"
             onError={() => setImgErr(true)}
           />
-        ) : (
-          <CategoryIcon categoryId={catId} size={30} color={t.accent} />
         )}
       </div>
 

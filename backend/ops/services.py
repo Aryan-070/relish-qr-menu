@@ -17,14 +17,73 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from menu.models import MenuItem, Modifier
-from ops.models import AuditLog, Order, OrderLine, OrderLineModifier
+from ops.models import (
+    AuditLog,
+    Order,
+    OrderLine,
+    OrderLineModifier,
+    RestaurantTable,
+    ServiceRequest,
+)
+
+_SERVICE_REQUEST_CODE_RETRIES = 25
 
 
 class OrderError(Exception):
     """Raised when an order cannot be placed or governed (bad item, etc.)."""
+
+
+def create_service_request(
+    *, restaurant_id: Any, table: RestaurantTable, type: str, note: str = ""
+) -> ServiceRequest:
+    """Create a :class:`ServiceRequest` with a unique ``REQ-NNNNN`` code.
+
+    The single create path shared by the staff floor viewset and the guest
+    dining endpoint. The code is seeded from a row count (racy) but the
+    ``(restaurant_id, code)`` unique constraint + retry guarantees uniqueness.
+    Callers broadcast the ``service_request_event`` after creating.
+    """
+    seed = ServiceRequest.all_objects.filter(restaurant_id=restaurant_id).count() + 1
+    for offset in range(_SERVICE_REQUEST_CODE_RETRIES):
+        code = f"REQ-{seed + offset:05d}"
+        try:
+            with transaction.atomic():
+                return ServiceRequest.objects.create(
+                    restaurant_id=restaurant_id,
+                    table=table,
+                    type=type,
+                    note=note or "",
+                    code=code,
+                )
+        except IntegrityError:
+            continue
+    raise OrderError("Could not allocate a unique service-request code; please retry.")
+
+
+def record_price_change(
+    *,
+    restaurant_id: Any,
+    menu_item_id: Any,
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+    actor_membership_id: Any | None = None,
+) -> AuditLog:
+    """Append an immutable ``price-change`` audit row for a menu-item edit.
+
+    Called from ``menu.views.MenuItemViewSet`` (lazily, to avoid a menu→ops
+    import cycle) whenever an item's price or tax rate changes.
+    """
+    return AuditLog.objects.create(
+        restaurant_id=restaurant_id,
+        type="price-change",
+        actor_membership_id=actor_membership_id,
+        before=dict(before),
+        after=dict(after),
+        reason=f"menu_item:{menu_item_id}",
+    )
 
 
 def next_order_code(restaurant_id: Any) -> str:
@@ -89,6 +148,7 @@ def place_order(
     lines: Iterable[Mapping[str, Any]],
     session_id: Any | None = None,
     participant_id: Any | None = None,
+    customer_id: Any | None = None,
     confirmation: str = "confirmed",
     idempotency_key: str = "",
 ) -> Order:
@@ -150,6 +210,7 @@ def place_order(
         waiter_membership_id=waiter_membership_id,
         session_id=session_id,
         participant_id=participant_id,
+        customer_id=customer_id,
         confirmation=confirmation,
         idempotency_key=idempotency_key,
         source=source,

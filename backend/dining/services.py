@@ -15,7 +15,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from ops.models import Order, RestaurantTable
+from ops.models import Order, RestaurantTable, ServiceRequest
+from ops.services import create_service_request as _ops_create_service_request
 from ops.services import place_order
 
 from .constants import LIVE_SESSION_STATUSES
@@ -24,6 +25,35 @@ from .models import Check, DiningSession, GuestDevice
 
 class SessionError(Exception):
     """Raised when a session action is invalid (closed, wrong table, etc.)."""
+
+
+def create_service_request(
+    *, session: DiningSession, device: GuestDevice | None, kind: str, note: str = ""
+) -> ServiceRequest:
+    """Raise a guest service request on the shared ``ops.ServiceRequest`` queue.
+
+    Guest calls land on the same model the staff floor cockpit reads, so there is
+    one service-request surface. Collapses a duplicate pending request of the
+    same kind on the table, and carries the guest's name into the note for staff.
+    """
+    if not session.is_live:
+        raise SessionError("This session is no longer live.")
+
+    existing = ServiceRequest.objects.filter(
+        restaurant_id=session.restaurant_id,
+        table_id=session.table_id,
+        type=kind,
+        status="pending",
+    ).first()
+    if existing is not None:
+        return existing
+
+    who = (device.display_name or "Guest") if device is not None else "Guest"
+    full_note = f"{who}: {note}" if note else f"{who} (from QR)"
+    table = RestaurantTable.all_objects.get(pk=session.table_id)
+    return _ops_create_service_request(
+        restaurant_id=session.restaurant_id, table=table, type=kind, note=full_note
+    )
 
 
 # ── Join / presence ──────────────────────────────────────────────────────────
@@ -161,6 +191,8 @@ def submit_order(
             lines=lines,
             session_id=session.id,
             participant_id=device.id,
+            # Link to the CRM customer if this device already shared contact.
+            customer_id=device.customer_id,
             confirmation=confirmation,
             idempotency_key=idempotency_key,
         )
@@ -232,16 +264,30 @@ def confirm_orders(*, session: DiningSession, order_ids: Iterable[Any]) -> list[
 # ── Contact capture / bill / close ────────────────────────────────────────────
 @transaction.atomic
 def attach_customer(
-    *, session: DiningSession, device: GuestDevice, org_id: Any, phone: str, name: str = ""
+    *,
+    session: DiningSession,
+    device: GuestDevice,
+    org_id: Any,
+    phone: str,
+    name: str = "",
+    birth_date: Any = None,
 ) -> GuestDevice:
     """Resolve-or-create a CRM customer and link it to device + check liability."""
     # Imported lazily so the dining app has no hard import-time dep on crm.
     from crm.loyalty_services import enroll_customer
 
-    customer, _created = enroll_customer(org_id=str(org_id), phone=phone, name=name)
+    customer, _created = enroll_customer(
+        org_id=str(org_id), phone=phone, name=name, birth_date=birth_date
+    )
     device.customer = customer
     device.is_payer = True
     device.save(update_fields=["customer", "is_payer", "updated_at"])
+
+    # Backfill orders this device already placed this session so they surface in
+    # CRM under the now-linked customer (they were anonymous at creation time).
+    Order.all_objects.filter(
+        session=session, participant_id=device.id, customer_id__isnull=True
+    ).update(customer_id=customer.id)
 
     check = getattr(session, "tab", None)
     if check is not None and check.liable_customer_id is None:

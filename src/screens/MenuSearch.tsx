@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Search, X, Flame } from 'lucide-react'
 import type { MenuItem } from '../data/menu'
-import { getCategoryById } from '../data/menu'
+import { useMenuData } from '../data/MenuDataContext'
 import { DIETARY_FILTERS, type DietaryTag } from '../data/dietary'
 import { useMenuSearch } from '../hooks/useMenuSearch'
 import { MenuCard } from '../components/molecules/MenuCard'
@@ -17,6 +17,7 @@ interface MenuSearchProps {
 export function MenuSearch({ onClose, onItemTap }: MenuSearchProps) {
   const { tokens: t } = useTheme()
   const tr = useT()
+  const { getCategoryById } = useMenuData()
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<Set<DietaryTag>>(new Set())
   const [maxSpice, setMaxSpice] = useState<number | undefined>(undefined)

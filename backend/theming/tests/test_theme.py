@@ -118,9 +118,13 @@ def test_public_theme_config_returns_only_safe_fields():
     assert "created_at" not in config
     assert set(config.keys()) == {
         "ui_theme",
+        "landing_variant",
         "component_style",
         "media_mode",
         "token_overrides",
+        "brand_colors",
+        "font_choices",
+        "custom_font",
         "allow_customer_choice",
         "customer_choices",
         "logo_url",
@@ -134,6 +138,54 @@ def test_public_theme_config_default_when_no_row():
     config = public_theme_config(restaurant.id)
 
     assert config["ui_theme"] == "warm"
+    assert config["landing_variant"] == "signature"
     assert config["component_style"] == "classic"
     assert config["media_mode"] == "image"
     assert config["token_overrides"] == {}
+
+
+def test_put_accepts_table_theory_and_landing_and_colors():
+    org, restaurant = _make_tenant()
+    client = _client(org, restaurant, perms=["manage-theme"])
+
+    resp = client.put(
+        reverse("theming:theme"),
+        {
+            "ui_theme": "table-theory",
+            "landing_variant": "botanica",
+            "brand_colors": {"primary": "#0B4A2F", "accent": "#8FB39A"},
+            "custom_font": {"name": "MyFont", "url": "https://cdn.test/f.woff2"},
+        },
+        format="json",
+    )
+    assert resp.status_code == 200, resp.data
+    assert resp.data["ui_theme"] == "table-theory"
+    assert resp.data["landing_variant"] == "botanica"
+    theme = RestaurantTheme.objects.get(restaurant_id=restaurant.id)
+    assert theme.brand_colors["primary"] == "#0B4A2F"
+    assert theme.custom_font["name"] == "MyFont"
+
+
+def test_put_rejects_bad_hex_color():
+    org, restaurant = _make_tenant()
+    client = _client(org, restaurant, perms=["manage-theme"])
+    resp = client.put(
+        reverse("theming:theme"),
+        {"brand_colors": {"primary": "not-a-color"}},
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_publish_promotes_landing_variant():
+    org, restaurant = _make_tenant()
+    client = _client(org, restaurant, perms=["manage-theme"])
+    client.put(
+        reverse("theming:theme_draft"),
+        {"draft": {"landing_variant": "cinematic", "ui_theme": "table-theory"}},
+        format="json",
+    )
+    publish = client.post(reverse("theming:theme_publish"))
+    assert publish.status_code == 200
+    assert publish.data["landing_variant"] == "cinematic"
+    assert publish.data["ui_theme"] == "table-theory"

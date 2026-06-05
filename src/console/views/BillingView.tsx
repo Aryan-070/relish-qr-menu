@@ -112,7 +112,7 @@ export function BillingView() {
           amountPaise: withGst(pkg!.renewalYr) * 100,
           invoiceId: dueInvoice?.id ?? `renew-${pkg!.id}`,
           description: `Annual renewal — ${pkg!.name}`,
-          customerEmail: auth.user?.email ?? undefined,
+          customerEmail: auth.email ?? undefined,
           onSuccess: confirmRenewal,
           onDismiss: () => toast.push('Payment cancelled', 'info'),
         })

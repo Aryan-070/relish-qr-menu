@@ -51,6 +51,7 @@ ROLE_DEFAULT_PERMISSIONS: dict[str, frozenset[str]] = {
             "refund",
             "edit-menu",
             "manage-stock",
+            "manage-staff",
             "view-reports",
             "manage-theme",
         }
@@ -78,6 +79,18 @@ INVITE_STATUS_CHOICES = (
     (INVITE_PENDING, "Pending"),
     (INVITE_ACCEPTED, "Accepted"),
     (INVITE_REVOKED, "Revoked"),
+)
+
+# Password-change-request lifecycle (waiter requests → admin/manager approves).
+PWD_REQ_PENDING = "pending"
+PWD_REQ_APPROVED = "approved"
+PWD_REQ_REJECTED = "rejected"
+PWD_REQ_CANCELLED = "cancelled"
+PWD_REQ_STATUS_CHOICES = (
+    (PWD_REQ_PENDING, "Pending"),
+    (PWD_REQ_APPROVED, "Approved"),
+    (PWD_REQ_REJECTED, "Rejected"),
+    (PWD_REQ_CANCELLED, "Cancelled"),
 )
 
 # OTP purposes.

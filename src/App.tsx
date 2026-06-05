@@ -1,25 +1,44 @@
-import { useState, lazy, Suspense } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { LayoutGrid, Smartphone } from 'lucide-react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { LandingSignatureDish } from './screens/LandingSignatureDish'
 import { ItemDetail } from './screens/ItemDetail'
 import { AddToOrder } from './screens/AddToOrder'
 import { ServicePanel } from './screens/ServicePanel'
+import { SaveDetailsSheet } from './screens/service/SaveDetailsSheet'
 import { OrderPanel } from './screens/OrderPanel'
 import { Checkout } from './screens/Checkout'
 import { useOrder } from './hooks/useOrder'
-import { type MenuItem, getCategoryForItem } from './data/menu'
+import { type MenuItem } from './data/menu'
+import { useMenuData, MenuDataProvider } from './data/MenuDataContext'
 import { type SelectedModifier, selectionLabel, selectionUnitPrice } from './data/modifiers'
 import { type Combo } from './data/combos'
 import { type OrderRecord, type OrderLine } from './console/lib/types'
 import { resolveGuestTableId } from './lib/tableSession'
 import { fadeIn } from './animations/variants'
+import { VARIANTS, DEFAULT_LANDING_VARIANT, type LandingVariant } from './data/landingVariants'
+import { queryClient } from './lib/queryClient'
+import { useConsumerMenu } from './hooks/useConsumerMenu'
+import { useApplyThemeConfig } from './theme/useThemeConfig'
+import { useSession } from './hooks/useSession'
+import { ApiError } from './lib/api/client'
+import type { OrderLineInput } from './lib/api/dining'
+
+/** Raw `?t=` table id from the URL (a real table UUID from the QR), or null. */
+function tableParamFromUrl(): string | null {
+  if (typeof window === 'undefined') return null
+  const t = new URLSearchParams(window.location.search).get('t')
+  return t && t.length > 0 ? t : null
+}
 
 // The table this guest is seated at — read from the scanned QR's `?t=` param,
 // falling back to a fixed demo table. Resolved once at load (a scan is a full
 // page navigation), see src/lib/tableSession.ts.
 const GUEST_TABLE_ID = resolveGuestTableId()
 import { ThemeProvider, useTheme } from './theme/ThemeContext'
+import { BrandProvider } from './theme/BrandContext'
+import { AppearanceLoader } from './theme/AppearanceLoader'
 import { ComponentStyleProvider } from './theme/ComponentStyleContext'
 import { MediaModeProvider } from './theme/MediaModeContext'
 import { OpsProvider, useOpsStore } from './console/store/useOpsStore'
@@ -53,38 +72,80 @@ const KIOSK_MODE =
 const QSR_MODE =
   typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/qsr'
 
+// Demo showcase: the full landing-variant playground + demo data, served at
+// `/demo`. The root URL (`/`) instead serves the live backend menu.
+const DEMO_MODE =
+  typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/demo'
+
+// Which restaurant the root storefront serves. A `?r=` param overrides the env
+// default so a single deploy can preview any tenant.
+function resolveRestaurantId(): string | null {
+  if (typeof window === 'undefined') return null
+  const fromQuery = new URLSearchParams(window.location.search).get('r')
+  if (fromQuery) return fromQuery
+  const env = import.meta.env.VITE_DEFAULT_RESTAURANT_ID as string | undefined
+  return env && env.length > 0 ? env : null
+}
+
 type Screen = 'cover' | 'menu' | 'recommend'
-type LandingVariant = 'classic' | 'gastronomique' | 'editorial' | 'botanica' | 'signature' | 'cinematic' | 'reel'
 
-const VARIANTS: Array<{ id: LandingVariant; label: string }> = [
-  { id: 'signature',      label: 'Signature'},
-  { id: 'classic',        label: 'Classic'  },
-  { id: 'gastronomique',  label: 'Deco'     },
-  { id: 'editorial',      label: 'Editorial'},
-  { id: 'botanica',       label: 'Botanica' },
-  { id: 'cinematic',      label: 'Cinema'   },
-  { id: 'reel',           label: 'Reel'     },
-]
+interface GuestExperienceProps {
+  /** Demo route: switchable landing variants + demo entry buttons + static menu. */
+  demo: boolean
+  /** Root storefront only: the restaurant whose live menu/theme to load. */
+  restaurantId: string | null
+  onEnterStaff: () => void
+}
 
-function AppInner() {
+function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperienceProps) {
   const { theme } = useTheme()
-  const [appMode, setAppMode] = useState<'guest' | 'staff'>(() =>
-    typeof window !== 'undefined' && window.location.hash === '#staff' ? 'staff' : 'guest',
-  )
+  const applyTheme = useApplyThemeConfig()
+  const ops = useOpsStore()
+
+  // Root storefront pulls the live menu + theme from the backend; the demo route
+  // uses the bundled static menu (the MenuDataProvider falls back to static).
+  const consumer = useConsumerMenu(demo ? null : restaurantId)
+
+  // Real ordering runs through the backend dining session — but only on the root
+  // storefront with a real table QR (`?t=`). Demo stays fully offline; the root
+  // without a table is browse-only (menu visible, ordering disabled).
+  const tableId = tableParamFromUrl()
+  const sessionParams = !demo && restaurantId && tableId ? { restaurantId, tableId } : null
+  const dining = useSession(sessionParams)
+  const orderingMode: 'demo' | 'session' | 'browse' = demo
+    ? 'demo'
+    : sessionParams
+      ? 'session'
+      : 'browse'
+  const [orderError, setOrderError] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+
   const [screen, setScreen] = useState<Screen>('cover')
-  const [landingVariant, setLandingVariant] = useState<LandingVariant>('reel')
+  const [landingVariant, setLandingVariant] = useState<LandingVariant>(DEFAULT_LANDING_VARIANT)
+
+  // Apply the published theme/branding (landing variant, colors, fonts, logo)
+  // once per distinct config — guarded by a content key so an unstable effect
+  // dependency can never drive a render loop.
+  const appliedThemeKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (demo || !consumer.theme) return
+    const key = JSON.stringify(consumer.theme)
+    if (appliedThemeKey.current === key) return
+    appliedThemeKey.current = key
+    applyTheme(consumer.theme)
+    if (consumer.theme.landing_variant) {
+      setLandingVariant(consumer.theme.landing_variant as LandingVariant)
+    }
+  }, [demo, consumer.theme, applyTheme])
 
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [addingItem, setAddingItem] = useState<{ item: MenuItem; label: string; unitPrice: number } | null>(null)
   const [waiterOpen, setWaiterOpen] = useState(false)
   const [orderOpen, setOrderOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
-  // When the panel opens because the guest just paid, land it on feedback.
   const [serviceInitialView, setServiceInitialView] = useState<'feedback' | undefined>(undefined)
   const [lastOrderId, setLastOrderId] = useState<string | null>(null)
   const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null)
-  // Transient status the Dynamic Island flashes (placed/waiter) before settling
-  // back to its derived cart/idle state.
   const [islandFlash, setIslandFlash] = useState<'placed' | 'waiter' | null>(null)
   const flashIsland = (m: 'placed' | 'waiter') => {
     setIslandFlash(m)
@@ -92,64 +153,21 @@ function AppInner() {
   }
 
   const { orderItems, addItem, addCombo, removeItem, updateQuantity, updateNote, clear, total, count } = useOrder()
-  const ops = useOpsStore()
-
-  const enterStaff = () => {
-    setAppMode('staff')
-    if (typeof window !== 'undefined') window.location.hash = 'staff'
-  }
-  const exitStaff = () => {
-    setAppMode('guest')
-    if (typeof window !== 'undefined') {
-      history.replaceState(null, '', window.location.pathname + window.location.search)
-    }
-  }
-
-  // All hooks are declared above this point — keep the early returns below them
-  // so hook order stays stable across guest/staff/kiosk toggles (Rules of Hooks).
-  if (QSR_MODE) {
-    // The /qsr pitch surface always renders in The Table Theory brand skin —
-    // a nested forced provider pins it without touching the consumer app's theme.
-    return (
-      <ThemeProvider forced="table-theory">
-        <div className="app-shell" data-ui-theme="table-theory">
-          <Suspense fallback={null}>
-            <QsrApp />
-          </Suspense>
-        </div>
-      </ThemeProvider>
-    )
-  }
-
-  if (KIOSK_MODE) {
-    return (
-      <div className="app-shell" data-ui-theme={theme}>
-        <Suspense fallback={null}>
-          <Kiosk />
-        </Suspense>
-      </div>
-    )
-  }
-
-  if (appMode === 'staff') {
-    return (
-      <div className="app-shell console-shell" data-ui-theme={theme}>
-        <Suspense fallback={null}>
-          <ConsoleApp onExit={exitStaff} />
-        </Suspense>
-      </div>
-    )
-  }
+  const { getCategoryForItem } = useMenuData()
 
   const goToMenu = () => setScreen('menu')
-
-  // Always go to menu (not cover) from recommend — cleaner UX
   const goBackFromRecommend = () => setScreen('menu')
-
   const goToRecommend = () => setScreen('recommend')
-
-  const openWaiter = () => { setServiceInitialView(undefined); setWaiterOpen(true); flashIsland('waiter') }
-
+  const openWaiter = () => {
+    setServiceInitialView(undefined)
+    setWaiterOpen(true)
+    flashIsland('waiter')
+    // On the real storefront this actually notifies staff (a backend service
+    // request that lands on the Service Queue / KDS). Demo stays local-only.
+    if (orderingMode === 'session') {
+      void dining.requestService('waiter').catch(() => {/* best-effort; UI already flashed */})
+    }
+  }
   const handleItemTap = (item: MenuItem) => setSelectedItem(item)
 
   const handleAddToOrder = (item: MenuItem, modifiers: SelectedModifier[]) => {
@@ -183,10 +201,47 @@ function AppInner() {
 
   const handleAddConfirmDone = () => setAddingItem(null)
 
-  // Commit the guest cart to the shared ops store so it surfaces on the
-  // waiter floor and the kitchen display, then reset the cart.
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (orderItems.length === 0) return
+    setOrderError(null)
+
+    // Root + real table QR → submit through the backend dining session. The
+    // server enforces the table's ordering policy (leader-only by default) and
+    // recomputes all money; on success we clear only the now-submitted cart.
+    if (orderingMode === 'session') {
+      // Required: the host must save name + mobile before the table can order.
+      if (!dining.hasContact) {
+        setDetailsOpen(true)
+        return
+      }
+      const lines: OrderLineInput[] = orderItems.map(o => ({
+        menu_item_id: o.item.id,
+        qty: o.quantity,
+        note: [o.label, o.note].filter(Boolean).join(' · ') || undefined,
+      }))
+      try {
+        await dining.submitOrder(lines)
+        clear()
+        flashIsland('placed')
+      } catch (e) {
+        setOrderError(
+          e instanceof ApiError && e.status === 403
+            ? "Your server hasn't enabled ordering for this table yet — please ask them."
+            : e instanceof ApiError
+              ? (e.body?.detail ?? 'Could not place the order.')
+              : 'Could not place the order — please try again.',
+        )
+      }
+      return
+    }
+
+    // Root with no table QR — nothing to order against.
+    if (orderingMode === 'browse') {
+      setOrderError('Scan the QR at your table to place an order.')
+      return
+    }
+
+    // Demo route: the offline localStorage ops-store path (unchanged).
     const lines: OrderLine[] = orderItems.map(o => ({
       itemId: o.item.id,
       name: o.item.name,
@@ -212,21 +267,29 @@ function AppInner() {
     }
     ops.placeOrder(order)
     flashIsland('placed')
-    // Accrue loyalty points for a linked member (1 point per ₹10 spent).
     if (activeCustomerId) ops.adjustPoints(activeCustomerId, Math.floor(total / 10))
-    // Cart is cleared when the panel closes (see OrderPanel onWaiter), so the
-    // "Calling waiter…" confirmation animation still has items to show.
   }
 
-  // Open the pay-at-table checkout for the current cart/bill.
+  // Whether the Place Order CTA is enabled, plus the contextual message shown
+  // when it isn't (browse-only, or leader-only and this device isn't allowed).
+  const canPlaceOrder =
+    orderingMode === 'demo' || (orderingMode === 'session' && dining.canOrder)
+  const orderGateMessage: string | null =
+    orderingMode === 'browse'
+      ? 'Scan the QR at your table to order.'
+      : orderingMode === 'session' && !dining.canOrder
+        ? dining.joining
+          ? 'Connecting to your table…'
+          : "Your server hasn't started ordering for this table yet — please ask them."
+        : null
+  const placedOrders = orderingMode === 'session' ? dining.session?.orders ?? [] : []
+
   const handleOpenCheckout = () => {
     if (orderItems.length === 0) return
     setOrderOpen(false)
     setTimeout(() => setCheckoutOpen(true), 80)
   }
 
-  // Payment succeeded: mark the table's orders paid, clear the cart, then route
-  // the guest into the post-pay feedback flow (the Sunday review pattern).
   const handlePaid = () => {
     ops.payTables([GUEST_TABLE_ID])
     clear()
@@ -235,49 +298,27 @@ function AppInner() {
     setTimeout(() => setWaiterOpen(true), 120)
   }
 
-  return (
+  // Root: render the live backend menu; demo: the bundled static menu. The
+  // MenuDataProvider lets the same components render either source unchanged.
+  const menuCategories = !demo && consumer.categories.length > 0 ? consumer.categories : undefined
+
+  const body = (
     <div className="app-shell" data-ui-theme={theme}>
       <Suspense fallback={null}>
         {screen === 'cover' && (
-          <motion.div
-            key="cover"
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="absolute inset-0"
-          >
-            {landingVariant === 'classic' && (
-              <LandingCover onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
-            )}
-            {landingVariant === 'gastronomique' && (
-              <LandingGastronomique onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
-            )}
-            {landingVariant === 'editorial' && (
-              <LandingEditorial onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
-            )}
-            {landingVariant === 'botanica' && (
-              <LandingBotanica onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
-            )}
-            {landingVariant === 'signature' && (
-              <LandingSignatureDish onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
-            )}
-            {landingVariant === 'cinematic' && (
-              <LandingCinematic onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
-            )}
-            {landingVariant === 'reel' && (
-              <LandingReel onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />
-            )}
+          <motion.div key="cover" variants={fadeIn} initial="hidden" animate="visible" className="absolute inset-0">
+            {landingVariant === 'classic' && <LandingCover onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />}
+            {landingVariant === 'gastronomique' && <LandingGastronomique onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />}
+            {landingVariant === 'editorial' && <LandingEditorial onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />}
+            {landingVariant === 'botanica' && <LandingBotanica onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />}
+            {landingVariant === 'signature' && <LandingSignatureDish onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />}
+            {landingVariant === 'cinematic' && <LandingCinematic onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />}
+            {landingVariant === 'reel' && <LandingReel onOpenMenu={goToMenu} onRecommend={goToRecommend} onWaiter={openWaiter} />}
           </motion.div>
         )}
 
         {screen === 'menu' && (
-          <motion.div
-            key="menu"
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="absolute inset-0"
-          >
+          <motion.div key="menu" variants={fadeIn} initial="hidden" animate="visible" className="absolute inset-0">
             <MenuBooklet
               orderCount={count}
               onItemTap={handleItemTap}
@@ -289,25 +330,14 @@ function AppInner() {
         )}
 
         {screen === 'recommend' && (
-          <motion.div
-            key="recommend"
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="absolute inset-0"
-          >
-            <RecommendationFlow
-              onBack={goBackFromRecommend}
-              onOpenMenu={goToMenu}
-              onWaiter={openWaiter}
-              onAddCombo={handleAddCombo}
-            />
+          <motion.div key="recommend" variants={fadeIn} initial="hidden" animate="visible" className="absolute inset-0">
+            <RecommendationFlow onBack={goBackFromRecommend} onOpenMenu={goToMenu} onWaiter={openWaiter} onAddCombo={handleAddCombo} />
           </motion.div>
         )}
       </Suspense>
 
-      {/* Variant switcher — only on cover screen */}
-      {screen === 'cover' && (
+      {/* Variant switcher — demo route only, cover screen only */}
+      {demo && screen === 'cover' && (
         <div className="absolute top-3 right-3 z-50 flex flex-col gap-1">
           {VARIANTS.map((v, i) => (
             <motion.button
@@ -316,12 +346,8 @@ function AppInner() {
               onClick={() => setLandingVariant(v.id)}
               className="px-2.5 py-1 rounded-full font-inter text-[8.5px] uppercase tracking-widest text-right"
               style={{
-                background: landingVariant === v.id
-                  ? 'rgba(217,160,58,0.28)'
-                  : 'rgba(0,0,0,0.42)',
-                border: landingVariant === v.id
-                  ? '1px solid rgba(217,160,58,0.55)'
-                  : '1px solid rgba(255,255,255,0.08)',
+                background: landingVariant === v.id ? 'rgba(217,160,58,0.28)' : 'rgba(0,0,0,0.42)',
+                border: landingVariant === v.id ? '1px solid rgba(217,160,58,0.55)' : '1px solid rgba(255,255,255,0.08)',
                 color: landingVariant === v.id ? '#D9A03A' : 'rgba(255,255,255,0.45)',
                 backdropFilter: 'blur(10px)',
                 WebkitBackdropFilter: 'blur(10px)',
@@ -333,7 +359,6 @@ function AppInner() {
         </div>
       )}
 
-      {/* Item detail — rendered outside AnimatePresence so it survives screen switches */}
       <ItemDetail
         item={selectedItem}
         onClose={() => setSelectedItem(null)}
@@ -341,7 +366,6 @@ function AppInner() {
         onWaiter={() => { setSelectedItem(null); setTimeout(openWaiter, 80) }}
       />
 
-      {/* Add to order confirmation slip */}
       <AddToOrder
         item={addingItem?.item ?? null}
         label={addingItem?.label}
@@ -350,21 +374,25 @@ function AppInner() {
         onShowWaiter={() => { handleAddConfirmDone(); setWaiterOpen(true) }}
       />
 
-      {/* Order panel */}
       <OrderPanel
         open={orderOpen}
         items={orderItems}
         total={total}
+        placedOrders={placedOrders}
+        canPlaceOrder={canPlaceOrder}
+        gateMessage={orderGateMessage}
+        errorMessage={orderError}
+        sessionActive={orderingMode === 'session'}
+        savedDetails={dining.hasContact}
+        onSaveDetails={() => setDetailsOpen(true)}
         onClose={() => setOrderOpen(false)}
         onRemove={removeItem}
         onUpdateQty={updateQuantity}
         onUpdateNote={updateNote}
         onPlaceOrder={handlePlaceOrder}
         onCheckout={handleOpenCheckout}
-        onWaiter={() => { setOrderOpen(false); clear(); setTimeout(openWaiter, 80) }}
       />
 
-      {/* Pay-at-table checkout — settle the bill from the guest's phone */}
       <Checkout
         open={checkoutOpen}
         items={orderItems}
@@ -375,7 +403,6 @@ function AppInner() {
         onAddUpsell={(item) => addItem(item)}
       />
 
-      {/* Service panel — replaces WaiterPanel */}
       <ServicePanel
         open={waiterOpen}
         initialView={serviceInitialView}
@@ -389,83 +416,146 @@ function AppInner() {
         onLinkCustomer={setActiveCustomerId}
       />
 
-      {/* Dynamic Island — live order/waiter status; appears only when there's
-          something to surface (cart items or a transient placed/waiter flash). */}
-      {(screen === 'menu' || screen === 'recommend') && (count > 0 || islandFlash) && (
-        <DynamicOrderIsland
-          mode={(islandFlash ?? 'cart') as IslandMode}
-          count={count}
-          total={total}
-          onView={() => setOrderOpen(true)}
+      {/* Save-your-details sheet (real storefront only) — required for the host
+          before ordering, optional + open to any guest for rewards/birthday. */}
+      {orderingMode === 'session' && (
+        <SaveDetailsSheet
+          open={detailsOpen}
+          required={dining.canOrder && !dining.hasContact}
+          onClose={() => setDetailsOpen(false)}
+          onSubmit={async ({ phone, name, birthday }) => {
+            await dining.captureContact(phone, name, birthday ?? undefined)
+            setDetailsOpen(false)
+          }}
         />
       )}
 
-      {/* Global UI-theme switcher — collapsed gear, anchored per-screen so it never overlaps nav */}
-      <ThemeSwitcher screen={screen} />
+      {(screen === 'menu' || screen === 'recommend') && (count > 0 || islandFlash) && (
+        <DynamicOrderIsland mode={(islandFlash ?? 'cart') as IslandMode} count={count} total={total} onView={() => setOrderOpen(true)} />
+      )}
 
-      {/* Media-mode switcher — Video/Photo toggle, opposite corner from the theme gear */}
+      <ThemeSwitcher screen={screen} />
       <MediaModeSwitcher screen={screen} />
 
-      {/* Language switcher — bottom-left utility cluster, above the staff entry */}
       <div className="fixed bottom-14 left-3 z-50">
         <LanguageSwitcher />
       </div>
 
-      {/* Discreet staff-console entry — bottom-left, all guest screens */}
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={enterStaff}
-        aria-label="Open staff console"
-        title="Staff console"
-        className="fixed bottom-3 left-3 z-50 w-9 h-9 inline-flex items-center justify-center rounded-full"
-        style={{
-          background: 'rgba(42,30,30,0.42)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          color: 'rgba(255,248,234,0.78)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-        }}
-      >
-        <LayoutGrid size={16} />
-      </motion.button>
+      {/* Demo-only entry affordances (staff console + QSR prototype). The root
+          storefront stays clean; staff reach the console via the `#staff` hash. */}
+      {demo && (
+        <>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={onEnterStaff}
+            aria-label="Open staff console"
+            title="Staff console"
+            className="fixed bottom-3 left-3 z-50 w-9 h-9 inline-flex items-center justify-center rounded-full"
+            style={{ background: 'rgba(42,30,30,0.42)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,248,234,0.78)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
+          >
+            <LayoutGrid size={16} />
+          </motion.button>
 
-      {/* Discreet QSR-prototype entry — bottom-left, beside the staff console */}
-      <motion.a
-        whileTap={{ scale: 0.9 }}
-        href="/qsr"
-        aria-label="Open QSR Copilot prototype"
-        title="QSR Copilot"
-        className="fixed bottom-3 left-14 z-50 w-9 h-9 inline-flex items-center justify-center rounded-full"
-        style={{
-          background: 'rgba(42,30,30,0.42)',
-          border: '1px solid rgba(255,255,255,0.12)',
-          color: 'rgba(255,248,234,0.78)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-        }}
-      >
-        <Smartphone size={16} />
-      </motion.a>
+          <motion.a
+            whileTap={{ scale: 0.9 }}
+            href="/qsr"
+            aria-label="Open QSR Copilot prototype"
+            title="QSR Copilot"
+            className="fixed bottom-3 left-14 z-50 w-9 h-9 inline-flex items-center justify-center rounded-full"
+            style={{ background: 'rgba(42,30,30,0.42)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,248,234,0.78)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
+          >
+            <Smartphone size={16} />
+          </motion.a>
+        </>
+      )}
     </div>
+  )
+
+  // The root storefront wraps the tree with backend-sourced menu data; the demo
+  // route renders against the bundled static menu (provider falls back to it).
+  return menuCategories ? <MenuDataProvider categories={menuCategories}>{body}</MenuDataProvider> : body
+}
+
+function AppInner() {
+  const { theme } = useTheme()
+  const [appMode, setAppMode] = useState<'guest' | 'staff'>(() =>
+    typeof window !== 'undefined' && window.location.hash === '#staff' ? 'staff' : 'guest',
+  )
+
+  const enterStaff = () => {
+    setAppMode('staff')
+    if (typeof window !== 'undefined') window.location.hash = 'staff'
+  }
+  const exitStaff = () => {
+    setAppMode('guest')
+    if (typeof window !== 'undefined') {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }
+
+  if (QSR_MODE) {
+    return (
+      <ThemeProvider forced="table-theory">
+        <div className="app-shell" data-ui-theme="table-theory">
+          <Suspense fallback={null}>
+            <QsrApp />
+          </Suspense>
+        </div>
+      </ThemeProvider>
+    )
+  }
+
+  if (KIOSK_MODE) {
+    return (
+      <div className="app-shell" data-ui-theme={theme}>
+        <Suspense fallback={null}>
+          <Kiosk />
+        </Suspense>
+      </div>
+    )
+  }
+
+  // `#staff` is reachable from any URL; the console is always login-gated.
+  if (appMode === 'staff') {
+    return (
+      <div className="app-shell console-shell" data-ui-theme={theme}>
+        <Suspense fallback={null}>
+          <ConsoleApp onExit={exitStaff} />
+        </Suspense>
+      </div>
+    )
+  }
+
+  return (
+    <GuestExperience
+      demo={DEMO_MODE}
+      restaurantId={DEMO_MODE ? null : resolveRestaurantId()}
+      onEnterStaff={enterStaff}
+    />
   )
 }
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <ComponentStyleProvider>
-          <MediaModeProvider>
-          <LanguageProvider>
-            <AuthProvider>
-                <OpsProvider>
-                  <AppInner />
-                </OpsProvider>
-              </AuthProvider>
-            </LanguageProvider>
-          </MediaModeProvider>
-        </ComponentStyleProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <BrandProvider>
+            <ComponentStyleProvider>
+              <MediaModeProvider>
+                <LanguageProvider>
+                  <AuthProvider>
+                    <AppearanceLoader />
+                    <OpsProvider>
+                      <AppInner />
+                    </OpsProvider>
+                  </AuthProvider>
+                </LanguageProvider>
+              </MediaModeProvider>
+            </ComponentStyleProvider>
+          </BrandProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   )
 }

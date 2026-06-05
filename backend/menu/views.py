@@ -123,6 +123,10 @@ class MenuItemViewSet(TenantScopedMenuViewSet):
         if client_version is not None and client_version != instance.version:
             raise StaleVersionError()
 
+        # Snapshot price/tax before the write so we can audit a change.
+        old_price = instance.price_minor
+        old_tax = instance.tax_rate_pct
+
         serializer = self.get_serializer(
             instance, data=request.data, partial=partial
         )
@@ -130,11 +134,34 @@ class MenuItemViewSet(TenantScopedMenuViewSet):
         # ``version`` is read-only on the serializer, so bump it explicitly.
         serializer.save(version=instance.version + 1)
         self._bust_public_cache()
+        self._audit_price_change(request, instance, old_price, old_tax)
 
         if getattr(instance, "_prefetched_objects_cache", None):
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
+
+    @staticmethod
+    def _audit_price_change(request, instance, old_price, old_tax) -> None:
+        """Append a ``price-change`` audit row when price or tax actually changed.
+
+        Imported lazily to avoid a menu→ops→menu import cycle at load time.
+        """
+        instance.refresh_from_db(fields=["price_minor", "tax_rate_pct"])
+        if instance.price_minor == old_price and instance.tax_rate_pct == old_tax:
+            return
+        from ops.services import record_price_change
+
+        record_price_change(
+            restaurant_id=instance.restaurant_id,
+            menu_item_id=instance.id,
+            before={"price_minor": old_price, "tax_rate_pct": old_tax},
+            after={
+                "price_minor": instance.price_minor,
+                "tax_rate_pct": instance.tax_rate_pct,
+            },
+            actor_membership_id=getattr(request, "membership_id", None),
+        )
 
 
 class ModifierGroupViewSet(TenantScopedMenuViewSet):

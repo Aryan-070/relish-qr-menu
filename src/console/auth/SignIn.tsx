@@ -5,27 +5,23 @@ import { panelStyle } from '../lib/skin'
 import { Button } from '../components/Button'
 import { useAuth } from './AuthContext'
 
-/** Console sign-in / sign-up. Only rendered in Supabase mode without a session. */
+/** Console sign-in. Accounts are provisioned by an admin/manager — there is no
+ *  self-registration. Login accepts a username or recovery email. */
 export function SignIn() {
   const { tokens: t } = useTheme()
   const auth = useAuth()
-  const [mode, setMode] = useState<'in' | 'up'>('in')
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    setNotice(null)
-    const fn = mode === 'in' ? auth.signIn : auth.signUp
-    const { error } = await fn(email.trim(), password)
+    const { error } = await auth.signIn(identifier.trim(), password)
     setBusy(false)
     if (error) setError(error)
-    else if (mode === 'up') setNotice('Account created. Check your email to confirm, then sign in.')
   }
 
   const inputStyle = {
@@ -52,21 +48,27 @@ export function SignIn() {
             Relish Console
           </h1>
           <p className="text-[13px] mt-1" style={{ color: t.descColor, fontFamily: t.descFont }}>
-            {mode === 'in' ? 'Sign in to manage your restaurant.' : 'Create your console account.'}
+            Sign in to manage your restaurant.
           </p>
         </div>
 
         <label className="flex flex-col gap-1 text-[12px]" style={{ color: t.descColor, fontFamily: t.descFont }}>
-          Email
-          <input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+          Username or email
+          <input
+            type="text"
+            required
+            autoComplete="username"
+            value={identifier}
+            onChange={e => setIdentifier(e.target.value)}
+            style={inputStyle}
+          />
         </label>
         <label className="flex flex-col gap-1 text-[12px]" style={{ color: t.descColor, fontFamily: t.descFont }}>
           Password
           <input
             type="password"
             required
-            minLength={6}
-            autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+            autoComplete="current-password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             style={inputStyle}
@@ -74,24 +76,14 @@ export function SignIn() {
         </label>
 
         {error && <p className="text-[12px]" style={{ color: '#b3141b', fontFamily: t.descFont }}>{error}</p>}
-        {notice && <p className="text-[12px]" style={{ color: '#3d6130', fontFamily: t.descFont }}>{notice}</p>}
 
         <Button type="submit" fullWidth disabled={busy}>
-          {busy ? 'Please wait…' : mode === 'in' ? 'Sign in' : 'Create account'}
+          {busy ? 'Please wait…' : 'Sign in'}
         </Button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === 'in' ? 'up' : 'in')
-            setError(null)
-            setNotice(null)
-          }}
-          className="text-[12px] underline self-center cursor-pointer"
-          style={{ color: t.accent, fontFamily: t.descFont }}
-        >
-          {mode === 'in' ? 'Need an account? Sign up' : 'Have an account? Sign in'}
-        </button>
+        <p className="text-[11px] self-center text-center" style={{ color: t.descColor, fontFamily: t.descFont }}>
+          No account? Ask your manager or admin to create one.
+        </p>
       </motion.form>
     </div>
   )

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { categories, type MenuItem } from '../data/menu'
+import { type MenuItem } from '../data/menu'
+import { useMenuData } from '../data/MenuDataContext'
 import { TopBar } from '../components/molecules/TopBar'
 import { CategoryNav } from '../components/molecules/CategoryNav'
 import { BottomNav } from '../components/molecules/BottomNav'
@@ -23,9 +24,18 @@ export function MenuBooklet({
   onRecommend,
   onViewOrder,
 }: MenuBookletProps) {
-  const [activeCatId, setActiveCatId] = useState(categories[0].id)
+  const { categories } = useMenuData()
+  const [activeCatId, setActiveCatId] = useState(() => categories[0]?.id ?? '')
   const [direction, setDirection] = useState<'left' | 'right'>('left')
   const [searchOpen, setSearchOpen] = useState(false)
+
+  // Adopt the first category once data arrives (or if the active id falls away
+  // after a menu refresh from the backend).
+  useEffect(() => {
+    if (categories.length > 0 && !categories.some(c => c.id === activeCatId)) {
+      setActiveCatId(categories[0].id)
+    }
+  }, [categories, activeCatId])
 
   const handleSearchItemTap = (item: MenuItem) => {
     setSearchOpen(false)
@@ -41,6 +51,8 @@ export function MenuBooklet({
 
   const activeCategory = categories.find(c => c.id === activeCatId) ?? categories[0]
   const variants = direction === 'left' ? slideLeft : slideRight
+
+  if (!activeCategory) return null
 
   return (
     <div

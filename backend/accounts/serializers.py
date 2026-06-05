@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import validate_password
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -39,39 +38,12 @@ def _primary_outlet(membership):
     )
 
 
-class SignupSerializer(serializers.ModelSerializer):
-    """Register a new account with email + password.
-
-    Password is write-only and run through Django's configured password
-    validators. The user is created through the manager so the password is
-    hashed and the email normalized.
-    """
-
-    password = serializers.CharField(
-        write_only=True,
-        required=True,
-        style={"input_type": "password"},
-        validators=[validate_password],
-    )
-
-    class Meta:
-        model = User
-        fields = ["id", "email", "password"]
-        read_only_fields = ["id"]
-
-    def create(self, validated_data):
-        return User.objects.create_user(
-            email=validated_data["email"],
-            password=validated_data["password"],
-        )
-
-
 class UserSerializer(serializers.ModelSerializer):
     """Read-only-ish representation of the authenticated user."""
 
     class Meta:
         model = User
-        fields = ["id", "email", "date_joined", "is_staff"]
+        fields = ["id", "username", "email", "date_joined", "is_staff"]
         read_only_fields = fields
 
 

@@ -29,6 +29,11 @@ import { Inventory } from './views/Inventory'
 import { Promotions } from './views/Promotions'
 import { CashLossView } from './views/CashLossView'
 import { StaffAdmin } from './views/StaffAdmin'
+import { StaffManagement } from './views/StaffManagement'
+import { PasswordApprovals } from './views/PasswordApprovals'
+import { PasswordChangeRequestView } from './views/PasswordChangeRequestView'
+import { AppearanceSettings } from './views/AppearanceSettings'
+import { LiveTables } from './views/LiveTables'
 import { Roster } from './views/Roster'
 import { GroupDashboard } from './views/GroupDashboard'
 import { useAuth } from './auth/AuthContext'
@@ -79,6 +84,16 @@ function renderView(view: ConsoleView) {
       return <CashLossView />
     case 'staff-admin':
       return <StaffAdmin />
+    case 'staff-management':
+      return <StaffManagement />
+    case 'password-approvals':
+      return <PasswordApprovals />
+    case 'password-request':
+      return <PasswordChangeRequestView />
+    case 'appearance':
+      return <AppearanceSettings />
+    case 'live-tables':
+      return <LiveTables />
     case 'roster':
       return <Roster />
     case 'group':
@@ -106,9 +121,10 @@ export function ConsoleApp({ onExit }: ConsoleAppProps) {
 
 function ConsoleBody({ onExit }: ConsoleAppProps) {
   const auth = useAuth()
-  // Demo mode defaults to admin and uses the manual switcher. In supabase mode the
-  // role follows the signed-in user's app_users.role (see the effect below).
-  const initialRole: Role = auth.mode === 'supabase' && auth.appRole ? auth.appRole : 'admin'
+  // The active console role follows the signed-in user's membership role. It
+  // starts at the least-privileged default and is adopted once `/auth/me/`
+  // resolves (see the effect below).
+  const initialRole: Role = auth.appRole ?? 'waiter'
   const [role, setRole] = useState<Role>(initialRole)
   const [activeView, setActiveView] = useState<ConsoleView>(defaultViewFor(initialRole))
   const [dateRange, setDateRange] = useState<DateRange>(DATE_RANGES[0])
@@ -121,23 +137,22 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
     setActiveView(defaultViewFor(r))
   }, [])
 
-  // Supabase mode only: when the user's app_users.role resolves (or changes),
-  // adopt it as the active console role and reset to that role's default view.
-  // Guarded so it never interferes with the demo-mode manual switcher.
+  // When the signed-in user's role resolves (or changes), adopt it as the active
+  // console role and reset to that role's default view.
   useEffect(() => {
-    if (auth.mode !== 'supabase' || !auth.appRole) return
+    if (!auth.appRole) return
     if (auth.appRole === role) return
     handleRole(auth.appRole)
-  }, [auth.mode, auth.appRole, role, handleRole])
+  }, [auth.appRole, role, handleRole])
 
   const focusBilling = useCallback((tableId: string) => {
     setBillingFocusTableId(tableId)
     setActiveView('waiter-billing')
   }, [])
 
-  // Leaving the console signs out too when real auth is on.
+  // Leaving the console always signs out.
   const handleExit = useCallback(() => {
-    if (auth.mode === 'supabase') void auth.signOut()
+    auth.signOut()
     onExit()
   }, [auth, onExit])
 
@@ -146,17 +161,15 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
     [role, dateRange, billingFocusTableId, navigate, focusBilling],
   )
 
-  // Auth gate (Supabase mode only). Demo mode falls straight through.
-  if (auth.mode === 'supabase') {
-    if (auth.status === 'loading') {
-      return (
-        <div className="min-h-screen grid place-items-center" style={{ background: '#FBF7F0', color: '#6E1F2C' }}>
-          <span style={{ fontFamily: 'Playfair Display, serif', fontSize: 20 }}>Relish…</span>
-        </div>
-      )
-    }
-    if (!auth.user) return <SignIn />
+  // The console is always login-gated.
+  if (auth.status === 'loading') {
+    return (
+      <div className="min-h-screen grid place-items-center" style={{ background: '#FBF7F0', color: '#6E1F2C' }}>
+        <span style={{ fontFamily: 'Playfair Display, serif', fontSize: 20 }}>Relish…</span>
+      </div>
+    )
   }
+  if (!auth.isAuthed) return <SignIn />
 
   return (
     <ToastProvider>
@@ -164,7 +177,7 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
         <ConsoleShell
           role={role}
           onRole={handleRole}
-          showRoleSwitcher={auth.mode === 'demo'}
+          showRoleSwitcher={false}
           activeView={activeView}
           onNavigate={navigate}
           dateRange={dateRange}
@@ -180,7 +193,7 @@ function ConsoleBody({ onExit }: ConsoleAppProps) {
         </ConsoleShell>
         <CommandPalette
           onExit={handleExit}
-          showRoleSwitcher={auth.mode === 'demo'}
+          showRoleSwitcher={false}
           onRole={handleRole}
           onDateRange={(days) => setDateRange(DATE_RANGES.find(r => r.days === days)!)}
         />

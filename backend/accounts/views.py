@@ -1,8 +1,8 @@
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers
-from rest_framework.generics import CreateAPIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -10,22 +10,21 @@ from accounts.constants import MEMBERSHIP_ACTIVE
 from accounts.serializers import (
     MembershipSummarySerializer,
     RelishTokenObtainPairSerializer,
-    SignupSerializer,
 )
 from common.context import get_current_org_id
 
 
-class SignupView(CreateAPIView):
-    """Public endpoint to register a new account."""
-
-    permission_classes = [AllowAny]
-    serializer_class = SignupSerializer
-
-
 class RelishTokenObtainPairView(TokenObtainPairView):
-    """Obtain an access/refresh pair with Relish tenancy claims attached."""
+    """Obtain an access/refresh pair with Relish tenancy claims attached.
+
+    Accepts a ``username`` or recovery email as the login identifier (resolved by
+    ``accounts.auth_backends.UsernameOrEmailBackend``). Self-registration is
+    intentionally not offered -- accounts are created by an admin/manager.
+    """
 
     serializer_class = RelishTokenObtainPairSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
 
 class MeView(APIView):
@@ -44,7 +43,8 @@ class MeView(APIView):
                 name="MeResponse",
                 fields={
                     "id": serializers.CharField(),
-                    "email": serializers.EmailField(),
+                    "username": serializers.CharField(),
+                    "email": serializers.EmailField(allow_null=True),
                     "memberships": MembershipSummarySerializer(many=True),
                     "active": MembershipSummarySerializer(allow_null=True),
                 },
@@ -73,6 +73,7 @@ class MeView(APIView):
         return Response(
             {
                 "id": str(user.id),
+                "username": user.username,
                 "email": user.email,
                 "memberships": MembershipSummarySerializer(
                     memberships, many=True

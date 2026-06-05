@@ -23,9 +23,13 @@ ORDER_CONFIRMATION_MODE_CHOICES = (
     ("leader", "Leader"),                # only the waiter-anointed leader orders
     ("waiter_confirm", "Waiter confirm"),  # anyone carts; waiter fires a batch
 )
-#: Robust default — bill integrity without putting the waiter on the critical
-#: path of every order (LLM-council recommendation).
-DEFAULT_ORDER_CONFIRMATION_MODE = "waiter_confirm"
+#: Default policy: leader-only — the waiter anoints a host who places the table's
+#: orders; everyone else browses (tightest control against accidental/abusive
+#: ordering). Operators can relax a session to ``waiter_confirm``/``auto_fire``.
+DEFAULT_ORDER_CONFIRMATION_MODE = "leader"
+
+# Guest service requests reuse the shared ``ops.ServiceRequest`` model + its
+# ``ops.models.REQUEST_TYPE_CHOICES`` — no dining-specific choice set.
 
 # ── Device role within a session ─────────────────────────────────────────────
 DEVICE_ROLE_CHOICES = (

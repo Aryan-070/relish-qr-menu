@@ -5,14 +5,24 @@
  * ``code`` (which equals the static qsrMenu item id).
  */
 import { apiFetch } from './client'
+import type { ThemeConfig } from './themeConfig'
 
 export interface PublicMenuItem {
   id: string
   code: string
   name: string
   price_minor: number
+  description?: string
+  tags?: string[]
+  badges?: string[]
+  is_jain?: boolean
+  can_be_jain?: boolean
+  chefs_special?: boolean
+  spice_level?: number
   available: boolean
   sold_out: boolean
+  image_url?: string
+  video_url?: string
 }
 
 export interface PublicMenuCategory {
@@ -26,6 +36,8 @@ export interface PublicMenuCategory {
 export interface PublicMenuResponse {
   available: boolean
   restaurant?: { id: string; name: string }
+  /** Published theme/branding config for the storefront (landing, colors, logo). */
+  theme?: ThemeConfig
   categories?: PublicMenuCategory[]
 }
 

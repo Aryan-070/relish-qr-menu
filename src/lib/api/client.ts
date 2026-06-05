@@ -66,7 +66,7 @@ export function setStaffToken(token: string | null): void {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   /** JSON body — serialised automatically. */
   body?: unknown
   /** Guest device token → sent as `X-Device-Token`. */
