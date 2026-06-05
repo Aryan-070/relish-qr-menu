@@ -420,6 +420,47 @@ def test_contact_capture_links_existing_orders_to_customer() -> None:
     assert order.customer_id is not None  # backfilled to the enrolled customer
 
 
+def test_contact_capture_stores_birthday_and_flips_has_contact() -> None:
+    from crm.models import Customer
+
+    _org, restaurant = _make_tenant("bday", "BD1")
+    table = _make_table(restaurant)
+    joined = _join(restaurant, table)
+    guest = APIClient()
+    url = f"/api/dining/sessions/{joined['session_id']}/"
+
+    before = guest.get(url, HTTP_X_DEVICE_TOKEN=joined["device_token"])
+    assert before.data["me"]["has_contact"] is False
+
+    resp = guest.post(
+        f"/api/dining/sessions/{joined['session_id']}/contact/",
+        {"phone": "+919800000001", "name": "Riya", "birth_day": 29, "birth_month": 2},
+        format="json",
+        HTTP_X_DEVICE_TOKEN=joined["device_token"],
+    )
+    assert resp.status_code == 200, resp.content
+
+    customer = Customer.objects.get(phone="+919800000001")
+    assert customer.birth_date is not None
+    assert (customer.birth_date.month, customer.birth_date.day) == (2, 29)  # leap-safe
+
+    after = guest.get(url, HTTP_X_DEVICE_TOKEN=joined["device_token"])
+    assert after.data["me"]["has_contact"] is True
+
+
+def test_contact_capture_rejects_impossible_birthday() -> None:
+    _org, restaurant = _make_tenant("bday2", "BD2")
+    table = _make_table(restaurant)
+    joined = _join(restaurant, table)
+    resp = APIClient().post(
+        f"/api/dining/sessions/{joined['session_id']}/contact/",
+        {"phone": "+919800000002", "birth_day": 31, "birth_month": 2},
+        format="json",
+        HTTP_X_DEVICE_TOKEN=joined["device_token"],
+    )
+    assert resp.status_code == 400
+
+
 # ── idempotency ───────────────────────────────────────────────────────────────
 def test_idempotent_submit_yields_one_order() -> None:
     _org, restaurant = _make_tenant("h", "H1")

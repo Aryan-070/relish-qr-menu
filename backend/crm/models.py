@@ -41,6 +41,9 @@ class Customer(TimeStampedModel):
     org_id = models.UUIDField(db_index=True)
     name = models.CharField(max_length=200, blank=True)
     phone = models.CharField(max_length=20)
+    #: Birthday for campaigns. Day+month only — stored with a fixed sentinel
+    #: year (2000, leap-safe); query by month/day and ignore the year.
+    birth_date = models.DateField(null=True, blank=True)
     tier = models.CharField(max_length=10, choices=TIER_CHOICES, default="Bronze")
     points = models.IntegerField(default=0)  # cached balance (truth = ledger)
     visits = models.IntegerField(default=0)

@@ -6,6 +6,7 @@ import { LandingSignatureDish } from './screens/LandingSignatureDish'
 import { ItemDetail } from './screens/ItemDetail'
 import { AddToOrder } from './screens/AddToOrder'
 import { ServicePanel } from './screens/ServicePanel'
+import { SaveDetailsSheet } from './screens/service/SaveDetailsSheet'
 import { OrderPanel } from './screens/OrderPanel'
 import { Checkout } from './screens/Checkout'
 import { useOrder } from './hooks/useOrder'
@@ -117,6 +118,7 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
       ? 'session'
       : 'browse'
   const [orderError, setOrderError] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   const [screen, setScreen] = useState<Screen>('cover')
   const [landingVariant, setLandingVariant] = useState<LandingVariant>(DEFAULT_LANDING_VARIANT)
@@ -207,6 +209,11 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
     // server enforces the table's ordering policy (leader-only by default) and
     // recomputes all money; on success we clear only the now-submitted cart.
     if (orderingMode === 'session') {
+      // Required: the host must save name + mobile before the table can order.
+      if (!dining.hasContact) {
+        setDetailsOpen(true)
+        return
+      }
       const lines: OrderLineInput[] = orderItems.map(o => ({
         menu_item_id: o.item.id,
         qty: o.quantity,
@@ -375,6 +382,9 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
         canPlaceOrder={canPlaceOrder}
         gateMessage={orderGateMessage}
         errorMessage={orderError}
+        sessionActive={orderingMode === 'session'}
+        savedDetails={dining.hasContact}
+        onSaveDetails={() => setDetailsOpen(true)}
         onClose={() => setOrderOpen(false)}
         onRemove={removeItem}
         onUpdateQty={updateQuantity}
@@ -405,6 +415,20 @@ function GuestExperience({ demo, restaurantId, onEnterStaff }: GuestExperiencePr
         activeCustomerId={activeCustomerId}
         onLinkCustomer={setActiveCustomerId}
       />
+
+      {/* Save-your-details sheet (real storefront only) — required for the host
+          before ordering, optional + open to any guest for rewards/birthday. */}
+      {orderingMode === 'session' && (
+        <SaveDetailsSheet
+          open={detailsOpen}
+          required={dining.canOrder && !dining.hasContact}
+          onClose={() => setDetailsOpen(false)}
+          onSubmit={async ({ phone, name, birthday }) => {
+            await dining.captureContact(phone, name, birthday ?? undefined)
+            setDetailsOpen(false)
+          }}
+        />
+      )}
 
       {(screen === 'menu' || screen === 'recommend') && (count > 0 || islandFlash) && (
         <DynamicOrderIsland mode={(islandFlash ?? 'cart') as IslandMode} count={count} total={total} onView={() => setOrderOpen(true)} />

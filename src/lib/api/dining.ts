@@ -60,7 +60,7 @@ export interface DiningSessionView {
   check: CheckView | null
   orders: SessionOrder[]
   /** The requesting device's own view of itself (null for staff / no token). */
-  me: { id: string; role: DeviceRole; is_payer: boolean } | null
+  me: { id: string; role: DeviceRole; is_payer: boolean; has_contact: boolean } | null
   /** Server-authoritative "may this device order?" — the UI mirrors this. */
   can_order: boolean
 }
@@ -123,10 +123,11 @@ export function submitSessionOrder(
   })
 }
 
-/** Capture contact details → resolve-or-create a CRM customer for the device. */
+/** Capture contact details → resolve-or-create a CRM customer for the device.
+ *  Birthday is day+month only (optional), for marketing automations. */
 export function submitContact(
   sessionId: string,
-  input: { phone: string; name?: string; device_token?: string },
+  input: { phone: string; name?: string; birth_day?: number | null; birth_month?: number | null; device_token?: string },
   deviceToken: string | null,
 ): Promise<DiningSessionView> {
   return apiFetch<DiningSessionView>(`/dining/sessions/${sessionId}/contact/`, {

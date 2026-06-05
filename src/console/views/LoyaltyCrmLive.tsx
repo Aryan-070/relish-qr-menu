@@ -300,6 +300,12 @@ function CustomerRow({ customer, onAdjust, onRedeem }: CustomerRowProps) {
 
           <div className="flex items-center gap-2 mt-1 text-[12px]" style={{ color: t.descColor, fontFamily: t.descFont }}>
             <span className="tabular-nums">{customer.phone}</span>
+            {customer.birthday && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="tabular-nums" title="Birthday (DD/MM)">🎂 {customer.birthday}</span>
+              </>
+            )}
             <span aria-hidden>·</span>
             <span className="tabular-nums">{customer.visits} visits</span>
             <span aria-hidden>·</span>

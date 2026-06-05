@@ -264,13 +264,21 @@ def confirm_orders(*, session: DiningSession, order_ids: Iterable[Any]) -> list[
 # ── Contact capture / bill / close ────────────────────────────────────────────
 @transaction.atomic
 def attach_customer(
-    *, session: DiningSession, device: GuestDevice, org_id: Any, phone: str, name: str = ""
+    *,
+    session: DiningSession,
+    device: GuestDevice,
+    org_id: Any,
+    phone: str,
+    name: str = "",
+    birth_date: Any = None,
 ) -> GuestDevice:
     """Resolve-or-create a CRM customer and link it to device + check liability."""
     # Imported lazily so the dining app has no hard import-time dep on crm.
     from crm.loyalty_services import enroll_customer
 
-    customer, _created = enroll_customer(org_id=str(org_id), phone=phone, name=name)
+    customer, _created = enroll_customer(
+        org_id=str(org_id), phone=phone, name=name, birth_date=birth_date
+    )
     device.customer = customer
     device.is_payer = True
     device.save(update_fields=["customer", "is_payer", "updated_at"])

@@ -59,6 +59,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
             org_id=get_current_org_id(),
             phone=serializer.validated_data["phone"],
             name=serializer.validated_data.get("name", ""),
+            birth_date=serializer.validated_data.get("birth_date"),
         )
         code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return Response(CustomerSerializer(customer).data, status=code)

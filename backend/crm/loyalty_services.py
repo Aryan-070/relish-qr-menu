@@ -7,6 +7,8 @@ and the cached balance can never drift apart on failure.
 """
 from __future__ import annotations
 
+from datetime import date
+
 from django.db import transaction
 from django.db.models import Sum
 
@@ -14,6 +16,20 @@ from crm.models import Customer, LoyaltyLedger
 
 #: Points awarded once, the first time a phone is enrolled.
 WELCOME_BONUS_POINTS = 50
+
+#: Birthdays store day+month only; this leap-safe sentinel year fills the slot.
+BIRTHDAY_SENTINEL_YEAR = 2000
+
+
+def birthday_date(day: int | None, month: int | None) -> date | None:
+    """Build a sentinel-year :class:`date` from a day+month, or ``None``.
+
+    Returns ``None`` if either part is missing; raises ``ValueError`` on an
+    impossible day/month combination (the serializer surfaces it as a 400).
+    """
+    if not day or not month:
+        return None
+    return date(BIRTHDAY_SENTINEL_YEAR, month, day)
 
 #: Tier thresholds (inclusive lower bounds), highest first.
 _TIER_THRESHOLDS: tuple[tuple[int, str], ...] = (
@@ -106,17 +122,30 @@ def enroll_customer(
     org_id: str,
     phone: str,
     name: str = "",
+    birth_date: date | None = None,
 ) -> tuple[Customer, bool]:
     """Get-or-create a customer by ``(org_id, phone)``.
 
     Returns ``(customer, created)``. A welcome bonus is granted exactly once,
-    on first enrollment.
+    on first enrollment. ``name`` / ``birth_date`` backfill an existing record
+    when it doesn't have them yet (re-visits enrich the profile).
     """
     customer, created = Customer.objects.get_or_create(
         org_id=org_id,
         phone=phone,
-        defaults={"name": name},
+        defaults={"name": name, "birth_date": birth_date},
     )
     if created:
         earn_points(customer, WELCOME_BONUS_POINTS, reason="adjust")
+    else:
+        fields: list[str] = []
+        if name and not customer.name:
+            customer.name = name
+            fields.append("name")
+        if birth_date and customer.birth_date is None:
+            customer.birth_date = birth_date
+            fields.append("birth_date")
+        if fields:
+            fields.append("updated_at")
+            customer.save(update_fields=fields)
     return customer, created

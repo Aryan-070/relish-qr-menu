@@ -20,6 +20,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "phone",
+            "birth_date",
             "tier",
             "points",
             "visits",
@@ -32,10 +33,25 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class EnrollCustomerSerializer(serializers.Serializer):
-    """Validate an enroll request: phone is required, name optional."""
+    """Validate an enroll request: phone required; name + birthday optional.
+
+    Birthday is day+month only; ``validate`` folds them into a ``birth_date``
+    (sentinel-year date) for the service layer.
+    """
 
     phone = serializers.CharField(max_length=20)
     name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    birth_day = serializers.IntegerField(min_value=1, max_value=31, required=False, allow_null=True)
+    birth_month = serializers.IntegerField(min_value=1, max_value=12, required=False, allow_null=True)
+
+    def validate(self, attrs):
+        from crm.loyalty_services import birthday_date
+
+        try:
+            attrs["birth_date"] = birthday_date(attrs.get("birth_day"), attrs.get("birth_month"))
+        except ValueError as exc:
+            raise serializers.ValidationError({"birth_day": "Invalid birthday."}) from exc
+        return attrs
 
 
 class PointsSerializer(serializers.Serializer):

@@ -257,6 +257,7 @@ class SessionContactView(APIView):
             org_id=org_id,
             phone=s.validated_data["phone"],
             name=s.validated_data.get("name", ""),
+            birth_date=s.validated_data.get("birth_date"),
         )
         return _session_response(session, device)
 

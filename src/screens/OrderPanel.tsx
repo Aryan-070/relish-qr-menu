@@ -29,6 +29,12 @@ interface OrderPanelProps {
   onPlaceOrder?: () => void | Promise<void>
   /** Open the pay-at-table checkout for the current bill. */
   onCheckout?: () => void
+  /** Real dining session active — show the save-your-details affordance. */
+  sessionActive?: boolean
+  /** Whether this device already saved contact details. */
+  savedDetails?: boolean
+  /** Open the save-your-details sheet. */
+  onSaveDetails?: () => void
 }
 
 export function OrderPanel({
@@ -45,6 +51,9 @@ export function OrderPanel({
   onUpdateNote,
   onPlaceOrder,
   onCheckout,
+  sessionActive = false,
+  savedDetails = false,
+  onSaveDetails,
 }: OrderPanelProps) {
   const [noteOpen, setNoteOpen] = useState<string | null>(null)
   const [orderSent, setOrderSent] = useState(false)
@@ -127,6 +136,23 @@ export function OrderPanel({
 
             {/* Items list */}
             <div className="flex-1 overflow-y-auto px-5 py-3">
+              {/* Save-your-details (rewards + birthday) — any guest can use it. */}
+              {sessionActive && onSaveDetails && (
+                <button
+                  type="button"
+                  onClick={onSaveDetails}
+                  className="w-full mb-3 px-3 py-2.5 rounded-xl text-left flex items-center justify-between"
+                  style={{ background: 'rgba(217,160,58,0.12)', border: '1px solid rgba(217,160,58,0.35)' }}
+                >
+                  <span className="font-inter text-[12.5px]" style={{ color: 'var(--ink)' }}>
+                    {savedDetails ? '✓ Your details are saved' : '🎁 Save your details for rewards & birthday treats'}
+                  </span>
+                  {!savedDetails && (
+                    <span className="font-inter text-[11px] font-semibold" style={{ color: 'var(--maroon)' }}>Add</span>
+                  )}
+                </button>
+              )}
+
               {/* Already-ordered (persisted from the dining session) */}
               {placedOrders.length > 0 && (
                 <div className="mb-4">

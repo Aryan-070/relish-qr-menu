@@ -84,12 +84,18 @@ export interface UseSessionResult {
   deviceToken: string | null
   role: DeviceRole | null
   canOrder: boolean
+  /** Has this device saved contact details (a linked CRM customer)? */
+  hasContact: boolean
   isLeader: boolean
   status: DiningSessionView['status'] | null
   refetch: () => void
   // Guest actions
   submitOrder: (lines: OrderLineInput[], idempotencyKey?: string) => Promise<void>
-  captureContact: (phone: string, name?: string) => Promise<void>
+  captureContact: (
+    phone: string,
+    name?: string,
+    birthday?: { day: number | null; month: number | null },
+  ) => Promise<void>
   requestService: (kind: ServiceRequestKind, note?: string) => Promise<void>
   askForBill: () => Promise<void>
   /** Create a Razorpay order for the bill — hand the result to checkout. */
@@ -210,9 +216,17 @@ export function useSession(params?: { restaurantId: string; tableId: string } | 
   )
 
   const captureContact = useCallback(
-    async (phone: string, name?: string) => {
+    async (
+      phone: string,
+      name?: string,
+      birthday?: { day: number | null; month: number | null },
+    ) => {
       if (!stored) throw new Error('No active session.')
-      await submitContact(stored.sessionId, { phone, name }, stored.deviceToken)
+      await submitContact(
+        stored.sessionId,
+        { phone, name, birth_day: birthday?.day ?? null, birth_month: birthday?.month ?? null },
+        stored.deviceToken,
+      )
       refetch()
     },
     [stored, refetch],
@@ -271,6 +285,7 @@ export function useSession(params?: { restaurantId: string; tableId: string } | 
     deviceToken,
     role: session?.me?.role ?? null,
     canOrder: session?.can_order ?? false,
+    hasContact: session?.me?.has_contact ?? false,
     isLeader: session?.me?.role === 'leader',
     status: session?.status ?? null,
     refetch,
